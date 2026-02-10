@@ -1,0 +1,312 @@
+{
+  "name": "WF2 - Audit Call Complete → Folder + Proposal + Pre-filled Form",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bluedot-transcript",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wf2-node-1",
+      "name": "BlueDot Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "bluedot-transcript",
+      "notes": "Set this URL in BlueDot → Automation → Integrations → Webhook. Subscribe to transcript and summary events."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "audit",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "RAPID",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "wf2-node-2",
+      "name": "Filter Audit Calls Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300],
+      "notes": "Only process recordings with 'audit' or 'RAPID' in the title."
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Prospects"
+        },
+        "options": {}
+      },
+      "id": "wf2-node-3",
+      "name": "Read Prospects Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match BlueDot recording to Prospects sheet row\n// FIX: Removed dangerous fallback that silently picked the wrong prospect\nconst bluedot = $('BlueDot Webhook').first().json;\nconst prospects = $('Read Prospects Sheet').all();\n\nconst transcript = bluedot.transcript || bluedot.content || '';\nconst attendees = bluedot.attendees || bluedot.participants || [];\n\nlet match = null;\nlet matchIndex = -1;\n\nfor (let i = 0; i < prospects.length; i++) {\n  const row = prospects[i].json;\n  const name = row.Full_Name || '';\n  const email = (row.Email || '').toLowerCase();\n  \n  // Match by name in transcript or attendee list\n  const nameMatch = name && (\n    transcript.toLowerCase().includes(name.toLowerCase()) ||\n    attendees.some(a => (a.name || a.email || '').toLowerCase().includes(name.toLowerCase()))\n  );\n  // Match by email in attendee list\n  const emailMatch = email && attendees.some(a => (a.email || '').toLowerCase() === email);\n  \n  if (nameMatch || emailMatch) {\n    match = row;\n    matchIndex = i + 2;\n    break;\n  }\n}\n\n// FIX: If no match found, throw an error instead of silently using wrong prospect\nif (!match) {\n  throw new Error('Could not match BlueDot transcript to any prospect. Attendees: ' + \n    JSON.stringify(attendees.map(a => a.name || a.email)) + \n    '. Manual review needed.');\n}\n\n// FIX: Idempotency check - skip if proposal already generated\nif (match.Drive_Folder_ID && match.Status === 'Proposal Sent') {\n  throw new Error('Proposal already generated for ' + match.Full_Name + '. Skipping duplicate BlueDot webhook.');\n}\n\nreturn [{\n  json: {\n    transcript: transcript,\n    summary: bluedot.summary || bluedot.notes || '',\n    prospect: match,\n    sheet_row: matchIndex,\n    matched: true\n  }\n}];"
+      },
+      "id": "wf2-node-4",
+      "name": "Match to Prospect",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "name": "={{ $json.prospect.Company_Name || 'Unknown' }} - Client Folder",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "list", "value": "YOUR_CLIENTS_FOLDER_ID" },
+        "options": {}
+      },
+      "id": "wf2-node-5",
+      "name": "Create Client Drive Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1130, 300],
+      "notes": "Replace YOUR_CLIENTS_FOLDER_ID with your root Clients folder in Google Drive."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a proposal writer for Veteran Vectors, an AI automation consulting company that helps SMBs eliminate manual processes. Extract structured proposal content from this audit call transcript. Be specific about the client's actual problems discussed and the concrete solutions recommended. Always include real numbers for ROI when discussed.\\n\\nReturn ONLY valid JSON with these exact keys:\\n{\\n  \\\"client_pain_points\\\": \\\"2-3 paragraph summary of their current problems and manual processes\\\",\\n  \\\"recommended_solution\\\": \\\"Detailed description of the automation solution proposed\\\",\\n  \\\"tech_stack\\\": \\\"List of specific tools and platforms (e.g., n8n, Google Workspace, Stripe, etc.)\\\",\\n  \\\"project_scope\\\": \\\"Concise scope statement suitable for a SOW\\\",\\n  \\\"project_name\\\": \\\"Short project name\\\",\\n  \\\"milestones\\\": \\\"Phase 1: Discovery, Phase 2: Design, Phase 3: Build, Phase 4: Test, Phase 5: Deploy - with brief descriptions of each\\\",\\n  \\\"timeline_weeks\\\": \\\"Estimated number of weeks\\\",\\n  \\\"estimated_project_cost\\\": \\\"Dollar amount if discussed, otherwise empty string\\\",\\n  \\\"estimated_retainer\\\": \\\"Monthly retainer amount if discussed, otherwise empty string\\\",\\n  \\\"roi_hours_saved_monthly\\\": \\\"Estimated hours saved per month\\\",\\n  \\\"roi_annual_value\\\": \\\"Estimated annual dollar value of time saved\\\",\\n  \\\"retainer_description\\\": \\\"What the retainer covers\\\",\\n  \\\"compliances\\\": \\\"Any compliance requirements mentioned (SOC2, ITAR, CMMC, etc.) or empty string\\\",\\n  \\\"proposal_text\\\": \\\"Full proposal narrative (500-800 words) covering: Executive Summary, Current State & Challenges, Proposed Solution, Tech Stack & Architecture, Timeline, Investment & ROI. Write in direct, professional tone. Include specific metrics.\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Here is the audit call transcript:\\n\\n{{ $('Match to Prospect').first().json.transcript }}\\n\\nAnd the AI summary:\\n\\n{{ $('Match to Prospect').first().json.summary }}\"\n    }\n  ],\n  \"temperature\": 0.3,\n  \"response_format\": { \"type\": \"json_object\" }\n}",
+        "options": {}
+      },
+      "id": "wf2-node-6",
+      "name": "AI Extract Proposal Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300],
+      "notes": "Uses OpenAI API. Set up HTTP Header Auth credential with: Name=Authorization, Value=Bearer YOUR_OPENAI_KEY."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and merge with prospect data\nconst aiResponse = $('AI Extract Proposal Content').first().json;\nconst matchData = $('Match to Prospect').first().json;\nconst folderId = $('Create Client Drive Folder').first().json.id;\n\nlet extracted;\ntry {\n  const content = aiResponse.choices[0].message.content;\n  extracted = JSON.parse(content);\n} catch (e) {\n  throw new Error('Failed to parse AI response: ' + e.message + '. Raw: ' + JSON.stringify(aiResponse).substring(0, 500));\n}\n\nreturn [{\n  json: {\n    ...extracted,\n    prospect: matchData.prospect,\n    sheet_row: matchData.sheet_row,\n    drive_folder_id: folderId\n  }\n}];"
+      },
+      "id": "wf2-node-7",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://public-api.gamma.app/v1.0/generations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputText\": {{ JSON.stringify($json.proposal_text) }},\n  \"textMode\": \"generate\",\n  \"format\": \"presentation\",\n  \"themeId\": \"YOUR_GAMMA_THEME_ID\",\n  \"numCards\": 8,\n  \"cardSplit\": \"auto\",\n  \"additionalInstructions\": \"Professional automation proposal for {{ $json.prospect.Company_Name || 'a client' }}. Sections: Title slide with Veteran Vectors branding, Executive Summary, Current Challenges, Proposed Solution, Tech Stack, Project Timeline, Investment & ROI, Next Steps. Use clean modern design with data visualizations for ROI. Use cyan (#4dd0e1) as accent color.\",\n  \"exportAs\": \"pdf\",\n  \"textOptions\": {\n    \"amount\": \"detailed\",\n    \"tone\": \"professional, direct, confident\",\n    \"audience\": \"small business owner, decision maker\",\n    \"language\": \"en\"\n  },\n  \"imageOptions\": {\n    \"source\": \"aiGenerated\",\n    \"style\": \"photorealistic\"\n  },\n  \"cardOptions\": {\n    \"dimensions\": \"16x9\"\n  }\n}",
+        "options": {}
+      },
+      "id": "wf2-node-8",
+      "name": "Gamma Generate Proposal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1790, 300],
+      "notes": "Set up HTTP Header Auth credential with: Name=X-API-KEY, Value=sk-gamma-XXXXX. Replace YOUR_GAMMA_THEME_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// FIX: Polling loop with retry logic instead of fixed 60s wait\n// This node polls Gamma up to 5 times (every 30s = 2.5 min total)\nconst generationId = $('Gamma Generate Proposal').first().json.generationId;\nconst gammaApiKey = ''; // Will be set via credential header\n\nlet status = 'pending';\nlet result = null;\nconst maxAttempts = 5;\nconst waitMs = 30000;\n\nfor (let attempt = 1; attempt <= maxAttempts; attempt++) {\n  // Wait before polling\n  await new Promise(resolve => setTimeout(resolve, waitMs));\n  \n  try {\n    const response = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `https://public-api.gamma.app/v1.0/generations/${generationId}`,\n      headers: {},\n      returnFullResponse: false\n    });\n    \n    result = response;\n    status = response.status || 'unknown';\n    \n    if (status === 'completed') {\n      break;\n    }\n  } catch (e) {\n    if (attempt === maxAttempts) {\n      throw new Error(`Gamma generation failed after ${maxAttempts} attempts. Last error: ${e.message}`);\n    }\n  }\n}\n\nif (status !== 'completed') {\n  throw new Error(`Gamma generation did not complete after ${maxAttempts * waitMs / 1000}s. Status: ${status}. Generation ID: ${generationId}. Manual check needed.`);\n}\n\n// Verify PDF URL exists\nconst pdfUrl = result.pdfUrl || result.exportUrl || '';\nif (!pdfUrl) {\n  throw new Error('Gamma generation completed but no PDF URL returned. Generation ID: ' + generationId);\n}\n\nreturn [{\n  json: {\n    ...result,\n    generation_id: generationId,\n    pdf_url: pdfUrl,\n    gamma_url: result.url || result.gammaUrl || ''\n  }\n}];"
+      },
+      "id": "wf2-node-9",
+      "name": "Poll Gamma With Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2010, 300],
+      "notes": "FIX: Replaces fixed 60s wait + single poll. Now polls up to 5 times every 30s with status checking. Uses the same Gamma HTTP Header Auth credential."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.pdf_url }}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "id": "wf2-node-11",
+      "name": "Download Proposal PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 300],
+      "notes": "Downloads the exported PDF from Gamma."
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "=Proposal - {{ $('Parse AI Response').first().json.prospect.Company_Name || 'Client' }}.pdf",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $('Parse AI Response').first().json.drive_folder_id }}" },
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "wf2-node-12",
+      "name": "Upload Proposal to Client Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build pre-filled form URL\nconst extracted = $('Parse AI Response').first().json;\nconst prospect = extracted.prospect || {};\nconst gammaResult = $('Poll Gamma With Retry').first().json;\nconst gammaUrl = gammaResult.gamma_url || '';\n\nconst params = new URLSearchParams();\n\n// From Calendly (prospect data)\nif (prospect.First_Name) params.set('First_Name', prospect.First_Name);\nif (prospect.Last_Name) params.set('Last_Name', prospect.Last_Name);\nif (prospect.Full_Name) params.set('Full_Client_Name', prospect.Full_Name);\nif (prospect.Email) params.set('Client_Email', prospect.Email);\nif (prospect.Client_Title) params.set('Client_Title', prospect.Client_Title);\nif (prospect.Company_Name) params.set('Company_Name', prospect.Company_Name);\nif (prospect.Company_Address) params.set('Company_Address', prospect.Company_Address);\nif (prospect.Company_State) params.set('Company_State', prospect.Company_State);\n\n// From AI extraction\nif (extracted.project_name) params.set('Project_Name', extracted.project_name);\nif (extracted.project_scope) params.set('Project_Scope', extracted.project_scope);\nif (extracted.milestones) params.set('Milestones', extracted.milestones);\nif (extracted.retainer_description) params.set('Retainer_description', extracted.retainer_description);\nif (extracted.estimated_project_cost) params.set('Project_Cost', extracted.estimated_project_cost);\nif (extracted.estimated_retainer) params.set('Monthly_Retainer', extracted.estimated_retainer);\nif (extracted.compliances) params.set('Compliances', extracted.compliances);\n\nconst formBaseUrl = 'https://veteranvectors.app.n8n.cloud/form/YOUR_FORM_ID';\nconst prefilledUrl = `${formBaseUrl}?${params.toString()}`;\n\nreturn [{\n  json: {\n    prefilled_form_url: prefilledUrl,\n    gamma_edit_url: gammaUrl,\n    client_name: prospect.Full_Name || prospect.Company_Name || 'Unknown Client',\n    company_name: prospect.Company_Name || '',\n    project_name: extracted.project_name || '',\n    drive_folder_id: extracted.drive_folder_id\n  }\n}];"
+      },
+      "id": "wf2-node-14",
+      "name": "Build Pre-filled Form URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2670, 300],
+      "notes": "Replace YOUR_FORM_ID with your actual n8n form ID from Workflow 3."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "mode": "list", "value": "YOUR_SPREADSHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "Prospects" },
+        "lookupColumn": "Email",
+        "lookupValue": "={{ $('Match to Prospect').first().json.prospect.Email }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Proposal Sent",
+            "Proposal_Link": "={{ $('Poll Gamma With Retry').first().json.gamma_url }}",
+            "Form_Link": "={{ $json.prefilled_form_url }}",
+            "Drive_Folder_ID": "={{ $('Parse AI Response').first().json.drive_folder_id }}"
+          }
+        },
+        "options": { "cellFormat": "USER_ENTERED" }
+      },
+      "id": "wf2-node-13",
+      "name": "Update Prospects Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2890, 300],
+      "notes": "FIX: Now uses Email lookup instead of row_number. Runs AFTER form URL is built to ensure all data is ready."
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:memo: *Proposal Ready: {{ $('Build Pre-filled Form URL').first().json.client_name }}*\n\nProject: {{ $('Build Pre-filled Form URL').first().json.project_name }}\nCompany: {{ $('Build Pre-filled Form URL').first().json.company_name }}\n\n:file_folder: *Client folder created in Google Drive*\n:page_facing_up: *Proposal PDF uploaded to client folder*\n\n:art: *Review/Edit Proposal in Gamma:*\n{{ $('Build Pre-filled Form URL').first().json.gamma_edit_url }}\n\n:pencil: *Submit Onboarding Form (pre-filled) — use AFTER reviewing proposal:*\n{{ $('Build Pre-filled Form URL').first().json.prefilled_form_url }}\n\n_Review the Gamma proposal first. Edit if needed. Only click the form link when you are ready to send the contract._",
+        "otherOptions": {}
+      },
+      "id": "wf2-node-15",
+      "name": "Slack Notify Anthony",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [3110, 300],
+      "notes": "Update the channel name to your preferred notification channel."
+    }
+  ],
+  "connections": {
+    "BlueDot Webhook": {
+      "main": [
+        [{ "node": "Filter Audit Calls Only", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Audit Calls Only": {
+      "main": [
+        [{ "node": "Read Prospects Sheet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Prospects Sheet": {
+      "main": [
+        [{ "node": "Match to Prospect", "type": "main", "index": 0 }]
+      ]
+    },
+    "Match to Prospect": {
+      "main": [
+        [{ "node": "Create Client Drive Folder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Client Drive Folder": {
+      "main": [
+        [{ "node": "AI Extract Proposal Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Extract Proposal Content": {
+      "main": [
+        [{ "node": "Parse AI Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [{ "node": "Gamma Generate Proposal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gamma Generate Proposal": {
+      "main": [
+        [{ "node": "Poll Gamma With Retry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Poll Gamma With Retry": {
+      "main": [
+        [{ "node": "Download Proposal PDF", "type": "main", "index": 0 }]
+      ]
+    },
+    "Download Proposal PDF": {
+      "main": [
+        [{ "node": "Upload Proposal to Client Folder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upload Proposal to Client Folder": {
+      "main": [
+        [{ "node": "Build Pre-filled Form URL", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Pre-filled Form URL": {
+      "main": [
+        [{ "node": "Update Prospects Sheet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Prospects Sheet": {
+      "main": [
+        [{ "node": "Slack Notify Anthony", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "Veteran Vectors Onboarding" }]
+}

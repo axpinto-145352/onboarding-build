@@ -1,0 +1,332 @@
+{
+  "name": "WF4 - Contract Reminders (Daily Check)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 24, "triggerAtHour": 9 }]
+        }
+      },
+      "id": "wf4-node-1",
+      "name": "Daily 9AM Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "list", "value": "YOUR_SPREADSHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "Client Tracker" },
+        "options": {}
+      },
+      "id": "wf4-node-2",
+      "name": "Read Client Tracker",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Contract Sent",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf4-node-3",
+      "name": "Filter Unsigned Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// FIX: Uses full ISO timestamp for accurate timing + tracks previously sent reminders\nconst sentDateStr = $json.Contract_Sent_Date;\nconst lastReminder = ($json.Last_Reminder_Sent || '').toLowerCase();\n\n// Parse the sent date - handles both ISO and date-only formats\nconst sentDate = new Date(sentDateStr);\nif (isNaN(sentDate.getTime())) {\n  // Invalid date, skip this row\n  return [{ json: { ...$json, reminder_type: 'none', hours_since_sent: 0 } }];\n}\n\nconst now = new Date();\nconst hoursSinceSent = (now - sentDate) / (1000 * 60 * 60);\n\nlet reminderType = 'none';\n\n// 48-hour reminder (after 48 hours, if not already sent)\nif (hoursSinceSent >= 48 && !lastReminder.includes('48hr')) {\n  reminderType = '48hour';\n}\n// 7-day reminder (after 168 hours, if not already sent)\nelse if (hoursSinceSent >= 168 && !lastReminder.includes('7day')) {\n  reminderType = '7day';\n}\n// 14-day escalation (after 336 hours, if not already escalated)\nelse if (hoursSinceSent >= 336 && !lastReminder.includes('14day')) {\n  reminderType = '14day';\n}\n// 30-day auto-expire (after 720 hours)\nelse if (hoursSinceSent >= 720 && !lastReminder.includes('expired')) {\n  reminderType = 'expire';\n}\n\nreturn [{\n  json: {\n    ...$json,\n    hours_since_sent: Math.round(hoursSinceSent),\n    reminder_type: reminderType\n  }\n}];"
+      },
+      "id": "wf4-node-4",
+      "name": "Calculate Reminder Timing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 300],
+      "notes": "FIX: No longer uses narrow time windows. Checks Last_Reminder_Sent column to prevent duplicates."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "none",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "wf4-node-5",
+      "name": "Needs Reminder?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route to the correct reminder type\nconst type = $json.reminder_type;\nreturn [{ json: { ...$json } }];"
+      },
+      "id": "wf4-node-5b",
+      "name": "Route Reminder Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1350, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "48hour",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf4-node-6",
+      "name": "IF 48-Hour",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email }}",
+        "subject": "=Quick follow-up: {{ $json.Project }} Statement of Work",
+        "message": "=Hi {{ $json.Client_Name }},\n\nJust checking in — I sent over the Statement of Work for {{ $json.Project }} a couple of days ago and wanted to make sure it came through okay.\n\nIf you have any questions about the scope, timeline, or investment, I'm happy to hop on a quick call.\n\nLooking forward to getting started.\n\nBest,\nAnthony Pinto\nVeteran Vectors LLC",
+        "options": {}
+      },
+      "id": "wf4-node-7",
+      "name": "Send 48hr Reminder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1790, 200],
+      "notes": "Friendly check-in email at 48 hours"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "7day",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf4-node-6b",
+      "name": "IF 7-Day",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1570, 500]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Email }}",
+        "subject": "=Following up: {{ $json.Project }} — Ready when you are",
+        "message": "=Hi {{ $json.Client_Name }},\n\nFollowing up on the Statement of Work I sent over for {{ $json.Project }} about a week ago.\n\nI want to make sure we can lock in your project timeline. If there's anything you'd like to adjust in the scope or terms, let me know and I'll get a revised version over to you right away.\n\nIf everything looks good, you can sign directly from the email you received from SignWell.\n\nTalk soon,\nAnthony Pinto\nVeteran Vectors LLC",
+        "options": {}
+      },
+      "id": "wf4-node-8",
+      "name": "Send 7-Day Reminder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1790, 500],
+      "notes": "Firmer follow-up at 7 days"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "14day",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf4-node-6c",
+      "name": "IF 14-Day",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1570, 700]
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:warning: *Contract unsigned for 14 days: {{ $json.Company }}*\n\nClient: {{ $json.Client_Name }}\nProject: {{ $json.Project }}\nSent: {{ $json.Contract_Sent_Date }}\n\n_Consider personal outreach. This deal may need attention._",
+        "otherOptions": {}
+      },
+      "id": "wf4-node-9",
+      "name": "Slack 14-Day Escalation",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1790, 700],
+      "notes": "FIX: New 14-day internal escalation via Slack instead of another client email."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "expire",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf4-node-6d",
+      "name": "IF 30-Day Expire",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1570, 900]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "mode": "list", "value": "YOUR_SPREADSHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "Client Tracker" },
+        "lookupColumn": "Email",
+        "lookupValue": "={{ $json.Email }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Contract Expired",
+            "Last_Reminder_Sent": "expired"
+          }
+        },
+        "options": { "cellFormat": "USER_ENTERED" }
+      },
+      "id": "wf4-node-10",
+      "name": "Auto-Expire Contract",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1790, 900],
+      "notes": "FIX: Auto-expires contracts after 30 days unsigned."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "mode": "list", "value": "YOUR_SPREADSHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "list", "value": "Client Tracker" },
+        "lookupColumn": "Email",
+        "lookupValue": "={{ $json.Email }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Last_Reminder_Sent": "={{ $json.reminder_type + ' - ' + new Date().toISOString() }}"
+          }
+        },
+        "options": { "cellFormat": "USER_ENTERED" }
+      },
+      "id": "wf4-node-11",
+      "name": "Log Reminder Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2010, 350],
+      "notes": "FIX: Logs which reminder was sent to prevent duplicates on next run."
+    }
+  ],
+  "connections": {
+    "Daily 9AM Check": {
+      "main": [
+        [{ "node": "Read Client Tracker", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Client Tracker": {
+      "main": [
+        [{ "node": "Filter Unsigned Only", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Unsigned Only": {
+      "main": [
+        [{ "node": "Calculate Reminder Timing", "type": "main", "index": 0 }]
+      ]
+    },
+    "Calculate Reminder Timing": {
+      "main": [
+        [{ "node": "Needs Reminder?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Needs Reminder?": {
+      "main": [
+        [{ "node": "Route Reminder Type", "type": "main", "index": 0 }]
+      ]
+    },
+    "Route Reminder Type": {
+      "main": [
+        [
+          { "node": "IF 48-Hour", "type": "main", "index": 0 },
+          { "node": "IF 7-Day", "type": "main", "index": 0 },
+          { "node": "IF 14-Day", "type": "main", "index": 0 },
+          { "node": "IF 30-Day Expire", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "IF 48-Hour": {
+      "main": [
+        [{ "node": "Send 48hr Reminder", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Send 48hr Reminder": {
+      "main": [
+        [{ "node": "Log Reminder Sent", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF 7-Day": {
+      "main": [
+        [{ "node": "Send 7-Day Reminder", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Send 7-Day Reminder": {
+      "main": [
+        [{ "node": "Log Reminder Sent", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF 14-Day": {
+      "main": [
+        [{ "node": "Slack 14-Day Escalation", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Slack 14-Day Escalation": {
+      "main": [
+        [{ "node": "Log Reminder Sent", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF 30-Day Expire": {
+      "main": [
+        [{ "node": "Auto-Expire Contract", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "Veteran Vectors Onboarding" }]
+}
