@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-The Veteran Vectors onboarding pipeline is a well-conceived automation system that orchestrates Calendly, BlueDot, OpenAI, Gamma, SignWell, Stripe, Google Workspace, and Slack through n8n. The architectural decisions — five workflows with clear trigger boundaries, a manual review gate before contracts, and Google Sheets as a lightweight data hub — are sound for an early-stage consulting firm.
+The Veteran Vectors onboarding pipeline is a well-conceived automation system that orchestrates Calendly, BlueDot, Anthropic Claude, SignWell, Stripe, Google Workspace, and Slack through n8n. The architectural decisions — five workflows with clear trigger boundaries, a manual review gate before contracts, and Google Sheets as a lightweight data hub — are sound for an early-stage consulting firm.
 
 However, the audit identified **5 critical issues** that would cause failures in production, **13 high-severity issues** that would create data corruption or business process errors, and **18 medium/low issues** that affect reliability and maintainability.
 
@@ -36,10 +36,10 @@ The single most impactful business process change: **invoice sending moved from 
 
 | ID | Workflow | Issue | Status |
 |----|----------|-------|--------|
-| H-1 | WF2 | Gamma polling uses fixed 60s wait with no retry — if Gamma takes longer, proceeds with empty/incomplete data | FIXED: 5-attempt polling loop (30s intervals) |
+| H-1 | WF2 | ~~Gamma polling uses fixed 60s wait with no retry~~ Gamma removed — replaced with Claude AI + Google Docs proposal template | FIXED: Gamma removed entirely |
 | H-2 | WF2 | `Update Prospects Sheet` uses invalid `lookupColumn: "row_number"` — not a real column | FIXED: Uses Email lookup |
 | H-3 | WF2 | `Update Prospects Sheet` runs in parallel with PDF download — marks "Proposal Sent" even if download fails | FIXED: Moved to run AFTER all steps |
-| H-4 | WF2 | Unescaped transcript text in OpenAI JSON body — quotes/backslashes in transcript break JSON | NOTED: Recommend switching to n8n body parameter mapping |
+| H-4 | WF2 | Unescaped transcript text in Claude API JSON body — quotes/backslashes in transcript break JSON | NOTED: Recommend switching to n8n body parameter mapping |
 | H-5 | WF2 | No IF gate when `matched === false` — creates Drive folder named "Unknown" and proceeds with empty data | FIXED: Hard stop on no match |
 | H-6 | WF3 | Stripe amount parsing produces `NaN` if Initial_Payment is empty/non-numeric — Stripe rejects with 400 error | FIXED: Validation node pre-computes cents values |
 | H-7 | WF3 | Same NaN risk on Retainer amount (field not required) | FIXED: Validation node handles both amounts |
@@ -92,7 +92,8 @@ There are **12+ placeholder values** across all 5 workflows that must be replace
 |-------------|-------------|-----------|
 | `YOUR_SPREADSHEET_ID` | 8 | WF1, WF2 (×2), WF3 (×2), WF4, WF5 (×2) |
 | `YOUR_CLIENTS_FOLDER_ID` | 2 | WF2, WF3 |
-| `YOUR_GAMMA_THEME_ID` | 1 | WF2 |
+| `YOUR_PROPOSAL_TEMPLATE_DOC_ID` | 1 | WF2 |
+| `YOUR_ANTHROPIC_API_KEY` | 1 | WF2 |
 | `YOUR_FORM_ID` | 1 | WF2 |
 | `YOUR_SIGNWELL_TEMPLATE_ID` | 1 | WF3 |
 | `YOUR_CHECKLIST_TEMPLATE_DOC_ID` | 1 | WF5 |
@@ -118,7 +119,7 @@ There are **12+ placeholder values** across all 5 workflows that must be replace
 |--------|-----|
 | Removed dangerous fallback matching → hard stop with error | Prevents wrong-client proposals (highest risk bug) |
 | Added idempotency check (skip if `Drive_Folder_ID` exists) | Prevents duplicate processing from BlueDot webhook retries |
-| Replaced fixed 60s Wait + single Poll → 5-attempt polling loop (30s intervals) | Handles Gamma taking longer than 60 seconds |
+| Removed Gamma API integration entirely — replaced with Claude AI + Google Docs proposal template | Eliminates Gamma dependency; proposals generated via Claude and rendered in branded Google Docs template |
 | Moved `Update Prospects Sheet` to run AFTER all steps | Sheet only updated when all deliverables succeed |
 | Changed sheet update to use Email lookup (was `row_number`) | Uses a real column for reliable row targeting |
 
@@ -164,9 +165,9 @@ PHASE 1: LEAD CAPTURE
 
 PHASE 2: DISCOVERY
   Audit call happens (manual)
-  BlueDot transcript → WF2 → Drive folder + AI proposal + Gamma deck + form URL
+  BlueDot transcript → WF2 → Drive folder + Claude proposal + Google Doc + form URL
   [Slack: "Proposal ready for review" + links]
-  Anthony reviews and edits proposal in Gamma (MANUAL GATE — KEEP THIS)
+  Anthony reviews and edits proposal in Google Docs (MANUAL GATE — KEEP THIS)
 
 PHASE 3: CONTRACT
   Anthony submits pre-filled form → WF3 → SignWell contract sent
@@ -214,7 +215,7 @@ PHASE 6: PAYMENT CONFIRMATION (FUTURE — WF6)
 |---|---------------|--------|
 | 1 | Add workflow-level error trigger nodes to all 5 workflows → Slack notification on any failure | Catches silent failures |
 | 2 | Verify SignWell template field `api_id` names match via `GET /api/v1/document_templates/{id}` | Prevents silent field mismatches |
-| 3 | Escape transcript text in WF2 OpenAI JSON body using `JSON.stringify().slice(1,-1)` | Prevents broken AI calls from transcripts with quotes |
+| 3 | Escape transcript text in WF2 Claude API JSON body using `JSON.stringify().slice(1,-1)` | Prevents broken AI calls from transcripts with quotes |
 | 4 | Add IF gate after SignWell API in WF3 — check `$json.id` exists before proceeding to Stripe | Prevents invoicing for unsent contracts |
 
 ### Medium-Term (half day each)
@@ -251,7 +252,7 @@ PHASE 6: PAYMENT CONFIRMATION (FUTURE — WF6)
 
 1. **Google Sheets as database is acceptable for current scale** but has no row-level locking, no concurrent write safety, and a 60 req/min rate limit.
 
-2. **No idempotency keys on external API calls.** SignWell, Stripe, and Gamma calls have no idempotency keys. If any workflow is accidentally re-run, duplicates are created.
+2. **No idempotency keys on external API calls.** SignWell and Stripe calls have no idempotency keys. If any workflow is accidentally re-run, duplicates are created.
 
 3. **The manual review gate is well-designed and should never be automated away.** It prevents AI-generated errors from reaching clients.
 
