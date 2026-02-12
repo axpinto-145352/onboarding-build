@@ -92,30 +92,31 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.openai.com/v1/chat/completions",
+        "url": "https://api.anthropic.com/v1/messages",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "anthropic-version", "value": "2023-06-01" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a proposal writer for Veteran Vectors, an AI automation consulting company that helps SMBs eliminate manual processes. Extract structured proposal content from this audit call transcript. Be specific about the client's actual problems discussed and the concrete solutions recommended. Always include real numbers for ROI when discussed.\\n\\nReturn ONLY valid JSON with these exact keys:\\n{\\n  \\\"client_pain_points\\\": \\\"2-3 paragraph summary of their current problems and manual processes\\\",\\n  \\\"recommended_solution\\\": \\\"Detailed description of the automation solution proposed\\\",\\n  \\\"tech_stack\\\": \\\"List of specific tools and platforms (e.g., n8n, Google Workspace, Stripe, etc.)\\\",\\n  \\\"project_scope\\\": \\\"Concise scope statement suitable for a SOW\\\",\\n  \\\"project_name\\\": \\\"Short project name\\\",\\n  \\\"milestones\\\": \\\"Phase 1: Discovery, Phase 2: Design, Phase 3: Build, Phase 4: Test, Phase 5: Deploy - with brief descriptions of each\\\",\\n  \\\"timeline_weeks\\\": \\\"Estimated number of weeks\\\",\\n  \\\"estimated_project_cost\\\": \\\"Dollar amount if discussed, otherwise empty string\\\",\\n  \\\"estimated_retainer\\\": \\\"Monthly retainer amount if discussed, otherwise empty string\\\",\\n  \\\"roi_hours_saved_monthly\\\": \\\"Estimated hours saved per month\\\",\\n  \\\"roi_annual_value\\\": \\\"Estimated annual dollar value of time saved\\\",\\n  \\\"retainer_description\\\": \\\"What the retainer covers\\\",\\n  \\\"compliances\\\": \\\"Any compliance requirements mentioned (SOC2, ITAR, CMMC, etc.) or empty string\\\",\\n  \\\"proposal_text\\\": \\\"Full proposal narrative (500-800 words) covering: Executive Summary, Current State & Challenges, Proposed Solution, Tech Stack & Architecture, Timeline, Investment & ROI. Write in direct, professional tone. Include specific metrics.\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Here is the audit call transcript:\\n\\n{{ $('Match to Prospect').first().json.transcript }}\\n\\nAnd the AI summary:\\n\\n{{ $('Match to Prospect').first().json.summary }}\"\n    }\n  ],\n  \"temperature\": 0.3,\n  \"response_format\": { \"type\": \"json_object\" }\n}",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a proposal writer for Veteran Vectors, an AI automation consulting company that helps SMBs eliminate manual processes. Extract structured proposal content from this audit call transcript. Be specific about the client's actual problems discussed and the concrete solutions recommended. Always include real numbers for ROI when discussed.\\n\\nReturn ONLY valid JSON with these exact keys:\\n{\\n  \\\"client_pain_points\\\": \\\"2-3 paragraph summary of their current problems and manual processes\\\",\\n  \\\"recommended_solution\\\": \\\"Detailed description of the automation solution proposed\\\",\\n  \\\"tech_stack\\\": \\\"List of specific tools and platforms (e.g., n8n, Google Workspace, Stripe, etc.)\\\",\\n  \\\"project_scope\\\": \\\"Concise scope statement suitable for a SOW\\\",\\n  \\\"project_name\\\": \\\"Short project name\\\",\\n  \\\"milestones\\\": \\\"Phase 1: Discovery, Phase 2: Design, Phase 3: Build, Phase 4: Test, Phase 5: Deploy - with brief descriptions of each\\\",\\n  \\\"timeline_weeks\\\": \\\"Estimated number of weeks\\\",\\n  \\\"estimated_project_cost\\\": \\\"Dollar amount if discussed, otherwise empty string\\\",\\n  \\\"estimated_retainer\\\": \\\"Monthly retainer amount if discussed, otherwise empty string\\\",\\n  \\\"roi_hours_saved_monthly\\\": \\\"Estimated hours saved per month\\\",\\n  \\\"roi_annual_value\\\": \\\"Estimated annual dollar value of time saved\\\",\\n  \\\"retainer_description\\\": \\\"What the retainer covers\\\",\\n  \\\"compliances\\\": \\\"Any compliance requirements mentioned (SOC2, ITAR, CMMC, etc.) or empty string\\\",\\n  \\\"proposal_text\\\": \\\"Full proposal narrative (500-800 words) covering: Executive Summary, Current State & Challenges, Proposed Solution, Tech Stack & Architecture, Timeline, Investment & ROI. Write in direct, professional tone. Include specific metrics.\\\"\\n}\\n\\nHere is the audit call transcript:\\n\\n{{ $('Match to Prospect').first().json.transcript }}\\n\\nAnd the AI summary:\\n\\n{{ $('Match to Prospect').first().json.summary }}\"\n    }\n  ]\n}",
         "options": {}
       },
       "id": "wf2-node-6",
-      "name": "AI Extract Proposal Content",
+      "name": "Claude Extract Proposal Content",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1350, 300],
-      "notes": "Uses OpenAI API. Set up HTTP Header Auth credential with: Name=Authorization, Value=Bearer YOUR_OPENAI_KEY."
+      "notes": "Uses Anthropic Claude API. Set up HTTP Header Auth credential with: Name=x-api-key, Value=YOUR_ANTHROPIC_API_KEY."
     },
     {
       "parameters": {
-        "jsCode": "// Parse AI response and merge with prospect data\nconst aiResponse = $('AI Extract Proposal Content').first().json;\nconst matchData = $('Match to Prospect').first().json;\nconst folderId = $('Create Client Drive Folder').first().json.id;\n\nlet extracted;\ntry {\n  const content = aiResponse.choices[0].message.content;\n  extracted = JSON.parse(content);\n} catch (e) {\n  throw new Error('Failed to parse AI response: ' + e.message + '. Raw: ' + JSON.stringify(aiResponse).substring(0, 500));\n}\n\nreturn [{\n  json: {\n    ...extracted,\n    prospect: matchData.prospect,\n    sheet_row: matchData.sheet_row,\n    drive_folder_id: folderId\n  }\n}];"
+        "jsCode": "// Parse Claude API response and merge with prospect data\nconst aiResponse = $('Claude Extract Proposal Content').first().json;\nconst matchData = $('Match to Prospect').first().json;\nconst folderId = $('Create Client Drive Folder').first().json.id;\n\nlet extracted;\ntry {\n  const content = aiResponse.content[0].text;\n  // Strip markdown code fences if Claude wraps the JSON\n  const cleaned = content.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/i, '').trim();\n  extracted = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Failed to parse Claude response: ' + e.message + '. Raw: ' + JSON.stringify(aiResponse).substring(0, 500));\n}\n\nreturn [{\n  json: {\n    ...extracted,\n    prospect: matchData.prospect,\n    sheet_row: matchData.sheet_row,\n    drive_folder_id: folderId\n  }\n}];"
       },
       "id": "wf2-node-7",
       "name": "Parse AI Response",
@@ -125,53 +126,65 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://public-api.gamma.app/v1.0/generations",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"inputText\": {{ JSON.stringify($json.proposal_text) }},\n  \"textMode\": \"generate\",\n  \"format\": \"presentation\",\n  \"themeId\": \"YOUR_GAMMA_THEME_ID\",\n  \"numCards\": 8,\n  \"cardSplit\": \"auto\",\n  \"additionalInstructions\": \"Professional automation proposal for {{ $json.prospect.Company_Name || 'a client' }}. Sections: Title slide with Veteran Vectors branding, Executive Summary, Current Challenges, Proposed Solution, Tech Stack, Project Timeline, Investment & ROI, Next Steps. Use clean modern design with data visualizations for ROI. Use cyan (#4dd0e1) as accent color.\",\n  \"exportAs\": \"pdf\",\n  \"textOptions\": {\n    \"amount\": \"detailed\",\n    \"tone\": \"professional, direct, confident\",\n    \"audience\": \"small business owner, decision maker\",\n    \"language\": \"en\"\n  },\n  \"imageOptions\": {\n    \"source\": \"aiGenerated\",\n    \"style\": \"photorealistic\"\n  },\n  \"cardOptions\": {\n    \"dimensions\": \"16x9\"\n  }\n}",
+        "operation": "copy",
+        "fileId": { "__rl": true, "mode": "id", "value": "YOUR_PROPOSAL_TEMPLATE_DOC_ID" },
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.drive_folder_id }}" },
+        "name": "=Proposal - {{ $json.prospect.Company_Name || 'Client' }}",
         "options": {}
       },
       "id": "wf2-node-8",
-      "name": "Gamma Generate Proposal",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "name": "Copy Proposal Template",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
       "position": [1790, 300],
-      "notes": "Set up HTTP Header Auth credential with: Name=X-API-KEY, Value=sk-gamma-XXXXX. Replace YOUR_GAMMA_THEME_ID."
+      "notes": "Replace YOUR_PROPOSAL_TEMPLATE_DOC_ID with the Google Doc ID of your proposal template. Template should contain placeholders like {{CLIENT_NAME}}, {{PAIN_POINTS}}, etc."
     },
     {
       "parameters": {
-        "jsCode": "// FIX: Polling loop with retry logic instead of fixed 60s wait\n// This node polls Gamma up to 5 times (every 30s = 2.5 min total)\nconst generationId = $('Gamma Generate Proposal').first().json.generationId;\nconst gammaApiKey = ''; // Will be set via credential header\n\nlet status = 'pending';\nlet result = null;\nconst maxAttempts = 5;\nconst waitMs = 30000;\n\nfor (let attempt = 1; attempt <= maxAttempts; attempt++) {\n  // Wait before polling\n  await new Promise(resolve => setTimeout(resolve, waitMs));\n  \n  try {\n    const response = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `https://public-api.gamma.app/v1.0/generations/${generationId}`,\n      headers: {},\n      returnFullResponse: false\n    });\n    \n    result = response;\n    status = response.status || 'unknown';\n    \n    if (status === 'completed') {\n      break;\n    }\n  } catch (e) {\n    if (attempt === maxAttempts) {\n      throw new Error(`Gamma generation failed after ${maxAttempts} attempts. Last error: ${e.message}`);\n    }\n  }\n}\n\nif (status !== 'completed') {\n  throw new Error(`Gamma generation did not complete after ${maxAttempts * waitMs / 1000}s. Status: ${status}. Generation ID: ${generationId}. Manual check needed.`);\n}\n\n// Verify PDF URL exists\nconst pdfUrl = result.pdfUrl || result.exportUrl || '';\nif (!pdfUrl) {\n  throw new Error('Gamma generation completed but no PDF URL returned. Generation ID: ' + generationId);\n}\n\nreturn [{\n  json: {\n    ...result,\n    generation_id: generationId,\n    pdf_url: pdfUrl,\n    gamma_url: result.url || result.gammaUrl || ''\n  }\n}];"
+        "jsCode": "// Populate the Google Docs proposal template with Claude-extracted content\nconst extracted = $('Parse AI Response').first().json;\nconst docId = $('Copy Proposal Template').first().json.id;\nconst prospect = extracted.prospect || {};\n\n// Build the batchUpdate requests to replace template placeholders\nconst replacements = {\n  '{{CLIENT_NAME}}': prospect.Full_Name || prospect.Company_Name || 'Valued Client',\n  '{{COMPANY_NAME}}': prospect.Company_Name || '',\n  '{{DATE}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),\n  '{{PROJECT_NAME}}': extracted.project_name || '',\n  '{{PAIN_POINTS}}': extracted.client_pain_points || '',\n  '{{RECOMMENDED_SOLUTION}}': extracted.recommended_solution || '',\n  '{{TECH_STACK}}': extracted.tech_stack || '',\n  '{{PROJECT_SCOPE}}': extracted.project_scope || '',\n  '{{MILESTONES}}': extracted.milestones || '',\n  '{{TIMELINE}}': extracted.timeline_weeks ? extracted.timeline_weeks + ' weeks' : 'TBD',\n  '{{PROJECT_COST}}': extracted.estimated_project_cost || 'TBD',\n  '{{MONTHLY_RETAINER}}': extracted.estimated_retainer || 'N/A',\n  '{{RETAINER_DESCRIPTION}}': extracted.retainer_description || '',\n  '{{ROI_HOURS_SAVED}}': extracted.roi_hours_saved_monthly || '',\n  '{{ROI_ANNUAL_VALUE}}': extracted.roi_annual_value || '',\n  '{{COMPLIANCES}}': extracted.compliances || 'N/A',\n  '{{PROPOSAL_BODY}}': extracted.proposal_text || ''\n};\n\nconst requests = Object.entries(replacements).map(([placeholder, value]) => ({\n  replaceAllText: {\n    containsText: { text: placeholder, matchCase: true },\n    replaceText: String(value)\n  }\n}));\n\nreturn [{\n  json: {\n    doc_id: docId,\n    requests: requests,\n    drive_folder_id: extracted.drive_folder_id,\n    prospect: prospect,\n    extracted: extracted\n  }\n}];"
       },
       "id": "wf2-node-9",
-      "name": "Poll Gamma With Retry",
+      "name": "Build Template Replacements",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [2010, 300],
-      "notes": "FIX: Replaces fixed 60s wait + single poll. Now polls up to 5 times every 30s with status checking. Uses the same Gamma HTTP Header Auth credential."
+      "notes": "Builds Google Docs batchUpdate requests to replace all template placeholders with Claude-extracted proposal content."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.doc_id }}:batchUpdate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"requests\": {{ JSON.stringify($json.requests) }} }",
+        "options": {}
+      },
+      "id": "wf2-node-10",
+      "name": "Populate Proposal Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 300],
+      "notes": "Uses Google OAuth2 credential to replace placeholders in the copied proposal doc. Requires Google Docs API scope: https://www.googleapis.com/auth/documents."
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $json.pdf_url }}",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $('Build Template Replacements').first().json.doc_id }}/export?mimeType=application/pdf",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
         "options": {
           "response": { "response": { "responseFormat": "file" } }
         }
       },
       "id": "wf2-node-11",
-      "name": "Download Proposal PDF",
+      "name": "Export Proposal as PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2230, 300],
-      "notes": "Downloads the exported PDF from Gamma."
+      "position": [2450, 300],
+      "notes": "Exports the populated Google Doc as a PDF. Uses the same Google OAuth2 credential."
     },
     {
       "parameters": {
@@ -183,20 +196,20 @@
         "options": {}
       },
       "id": "wf2-node-12",
-      "name": "Upload Proposal to Client Folder",
+      "name": "Upload Proposal PDF to Client Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [2450, 300]
+      "position": [2670, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Build pre-filled form URL\nconst extracted = $('Parse AI Response').first().json;\nconst prospect = extracted.prospect || {};\nconst gammaResult = $('Poll Gamma With Retry').first().json;\nconst gammaUrl = gammaResult.gamma_url || '';\n\nconst params = new URLSearchParams();\n\n// From Calendly (prospect data)\nif (prospect.First_Name) params.set('First_Name', prospect.First_Name);\nif (prospect.Last_Name) params.set('Last_Name', prospect.Last_Name);\nif (prospect.Full_Name) params.set('Full_Client_Name', prospect.Full_Name);\nif (prospect.Email) params.set('Client_Email', prospect.Email);\nif (prospect.Client_Title) params.set('Client_Title', prospect.Client_Title);\nif (prospect.Company_Name) params.set('Company_Name', prospect.Company_Name);\nif (prospect.Company_Address) params.set('Company_Address', prospect.Company_Address);\nif (prospect.Company_State) params.set('Company_State', prospect.Company_State);\n\n// From AI extraction\nif (extracted.project_name) params.set('Project_Name', extracted.project_name);\nif (extracted.project_scope) params.set('Project_Scope', extracted.project_scope);\nif (extracted.milestones) params.set('Milestones', extracted.milestones);\nif (extracted.retainer_description) params.set('Retainer_description', extracted.retainer_description);\nif (extracted.estimated_project_cost) params.set('Project_Cost', extracted.estimated_project_cost);\nif (extracted.estimated_retainer) params.set('Monthly_Retainer', extracted.estimated_retainer);\nif (extracted.compliances) params.set('Compliances', extracted.compliances);\n\nconst formBaseUrl = 'https://veteranvectors.app.n8n.cloud/form/YOUR_FORM_ID';\nconst prefilledUrl = `${formBaseUrl}?${params.toString()}`;\n\nreturn [{\n  json: {\n    prefilled_form_url: prefilledUrl,\n    gamma_edit_url: gammaUrl,\n    client_name: prospect.Full_Name || prospect.Company_Name || 'Unknown Client',\n    company_name: prospect.Company_Name || '',\n    project_name: extracted.project_name || '',\n    drive_folder_id: extracted.drive_folder_id\n  }\n}];"
+        "jsCode": "// Build pre-filled form URL\nconst extracted = $('Parse AI Response').first().json;\nconst prospect = extracted.prospect || {};\nconst docId = $('Build Template Replacements').first().json.doc_id;\nconst proposalDocUrl = `https://docs.google.com/document/d/${docId}/edit`;\n\nconst params = new URLSearchParams();\n\n// From Calendly (prospect data)\nif (prospect.First_Name) params.set('First_Name', prospect.First_Name);\nif (prospect.Last_Name) params.set('Last_Name', prospect.Last_Name);\nif (prospect.Full_Name) params.set('Full_Client_Name', prospect.Full_Name);\nif (prospect.Email) params.set('Client_Email', prospect.Email);\nif (prospect.Client_Title) params.set('Client_Title', prospect.Client_Title);\nif (prospect.Company_Name) params.set('Company_Name', prospect.Company_Name);\nif (prospect.Company_Address) params.set('Company_Address', prospect.Company_Address);\nif (prospect.Company_State) params.set('Company_State', prospect.Company_State);\n\n// From AI extraction\nif (extracted.project_name) params.set('Project_Name', extracted.project_name);\nif (extracted.project_scope) params.set('Project_Scope', extracted.project_scope);\nif (extracted.milestones) params.set('Milestones', extracted.milestones);\nif (extracted.retainer_description) params.set('Retainer_description', extracted.retainer_description);\nif (extracted.estimated_project_cost) params.set('Project_Cost', extracted.estimated_project_cost);\nif (extracted.estimated_retainer) params.set('Monthly_Retainer', extracted.estimated_retainer);\nif (extracted.compliances) params.set('Compliances', extracted.compliances);\n\nconst formBaseUrl = 'https://veteranvectors.app.n8n.cloud/form/YOUR_FORM_ID';\nconst prefilledUrl = `${formBaseUrl}?${params.toString()}`;\n\nreturn [{\n  json: {\n    prefilled_form_url: prefilledUrl,\n    proposal_doc_url: proposalDocUrl,\n    client_name: prospect.Full_Name || prospect.Company_Name || 'Unknown Client',\n    company_name: prospect.Company_Name || '',\n    project_name: extracted.project_name || '',\n    drive_folder_id: extracted.drive_folder_id\n  }\n}];"
       },
       "id": "wf2-node-14",
       "name": "Build Pre-filled Form URL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2670, 300],
+      "position": [2890, 300],
       "notes": "Replace YOUR_FORM_ID with your actual n8n form ID from Workflow 3."
     },
     {
@@ -210,7 +223,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "Status": "Proposal Sent",
-            "Proposal_Link": "={{ $('Poll Gamma With Retry').first().json.gamma_url }}",
+            "Proposal_Link": "={{ $('Build Pre-filled Form URL').first().json.proposal_doc_url }}",
             "Form_Link": "={{ $json.prefilled_form_url }}",
             "Drive_Folder_ID": "={{ $('Parse AI Response').first().json.drive_folder_id }}"
           }
@@ -221,20 +234,20 @@
       "name": "Update Prospects Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [2890, 300],
+      "position": [3110, 300],
       "notes": "FIX: Now uses Email lookup instead of row_number. Runs AFTER form URL is built to ensure all data is ready."
     },
     {
       "parameters": {
         "channel": "#onboarding-alerts",
-        "text": "=:memo: *Proposal Ready: {{ $('Build Pre-filled Form URL').first().json.client_name }}*\n\nProject: {{ $('Build Pre-filled Form URL').first().json.project_name }}\nCompany: {{ $('Build Pre-filled Form URL').first().json.company_name }}\n\n:file_folder: *Client folder created in Google Drive*\n:page_facing_up: *Proposal PDF uploaded to client folder*\n\n:art: *Review/Edit Proposal in Gamma:*\n{{ $('Build Pre-filled Form URL').first().json.gamma_edit_url }}\n\n:pencil: *Submit Onboarding Form (pre-filled) — use AFTER reviewing proposal:*\n{{ $('Build Pre-filled Form URL').first().json.prefilled_form_url }}\n\n_Review the Gamma proposal first. Edit if needed. Only click the form link when you are ready to send the contract._",
+        "text": "=:memo: *Proposal Ready: {{ $('Build Pre-filled Form URL').first().json.client_name }}*\n\nProject: {{ $('Build Pre-filled Form URL').first().json.project_name }}\nCompany: {{ $('Build Pre-filled Form URL').first().json.company_name }}\n\n:file_folder: *Client folder created in Google Drive*\n:page_facing_up: *Proposal PDF uploaded to client folder*\n\n:pencil2: *Review/Edit Proposal in Google Docs:*\n{{ $('Build Pre-filled Form URL').first().json.proposal_doc_url }}\n\n:pencil: *Submit Onboarding Form (pre-filled) — use AFTER reviewing proposal:*\n{{ $('Build Pre-filled Form URL').first().json.prefilled_form_url }}\n\n_Review the proposal in Google Docs first. Edit if needed. Only click the form link when you are ready to send the contract._",
         "otherOptions": {}
       },
       "id": "wf2-node-15",
       "name": "Slack Notify Anthony",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [3110, 300],
+      "position": [3330, 300],
       "notes": "Update the channel name to your preferred notification channel."
     }
   ],
@@ -261,35 +274,40 @@
     },
     "Create Client Drive Folder": {
       "main": [
-        [{ "node": "AI Extract Proposal Content", "type": "main", "index": 0 }]
+        [{ "node": "Claude Extract Proposal Content", "type": "main", "index": 0 }]
       ]
     },
-    "AI Extract Proposal Content": {
+    "Claude Extract Proposal Content": {
       "main": [
         [{ "node": "Parse AI Response", "type": "main", "index": 0 }]
       ]
     },
     "Parse AI Response": {
       "main": [
-        [{ "node": "Gamma Generate Proposal", "type": "main", "index": 0 }]
+        [{ "node": "Copy Proposal Template", "type": "main", "index": 0 }]
       ]
     },
-    "Gamma Generate Proposal": {
+    "Copy Proposal Template": {
       "main": [
-        [{ "node": "Poll Gamma With Retry", "type": "main", "index": 0 }]
+        [{ "node": "Build Template Replacements", "type": "main", "index": 0 }]
       ]
     },
-    "Poll Gamma With Retry": {
+    "Build Template Replacements": {
       "main": [
-        [{ "node": "Download Proposal PDF", "type": "main", "index": 0 }]
+        [{ "node": "Populate Proposal Template", "type": "main", "index": 0 }]
       ]
     },
-    "Download Proposal PDF": {
+    "Populate Proposal Template": {
       "main": [
-        [{ "node": "Upload Proposal to Client Folder", "type": "main", "index": 0 }]
+        [{ "node": "Export Proposal as PDF", "type": "main", "index": 0 }]
       ]
     },
-    "Upload Proposal to Client Folder": {
+    "Export Proposal as PDF": {
+      "main": [
+        [{ "node": "Upload Proposal PDF to Client Folder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upload Proposal PDF to Client Folder": {
       "main": [
         [{ "node": "Build Pre-filled Form URL", "type": "main", "index": 0 }]
       ]

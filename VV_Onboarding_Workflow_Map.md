@@ -57,7 +57,7 @@ AUDIT CALL          AUDIT CALL       PROCESSES           PROPOSAL        ONBOARD
 
 **Trigger:** BlueDot webhook fires after audit call recording is processed
 
-**v2 improvements:** Hard-stop on match failure (no fallback), idempotency check, Gamma retry polling, sequential data flow
+**v2 improvements:** Hard-stop on match failure (no fallback), idempotency check, Claude AI + Google Docs proposal template, sequential data flow
 
 ```
 [BlueDot Webhook] ──► [Filter: "audit" in title?]
@@ -76,25 +76,31 @@ AUDIT CALL          AUDIT CALL       PROCESSES           PROPOSAL        ONBOARD
                               [Create Client Drive Folder]
                                      │
                                      ▼
-                              [AI Node — OpenAI GPT-4o]
-                              Extract from transcript
+                              [Claude API — Extract Proposal Content]
+                              Anthropic Claude extracts structured
+                              proposal data from transcript
                                      │
                                      ▼
                               [Parse AI Response]
                                      │
                                      ▼
-                              [Gamma API — Generate Proposal]
+                              [Copy Proposal Template]
+                              Copies Google Doc template to client folder
                                      │
                                      ▼
-                              [Poll Gamma With Retry]  ◄── NEW: 5 attempts × 30s
-                              Check status === 'completed'
-                              Verify pdfUrl exists
+                              [Build Template Replacements]
+                              Maps Claude output to template placeholders
                                      │
                                      ▼
-                              [Download Proposal PDF]
+                              [Populate Proposal Template]
+                              Google Docs batchUpdate replaces placeholders
                                      │
                                      ▼
-                              [Upload to Client Drive Folder]
+                              [Export Proposal as PDF]
+                              Exports populated Google Doc as PDF
+                                     │
+                                     ▼
+                              [Upload Proposal PDF to Client Folder]
                                      │
                                      ▼
                               [Build Pre-filled Form URL]
@@ -106,7 +112,7 @@ AUDIT CALL          AUDIT CALL       PROCESSES           PROPOSAL        ONBOARD
                                      │
                                      ▼
                               [Slack Notify Anthony]
-                              + Gamma edit link (REVIEW FIRST)
+                              + Google Docs edit link (REVIEW FIRST)
                               + Pre-filled form link (USE AFTER REVIEW)
 ```
 
@@ -347,7 +353,8 @@ CALENDLY          BLUEDOT           N8N FORM          SIGNWELL
 |-------------|-------|-------------|
 | `YOUR_SPREADSHEET_ID` | All workflows | Google Sheet ID |
 | `YOUR_CLIENTS_FOLDER_ID` | WF2, WF3 | Root Clients folder in Drive |
-| `YOUR_GAMMA_THEME_ID` | WF2 | From Gamma app themes |
+| `YOUR_PROPOSAL_TEMPLATE_DOC_ID` | WF2 | Google Doc proposal template ID |
+| `YOUR_ANTHROPIC_API_KEY` | WF2 | Anthropic API key for Claude |
 | `YOUR_FORM_ID` | WF2 | n8n form URL path from WF3 |
 | `YOUR_SIGNWELL_TEMPLATE_ID` | WF3 | SignWell template ID |
 | `YOUR_CHECKLIST_TEMPLATE_DOC_ID` | WF5 | Google Doc checklist template |
