@@ -61,7 +61,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Match SignWell doc to client tracker row\nconst signwellData = $('Extract SignWell Data').first().json;\nconst rows = $('Read Client Tracker').all();\n\nlet matchedRow = null;\nlet matchedIndex = -1;\n\nfor (let i = 0; i < rows.length; i++) {\n  const row = rows[i].json;\n  if (row.SignWell_Doc_ID === signwellData.signwell_doc_id ||\n      (row.Email && row.Email.toLowerCase() === (signwellData.client_email || '').toLowerCase())) {\n    matchedRow = row;\n    matchedIndex = i + 2;\n    break;\n  }\n}\n\nif (!matchedRow) {\n  throw new Error('Could not match SignWell document to client tracker. Doc ID: ' + signwellData.signwell_doc_id);\n}\n\n// Build sanitized company name for Slack channel\nconst channelName = 'client-' + (matchedRow.Company || '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]/g, '-')\n  .replace(/-+/g, '-')\n  .replace(/^-|-$/g, '')\n  .substring(0, 60);\n\nreturn [{\n  json: {\n    ...signwellData,\n    client: matchedRow,\n    sheet_row: matchedIndex,\n    slack_channel_name: channelName\n  }\n}];"
+        "jsCode": "// Match SignWell doc to client tracker row\nconst signwellData = $('Extract SignWell Data').first().json;\nconst rows = $('Read Client Tracker').all();\n\nlet matchedRow = null;\nlet matchedIndex = -1;\n\nfor (let i = 0; i < rows.length; i++) {\n  const row = rows[i].json;\n  if (row.SignWell_Doc_ID === signwellData.signwell_doc_id ||\n      (row.Email && row.Email.toLowerCase() === (signwellData.client_email || '').toLowerCase())) {\n    matchedRow = row;\n    matchedIndex = i + 2;\n    break;\n  }\n}\n\nif (!matchedRow) {\n  throw new Error('Could not match SignWell document to client tracker. Doc ID: ' + signwellData.signwell_doc_id);\n}\n\n// GATE: Idempotency — skip if already onboarded (prevents duplicate webhook processing)\nif (matchedRow.Status === 'Onboarded') {\n  throw new Error('Client ' + (matchedRow.Client_Name || matchedRow.Company) + ' is already onboarded. Skipping duplicate SignWell webhook.');\n}\n\n// GATE: Verify Invoice_ID exists before proceeding to Stripe send\nif (!matchedRow.Invoice_ID || matchedRow.Invoice_ID.trim() === '') {\n  throw new Error('No Invoice_ID found for ' + (matchedRow.Client_Name || matchedRow.Company) + '. Cannot send invoice. Check WF3 execution for this client.');\n}\n\n// GATE: Verify Drive_Folder_ID exists before proceeding to upload\nif (!matchedRow.Drive_Folder_ID || matchedRow.Drive_Folder_ID.trim() === '') {\n  throw new Error('No Drive_Folder_ID found for ' + (matchedRow.Client_Name || matchedRow.Company) + '. Cannot upload signed PDF. Check WF2/WF3 execution.');\n}\n\n// Build sanitized company name for Slack channel\nconst channelName = 'client-' + (matchedRow.Company || '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]/g, '-')\n  .replace(/-+/g, '-')\n  .replace(/^-|-$/g, '')\n  .substring(0, 60);\n\nreturn [{\n  json: {\n    ...signwellData,\n    client: matchedRow,\n    sheet_row: matchedIndex,\n    slack_channel_name: channelName\n  }\n}];"
       },
       "id": "wf5-node-5",
       "name": "Match Client Record",
@@ -307,10 +307,7 @@
     },
     "Upload to Client Drive Folder": {
       "main": [
-        [
-          { "node": "Create Slack Channel", "type": "main", "index": 0 },
-          { "node": "Copy Onboarding Checklist", "type": "main", "index": 0 }
-        ]
+        [{ "node": "Create Slack Channel", "type": "main", "index": 0 }]
       ]
     },
     "Create Slack Channel": {
@@ -325,7 +322,7 @@
     },
     "Post Welcome Message": {
       "main": [
-        [{ "node": "Send Welcome Email", "type": "main", "index": 0 }]
+        [{ "node": "Copy Onboarding Checklist", "type": "main", "index": 0 }]
       ]
     },
     "Copy Onboarding Checklist": {
