@@ -32,6 +32,16 @@
               "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
               "rightValue": "RAPID",
               "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "discovery",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "veteran vectors",
+              "operator": { "type": "string", "operation": "contains" }
             }
           ]
         }
@@ -41,7 +51,7 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2,
       "position": [470, 300],
-      "notes": "Only process recordings with 'audit' or 'RAPID' in the title."
+      "notes": "Processes recordings with 'audit', 'RAPID', 'discovery', or 'veteran vectors' in the title."
     },
     {
       "parameters": {
@@ -66,7 +76,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Match BlueDot recording to Prospects sheet row\n// FIX: Removed dangerous fallback that silently picked the wrong prospect\nconst bluedot = $('BlueDot Webhook').first().json;\nconst prospects = $('Read Prospects Sheet').all();\n\nconst transcript = bluedot.transcript || bluedot.content || '';\nconst attendees = bluedot.attendees || bluedot.participants || [];\n\nlet match = null;\nlet matchIndex = -1;\n\nfor (let i = 0; i < prospects.length; i++) {\n  const row = prospects[i].json;\n  const name = row.Full_Name || '';\n  const email = (row.Email || '').toLowerCase();\n  \n  // Match by name in transcript or attendee list\n  const nameMatch = name && (\n    transcript.toLowerCase().includes(name.toLowerCase()) ||\n    attendees.some(a => (a.name || a.email || '').toLowerCase().includes(name.toLowerCase()))\n  );\n  // Match by email in attendee list\n  const emailMatch = email && attendees.some(a => (a.email || '').toLowerCase() === email);\n  \n  if (nameMatch || emailMatch) {\n    match = row;\n    matchIndex = i + 2;\n    break;\n  }\n}\n\n// FIX: If no match found, throw an error instead of silently using wrong prospect\nif (!match) {\n  throw new Error('Could not match BlueDot transcript to any prospect. Attendees: ' + \n    JSON.stringify(attendees.map(a => a.name || a.email)) + \n    '. Manual review needed.');\n}\n\n// FIX: Idempotency check - skip if proposal already generated\nif (match.Drive_Folder_ID && match.Status === 'Proposal Sent') {\n  throw new Error('Proposal already generated for ' + match.Full_Name + '. Skipping duplicate BlueDot webhook.');\n}\n\nreturn [{\n  json: {\n    transcript: transcript,\n    summary: bluedot.summary || bluedot.notes || '',\n    prospect: match,\n    sheet_row: matchIndex,\n    matched: true\n  }\n}];"
+        "jsCode": "// Match BlueDot recording to Prospects sheet row\n// FIX: Removed dangerous fallback that silently picked the wrong prospect\nconst bluedot = $('BlueDot Webhook').first().json;\nconst prospects = $('Read Prospects Sheet').all();\n\nconst transcript = bluedot.transcript || bluedot.content || '';\nconst attendees = bluedot.attendees || bluedot.participants || [];\n\nlet match = null;\nlet matchIndex = -1;\n\nfor (let i = 0; i < prospects.length; i++) {\n  const row = prospects[i].json;\n  const name = row.Full_Name || '';\n  const email = (row.Email || '').toLowerCase();\n  \n  // Match by name in transcript or attendee list\n  const nameMatch = name && (\n    transcript.toLowerCase().includes(name.toLowerCase()) ||\n    attendees.some(a => (a.name || a.email || '').toLowerCase().includes(name.toLowerCase()))\n  );\n  // Match by email in attendee list\n  const emailMatch = email && attendees.some(a => (a.email || '').toLowerCase() === email);\n  \n  if (nameMatch || emailMatch) {\n    match = row;\n    matchIndex = i + 2;\n    break;\n  }\n}\n\n// FIX: If no match found, throw an error instead of silently using wrong prospect\nif (!match) {\n  throw new Error('Could not match BlueDot transcript to any prospect. Attendees: ' + \n    JSON.stringify(attendees.map(a => a.name || a.email)) + \n    '. Manual review needed.');\n}\n\n// FIX: Idempotency check - skip if proposal already generated\nif (match.Drive_Folder_ID && (match.Status === 'Proposal Draft' || match.Status === 'Proposal Sent' || match.Status === 'Proposal Reviewed')) {\n  throw new Error('Proposal already generated for ' + match.Full_Name + ' (status: ' + match.Status + '). Skipping duplicate BlueDot webhook.');\n}\n\nreturn [{\n  json: {\n    transcript: transcript,\n    summary: bluedot.summary || bluedot.notes || '',\n    prospect: match,\n    sheet_row: matchIndex,\n    matched: true\n  }\n}];"
       },
       "id": "wf2-node-4",
       "name": "Match to Prospect",
@@ -222,7 +232,7 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "Status": "Proposal Sent",
+            "Status": "Proposal Draft",
             "Proposal_Link": "={{ $('Build Pre-filled Form URL').first().json.proposal_doc_url }}",
             "Form_Link": "={{ $json.prefilled_form_url }}",
             "Drive_Folder_ID": "={{ $('Parse AI Response').first().json.drive_folder_id }}"
@@ -240,7 +250,7 @@
     {
       "parameters": {
         "channel": "#onboarding-alerts",
-        "text": "=:memo: *Proposal Ready: {{ $('Build Pre-filled Form URL').first().json.client_name }}*\n\nProject: {{ $('Build Pre-filled Form URL').first().json.project_name }}\nCompany: {{ $('Build Pre-filled Form URL').first().json.company_name }}\n\n:file_folder: *Client folder created in Google Drive*\n:page_facing_up: *Proposal PDF uploaded to client folder*\n\n:pencil2: *Review/Edit Proposal in Google Docs:*\n{{ $('Build Pre-filled Form URL').first().json.proposal_doc_url }}\n\n:pencil: *Submit Onboarding Form (pre-filled) — use AFTER reviewing proposal:*\n{{ $('Build Pre-filled Form URL').first().json.prefilled_form_url }}\n\n_Review the proposal in Google Docs first. Edit if needed. Only click the form link when you are ready to send the contract._",
+        "text": "=:memo: *DRAFT Proposal Ready for Review: {{ $('Build Pre-filled Form URL').first().json.client_name }}*\n\nProject: {{ $('Build Pre-filled Form URL').first().json.project_name }}\nCompany: {{ $('Build Pre-filled Form URL').first().json.company_name }}\n\n:warning: *Status: PROPOSAL DRAFT — not sent to client yet*\n\n:file_folder: Client folder created in Google Drive\n:page_facing_up: Proposal PDF saved to client folder\n\n*Step 1 — Review and edit the proposal:*\n{{ $('Build Pre-filled Form URL').first().json.proposal_doc_url }}\n\n*Step 2 — ONLY after review, submit the onboarding form to send the contract:*\n{{ $('Build Pre-filled Form URL').first().json.prefilled_form_url }}\n\n_The client has NOT received anything yet. Review the Google Doc, make edits, then use the form link to trigger the contract._",
         "otherOptions": {}
       },
       "id": "wf2-node-15",
