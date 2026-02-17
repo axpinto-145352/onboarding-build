@@ -1,0 +1,335 @@
+{
+  "name": "WF1 - Audit Call Booked (Calendly → Prospects Sheet)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calendly-audit-booked",
+        "options": {}
+      },
+      "id": "wf1-node-1",
+      "name": "Calendly Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        256,
+        304
+      ],
+      "webhookId": "calendly-audit-booked",
+      "notes": "Set this webhook URL as your Calendly webhook endpoint. Subscribe to 'invitee.created' events for your Audit Call event type."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event || '' }}",
+              "rightValue": "invitee.created",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf1-node-1b",
+      "name": "Filter Bookings Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        480,
+        304
+      ],
+      "notes": "Only process 'invitee.created' events. Ignores cancellations and other event types."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract invitee data from Calendly webhook payload\nconst payload = $input.first().json;\n\n// Calendly v2 webhook structure\nconst event = payload.payload || payload;\nconst invitee = event.invitee || event;\nconst questions = event.questions_and_answers || [];\n\n// Helper to find custom question answers\nfunction findAnswer(questionText) {\n  const q = questions.find(q => \n    q.question.toLowerCase().includes(questionText.toLowerCase())\n  );\n  return q ? q.answer : '';\n}\n\nconst nameParts = (invitee.name || '').split(' ');\nconst firstName = nameParts[0] || '';\nconst lastName = nameParts.slice(1).join(' ') || '';\n\n// Generate a unique prospect ID for reliable cross-workflow matching\nconst prospectId = 'VV-' + Date.now().toString(36).toUpperCase();\n\nreturn [{\n  json: {\n    prospect_id: prospectId,\n    first_name: firstName,\n    last_name: lastName,\n    full_name: invitee.name || '',\n    email: (invitee.email || '').toLowerCase().trim(),\n    company_name: findAnswer('company'),\n    client_title: findAnswer('title') || findAnswer('role'),\n    company_address: findAnswer('address'),\n    company_city: findAnswer('city'),\n    company_state: findAnswer('state'),\n    company_zipcode: findAnswer('zip'),\n    scheduled_time: event.event?.start_time || event.scheduled_event?.start_time || '',\n    event_uri: event.event?.uri || event.scheduled_event?.uri || '',\n    status: 'Audit Scheduled',\n    booked_date: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "wf1-node-2",
+      "name": "Extract Invitee Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Prospects"
+        },
+        "options": {}
+      },
+      "id": "wf1-node-2b",
+      "name": "Read Prospects Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        912,
+        304
+      ],
+      "notes": "Read existing prospects to check for duplicates before appending."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check for duplicate prospects by email\nconst newProspect = $('Extract Invitee Data').first().json;\nconst existingRows = $('Read Prospects Sheet').all();\n\nconst email = newProspect.email;\nlet existingRow = null;\nlet existingIndex = -1;\n\nfor (let i = 0; i < existingRows.length; i++) {\n  const row = existingRows[i].json;\n  if (row.Email && row.Email.toLowerCase().trim() === email) {\n    existingRow = row;\n    existingIndex = i + 2; // +2 for header + 0-index\n    break;\n  }\n}\n\nreturn [{\n  json: {\n    ...newProspect,\n    is_duplicate: !!existingRow,\n    existing_row_index: existingIndex,\n    existing_prospect_id: existingRow ? (existingRow.Prospect_ID || '') : ''\n  }\n}];"
+      },
+      "id": "wf1-node-2c",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        304
+      ],
+      "notes": "Checks if a prospect with the same email already exists. If so, we update instead of append."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.is_duplicate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf1-node-2d",
+      "name": "IF Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Audit Scheduled",
+            "Scheduled_Time": "={{ $json.scheduled_time }}",
+            "Booked_Date": "={{ $json.booked_date }}"
+          }
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "wf1-node-2e",
+      "name": "Update Existing Prospect",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1584,
+        208
+      ],
+      "notes": "Updates existing prospect row with new booking info instead of creating a duplicate."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Prospect_ID": "={{ $json.prospect_id }}",
+            "First_Name": "={{ $json.first_name }}",
+            "Last_Name": "={{ $json.last_name }}",
+            "Full_Name": "={{ $json.full_name }}",
+            "Email": "={{ $json.email }}",
+            "Company_Name": "={{ $json.company_name }}",
+            "Client_Title": "={{ $json.client_title }}",
+            "Company_Address": "={{ $json.company_address }}",
+            "Company_City": "={{ $json.company_city }}",
+            "Company_State": "={{ $json.company_state }}",
+            "Company_Zipcode": "={{ $json.company_zipcode }}",
+            "Scheduled_Time": "={{ $json.scheduled_time }}",
+            "Event_URI": "={{ $json.event_uri }}",
+            "Status": "={{ $json.status }}",
+            "Booked_Date": "={{ $json.booked_date }}",
+            "Proposal_Link": "",
+            "Form_Link": "",
+            "Drive_Folder_ID": ""
+          }
+        },
+        "options": {}
+      },
+      "id": "wf1-node-3",
+      "name": "Add to Prospects Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1584,
+        400
+      ],
+      "notes": "Replace YOUR_SPREADSHEET_ID with your actual Google Sheet ID. Create a sheet called 'Prospects' with matching column headers. New column: Prospect_ID for reliable cross-workflow matching."
+    },
+    {
+      "parameters": {
+        "text": "=:calendar: *New Audit Call Booked*\n\nClient: {{ $('Extract Invitee Data').first().json.full_name }}\nCompany: {{ $('Extract Invitee Data').first().json.company_name }}\nEmail: {{ $('Extract Invitee Data').first().json.email }}\nScheduled: {{ $('Extract Invitee Data').first().json.scheduled_time }}\n\n_Prospect added to pipeline._",
+        "otherOptions": {}
+      },
+      "id": "wf1-node-4",
+      "name": "Slack Notify Booking",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        304
+      ],
+      "webhookId": "faec10e3-48c0-49b8-8e67-4accf3472094",
+      "notes": "Sends a notification when a new audit call is booked."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Calendly Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter Bookings Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Bookings Only": {
+      "main": [
+        [
+          {
+            "node": "Extract Invitee Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invitee Data": {
+      "main": [
+        [
+          {
+            "node": "Read Prospects Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Prospects Sheet": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "IF Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Update Existing Prospect",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add to Prospects Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Prospect": {
+      "main": [
+        [
+          {
+            "node": "Slack Notify Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Prospects Sheet": {
+      "main": [
+        [
+          {
+            "node": "Slack Notify Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "7f4ffd62-93c7-4644-b04c-ef34823c91e2",
+  "meta": {
+    "instanceId": "ea0340db5b8064116e794e0185a0bdec41ba3c48ebfd47c8bd55e58fde2a2625"
+  },
+  "id": "sfEABn2MQkv4nIHr",
+  "tags": []
+}

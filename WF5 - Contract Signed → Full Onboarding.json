@@ -1,0 +1,541 @@
+{
+  "name": "WF5 - Contract Signed → Full Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "signwell-signed",
+        "options": {}
+      },
+      "id": "wf5-node-1",
+      "name": "SignWell Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        256,
+        304
+      ],
+      "webhookId": "signwell-signed",
+      "notes": "In SignWell: Settings → Webhooks → Add webhook URL. Subscribe to 'document.completed' event."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event || $json.event_type || '' }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf5-node-2",
+      "name": "Filter Completed Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        480,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract doc info from SignWell webhook\nconst payload = $input.first().json;\nconst doc = payload.data || payload.document || payload;\n\nreturn [{\n  json: {\n    signwell_doc_id: doc.id || '',\n    doc_name: doc.name || doc.title || '',\n    completed_pdf_url: doc.completed_pdf || doc.pdf_url || doc.file_url || '',\n    recipients: doc.recipients || [],\n    client_name: (doc.recipients || []).find(r => r.role === 'Client')?.name || '',\n    client_email: (doc.recipients || []).find(r => r.role === 'Client')?.email || ''\n  }\n}];"
+      },
+      "id": "wf5-node-3",
+      "name": "Extract SignWell Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Client Tracker"
+        },
+        "options": {}
+      },
+      "id": "wf5-node-4",
+      "name": "Read Client Tracker",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match SignWell doc to client tracker row\nconst signwellData = $('Extract SignWell Data').first().json;\nconst rows = $('Read Client Tracker').all();\n\nlet matchedRow = null;\nlet matchedIndex = -1;\n\nfor (let i = 0; i < rows.length; i++) {\n  const row = rows[i].json;\n  if (row.SignWell_Doc_ID === signwellData.signwell_doc_id ||\n      (row.Email && row.Email.toLowerCase() === (signwellData.client_email || '').toLowerCase())) {\n    matchedRow = row;\n    matchedIndex = i + 2;\n    break;\n  }\n}\n\nif (!matchedRow) {\n  throw new Error('Could not match SignWell document to client tracker. Doc ID: ' + signwellData.signwell_doc_id);\n}\n\n// GATE: Idempotency — skip if already onboarded (prevents duplicate webhook processing)\nif (matchedRow.Status === 'Onboarded') {\n  throw new Error('Client ' + (matchedRow.Client_Name || matchedRow.Company) + ' is already onboarded. Skipping duplicate SignWell webhook.');\n}\n\n// GATE: Verify Invoice_ID exists before proceeding to Stripe send\nif (!matchedRow.Invoice_ID || matchedRow.Invoice_ID.trim() === '') {\n  throw new Error('No Invoice_ID found for ' + (matchedRow.Client_Name || matchedRow.Company) + '. Cannot send invoice. Check WF3 execution for this client.');\n}\n\n// GATE: Verify Drive_Folder_ID exists before proceeding to upload\nif (!matchedRow.Drive_Folder_ID || matchedRow.Drive_Folder_ID.trim() === '') {\n  throw new Error('No Drive_Folder_ID found for ' + (matchedRow.Client_Name || matchedRow.Company) + '. Cannot upload signed PDF. Check WF2/WF3 execution.');\n}\n\n// Build sanitized company name for Slack channel\nconst channelName = 'client-' + (matchedRow.Company || '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]/g, '-')\n  .replace(/-+/g, '-')\n  .replace(/^-|-$/g, '')\n  .substring(0, 60);\n\nreturn [{\n  json: {\n    ...signwellData,\n    client: matchedRow,\n    sheet_row: matchedIndex,\n    slack_channel_name: channelName\n  }\n}];"
+      },
+      "id": "wf5-node-5",
+      "name": "Match Client Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $json.client.Invoice_ID }}/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "wf5-node-5b",
+      "name": "Stripe Send Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        304
+      ],
+      "notes": "FIX: Invoice sending moved from WF3 to here. Only sends invoice AFTER contract is signed. Uses the Invoice_ID stored by WF3."
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Match Client Record').first().json.completed_pdf_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "wf5-node-6",
+      "name": "Download Signed PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        304
+      ],
+      "notes": "Downloads the signed contract PDF from SignWell's URL."
+    },
+    {
+      "parameters": {
+        "name": "=Signed SOW - {{ $('Match Client Record').first().json.client.Company }}.pdf",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "MY_DRIVE"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Match Client Record').first().json.client.Drive_Folder_ID }}"
+        },
+        "options": {}
+      },
+      "id": "wf5-node-7",
+      "name": "Upload to Client Drive Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1792,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/conversations.create",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $('Match Client Record').first().json.slack_channel_name }}\",\n  \"is_private\": false\n}",
+        "options": {}
+      },
+      "id": "wf5-node-8",
+      "name": "Create Slack Channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        208
+      ],
+      "notes": "HTTP Header Auth: Name=Authorization, Value=Bearer xoxb-YOUR_SLACK_BOT_TOKEN."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/conversations.setTopic",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"{{ $json.channel.id }}\",\n  \"topic\": \"{{ $('Match Client Record').first().json.client.Project }} | {{ $('Match Client Record').first().json.client.Company }}\"\n}",
+        "options": {}
+      },
+      "id": "wf5-node-9",
+      "name": "Set Channel Topic",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"{{ $('Create Slack Channel').first().json.channel.id }}\",\n  \"text\": \"Welcome to the {{ $('Match Client Record').first().json.client.Company }} project channel!\\n\\nProject: {{ $('Match Client Record').first().json.client.Project }}\\nClient: {{ $('Match Client Record').first().json.client.Client_Name }}\\nInvestment: {{ $('Match Client Record').first().json.client.Project_Cost }}\\n\\nContract is signed and filed. Welcome email with kickoff link has been sent.\\n\\nUse this channel for all project communications.\"\n}",
+        "options": {}
+      },
+      "id": "wf5-node-10",
+      "name": "Post Welcome Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2464,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_CHECKLIST_TEMPLATE_DOC_ID"
+        },
+        "name": "={{ $('Match Client Record').first().json.client.Company }} — Onboarding Checklist",
+        "options": {}
+      },
+      "id": "wf5-node-11",
+      "name": "Copy Onboarding Checklist",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2016,
+        512
+      ],
+      "notes": "Replace YOUR_CHECKLIST_TEMPLATE_DOC_ID."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/permissions",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"role\": \"commenter\",\n  \"type\": \"user\",\n  \"emailAddress\": \"{{ $('Match Client Record').first().json.client.Email }}\"\n}",
+        "options": {}
+      },
+      "id": "wf5-node-11b",
+      "name": "Share Checklist With Client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        512
+      ],
+      "notes": "FIX: Shares the onboarding checklist with the client. The welcome email promises this but the original workflow never did it."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"summary\": \"Send weekly update to {{ $('Match Client Record').first().json.client.Client_Name }} ({{ $('Match Client Record').first().json.client.Company }})\",\n  \"description\": \"Project: {{ $('Match Client Record').first().json.client.Project }}\\nEmail: {{ $('Match Client Record').first().json.client.Email }}\",\n  \"start\": {\n    \"dateTime\": \"{{ DateTime.now().plus({ days: 7 }).set({ hour: 9, minute: 0, second: 0 }).toISO() }}\",\n    \"timeZone\": \"America/Denver\"\n  },\n  \"end\": {\n    \"dateTime\": \"{{ DateTime.now().plus({ days: 7 }).set({ hour: 9, minute: 30, second: 0 }).toISO() }}\",\n    \"timeZone\": \"America/Denver\"\n  },\n  \"recurrence\": [\"RRULE:FREQ=WEEKLY;BYDAY=FR;UNTIL={{ $('Match Client Record').first().json.client.Project_End_Date ? $('Match Client Record').first().json.client.Project_End_Date.replace(/-/g, '') + 'T235959Z' : DateTime.now().plus({ months: 3 }).toFormat('yyyyMMdd') + 'T235959Z' }}\"],\n  \"reminders\": {\n    \"useDefault\": false,\n    \"overrides\": [\n      { \"method\": \"popup\", \"minutes\": 30 }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "wf5-node-13",
+      "name": "Create Weekly Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2464,
+        512
+      ],
+      "notes": "FIX: Calendar reminder now has an UNTIL date based on Project_End_Date (falls back to 3 months). No longer repeats forever."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Match Client Record').first().json.client.Email }}",
+        "subject": "=Welcome to Veteran Vectors — {{ $('Match Client Record').first().json.client.Project }}",
+        "message": "=Hi {{ $('Match Client Record').first().json.client.Client_Name }},\n\nGreat news — your Statement of Work for {{ $('Match Client Record').first().json.client.Project }} is fully signed and we're ready to roll.\n\nHere's what happens next:\n\n1. Book your kickoff call: https://calendly.com/YOUR_CALENDLY_LINK/kickoff\n\n2. Review your onboarding checklist — I've shared a Google Doc with the items we'll need from you to get started. You should have received a sharing notification.\n\n3. Your signed contract has been saved to your project folder for reference.\n\n4. Your initial invoice has been sent via Stripe — you'll receive a separate email with payment details.\n\nDuring the kickoff call, we'll walk through the project timeline, confirm priorities, and make sure we have everything needed to hit the ground running.\n\nLooking forward to building this with you.\n\nAnthony Pinto\nVeteran Vectors LLC\nanthony@veteranvectors.com",
+        "options": {}
+      },
+      "id": "wf5-node-12",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2672,
+        304
+      ],
+      "webhookId": "69cccc46-3b97-4a08-aede-1b868c020154",
+      "notes": "FIX: Updated email to mention that invoice has been sent (since it's now sent in WF5). Replace YOUR_CALENDLY_LINK."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Client Tracker"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Onboarded",
+            "Signed_Date": "={{ new Date().toISOString() }}",
+            "Slack_Channel": "={{ $('Create Slack Channel').first().json.channel.id }}"
+          }
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "wf5-node-14",
+      "name": "Update Tracker to Onboarded",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2896,
+        304
+      ],
+      "notes": "FIX: Now uses lookupColumn=SignWell_Doc_ID to reliably target the correct row."
+    },
+    {
+      "parameters": {
+        "text": "=:white_check_mark: *{{ $('Match Client Record').first().json.client.Company }} is fully onboarded!*\n\n- Contract signed\n- Invoice sent\n- Slack channel created\n- Onboarding checklist shared\n- Welcome email sent\n- Weekly reminder scheduled\n\n_Kickoff call link sent to {{ $('Match Client Record').first().json.client.Client_Name }}._",
+        "otherOptions": {}
+      },
+      "id": "wf5-node-15",
+      "name": "Slack Final Confirmation",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        3120,
+        304
+      ],
+      "webhookId": "71b069ec-f479-4c15-ac8c-b0d12b1a40f0"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SignWell Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter Completed Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Completed Only": {
+      "main": [
+        [
+          {
+            "node": "Extract SignWell Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract SignWell Data": {
+      "main": [
+        [
+          {
+            "node": "Read Client Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Client Tracker": {
+      "main": [
+        [
+          {
+            "node": "Match Client Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Client Record": {
+      "main": [
+        [
+          {
+            "node": "Stripe Send Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Send Invoice": {
+      "main": [
+        [
+          {
+            "node": "Download Signed PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Signed PDF": {
+      "main": [
+        [
+          {
+            "node": "Upload to Client Drive Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Client Drive Folder": {
+      "main": [
+        [
+          {
+            "node": "Create Slack Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Slack Channel": {
+      "main": [
+        [
+          {
+            "node": "Set Channel Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Channel Topic": {
+      "main": [
+        [
+          {
+            "node": "Post Welcome Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Welcome Message": {
+      "main": [
+        [
+          {
+            "node": "Copy Onboarding Checklist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copy Onboarding Checklist": {
+      "main": [
+        [
+          {
+            "node": "Share Checklist With Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share Checklist With Client": {
+      "main": [
+        [
+          {
+            "node": "Create Weekly Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Weekly Reminder": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Update Tracker to Onboarded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Tracker to Onboarded": {
+      "main": [
+        [
+          {
+            "node": "Slack Final Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "fe471380-d1fe-4bcd-89e9-26c3a3b6e6d9",
+  "meta": {
+    "instanceId": "ea0340db5b8064116e794e0185a0bdec41ba3c48ebfd47c8bd55e58fde2a2625"
+  },
+  "id": "zKn9pSTmyMQHJdad",
+  "tags": []
+}
