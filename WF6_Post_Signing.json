@@ -19,6 +19,17 @@
     },
     {
       "parameters": {
+        "jsCode": "// Verify SignWell webhook signature\nconst crypto = require('crypto');\nconst SIGNWELL_WEBHOOK_SECRET = 'YOUR_SIGNWELL_WEBHOOK_SECRET';\n\nconst raw = $input.first().json;\nconst headers = raw.headers || {};\nconst signature = headers['x-signwell-signature'] || headers['x-webhook-signature'] || '';\n\nif (!signature) {\n  throw new Error('Missing SignWell webhook signature. Rejecting request.');\n}\n\nconst body = raw.rawBody || JSON.stringify(raw.body || raw);\nconst computed = crypto.createHmac('sha256', SIGNWELL_WEBHOOK_SECRET).update(body).digest('hex');\n\nif (computed !== signature) {\n  throw new Error('SignWell webhook signature mismatch. Rejecting request.');\n}\n\nreturn $input.all();"
+      },
+      "id": "wf6-node-1b",
+      "name": "Verify SignWell Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [360, 300],
+      "notes": "Replace YOUR_SIGNWELL_WEBHOOK_SECRET with the secret from SignWell → Settings → Webhooks."
+    },
+    {
+      "parameters": {
         "conditions": {
           "combinator": "and",
           "conditions": [
@@ -94,7 +105,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Find the matching project and extract Stripe IDs from project metadata\n// Since Stripe IDs are stored as metadata during WF4, we need to look them up\nconst matchData = $('Match & Validate').first().json;\nconst projects = $('Find Notion Project').all();\n\n// For Stripe invoice ID and customer ID, we need to query Stripe\n// using the client email since we stored it in customer metadata\nreturn [{\n  json: {\n    ...matchData,\n    needs_stripe_lookup: true\n  }\n}];"
+        "jsCode": "// Find the matching project and extract its page ID for status update later\nconst matchData = $('Match & Validate').first().json;\nconst projects = $('Find Notion Project').all();\n\n// Match project to client by looking for the contact name or company in the project name\nlet projectPageId = '';\nfor (const proj of projects) {\n  const page = proj.json;\n  const props = page.properties || {};\n  const projName = (props['Project Name']?.title?.[0]?.plain_text || '').toLowerCase();\n  const company = (matchData.company_name || '').toLowerCase();\n  const name = (matchData.contact_name || '').toLowerCase();\n  if ((company && projName.includes(company)) || (name && projName.includes(name))) {\n    projectPageId = page.id;\n    break;\n  }\n}\n// If no match by name, take the first one (most common case: one contract sent at a time)\nif (!projectPageId && projects.length > 0) {\n  projectPageId = projects[0].json.id;\n}\n\nreturn [{\n  json: {\n    ...matchData,\n    notion_project_id: projectPageId,\n    needs_stripe_lookup: true\n  }\n}];"
       },
       "id": "wf6-node-5c",
       "name": "Prepare Stripe Lookup",
@@ -248,13 +259,10 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://www.googleapis.com/drive/v3/files",
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files?q={{ encodeURIComponent(\"name contains '\" + ($('Extract Invoice ID').first().json.company_name || $('Extract Invoice ID').first().json.contact_name) + \"' and mimeType = 'application/vnd.google-apps.folder' and 'YOUR_CLIENTS_FOLDER_ID' in parents\") }}&fields={{ encodeURIComponent('files(id, name)') }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"q\": \"name contains '{{ $('Extract Invoice ID').first().json.company_name || $('Extract Invoice ID').first().json.contact_name }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ 'YOUR_CLIENTS_FOLDER_ID' }}' in parents\",\n  \"fields\": \"files(id, name)\"\n}",
         "options": {}
       },
       "id": "wf6-node-9b",
@@ -374,19 +382,41 @@
     },
     {
       "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Prepare Stripe Lookup').first().json.notion_project_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Project Status", "selectValue": "Active" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf6-node-15b",
+      "name": "Update Notion Project - Active",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [5530, 300],
+      "notes": "Updates the Notion Project record to 'Active' so WF7 weekly check-ins can find it."
+    },
+    {
+      "parameters": {
         "channel": "#onboarding-alerts",
-        "text": "=:white_check_mark: *{{ $('Match & Validate').first().json.company_name }} is fully onboarded!*\n\n• Contract signed\n• Invoice sent (half upfront)\n• Retainer subscription activated\n• Signed contract saved to Drive\n• Private Slack channel created\n• Welcome email sent\n• Weekly Thursday check-in scheduled\n\n_Kickoff call link sent to {{ $('Match & Validate').first().json.contact_name }}._",
+        "text": "=:white_check_mark: *{{ $('Match & Validate').first().json.company_name }} is fully onboarded!*\n\n• Contract signed\n• Invoice sent (half upfront)\n• Retainer subscription activated\n• Signed contract saved to Drive\n• Private Slack channel created\n• Welcome email sent\n• Weekly Thursday check-in scheduled\n• Project marked Active in Notion\n\n_Kickoff call link sent to {{ $('Match & Validate').first().json.contact_name }}._",
         "otherOptions": {}
       },
       "id": "wf6-node-16",
       "name": "Slack Final Confirmation",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [5530, 300]
+      "position": [5750, 300]
     }
   ],
   "connections": {
     "SignWell Webhook": {
+      "main": [[{ "node": "Verify SignWell Signature", "type": "main", "index": 0 }]]
+    },
+    "Verify SignWell Signature": {
       "main": [[{ "node": "Filter Completed Only", "type": "main", "index": 0 }]]
     },
     "Filter Completed Only": {
@@ -462,6 +492,9 @@
       "main": [[{ "node": "Create Thursday Calendar Reminder", "type": "main", "index": 0 }]]
     },
     "Create Thursday Calendar Reminder": {
+      "main": [[{ "node": "Update Notion Project - Active", "type": "main", "index": 0 }]]
+    },
+    "Update Notion Project - Active": {
       "main": [[{ "node": "Slack Final Confirmation", "type": "main", "index": 0 }]]
     }
   },

@@ -19,6 +19,17 @@
     },
     {
       "parameters": {
+        "jsCode": "// Verify BlueDot webhook authenticity\nconst BLUEDOT_SECRET = 'YOUR_BLUEDOT_WEBHOOK_SECRET';\n\nconst headers = $input.first().json.headers || {};\nconst authHeader = headers['x-webhook-secret'] || headers['authorization'] || headers['x-bluedot-signature'] || '';\n\nif (!authHeader || !authHeader.includes(BLUEDOT_SECRET)) {\n  throw new Error('BlueDot webhook authentication failed. Rejecting request.');\n}\n\nreturn $input.all();"
+      },
+      "id": "wf3-node-1b",
+      "name": "Verify BlueDot Auth",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [360, 300],
+      "notes": "Replace YOUR_BLUEDOT_WEBHOOK_SECRET. Same secret as WF2."
+    },
+    {
+      "parameters": {
         "conditions": {
           "options": { "caseSensitive": false },
           "combinator": "or",
@@ -73,7 +84,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Match to Notion contact and get Drive folder ID\nconst bluedotData = $('Extract BlueDot Data').first().json;\nconst notionResults = $('Find Notion Contact').all();\n\nlet match = null;\nfor (const result of notionResults) {\n  const page = result.json;\n  const props = page.properties || {};\n  const email = props.Email?.email || '';\n  const name = props.Name?.title?.[0]?.plain_text || '';\n\n  if (bluedotData.client_email && email.toLowerCase() === bluedotData.client_email.toLowerCase()) {\n    match = page; break;\n  }\n  if (bluedotData.client_name && name.toLowerCase().includes(bluedotData.client_name.toLowerCase())) {\n    match = page; break;\n  }\n}\n\nif (!match) {\n  throw new Error('Could not match audit recording to any Notion contact. Client: ' + bluedotData.client_name + ' / ' + bluedotData.client_email);\n}\n\nconst props = match.properties || {};\nconst contactName = props.Name?.title?.[0]?.plain_text || bluedotData.client_name;\nconst company = props.Company?.rich_text?.[0]?.plain_text || '';\nconst notes = props.Notes?.rich_text?.[0]?.plain_text || '';\n\n// Check Notion page content/children for Drive folder ID\n// The Drive folder ID should have been stored by WF2\n// We'll look for it in the page properties or pass it through\n\nreturn [{\n  json: {\n    ...bluedotData,\n    notion_page_id: match.id,\n    contact_name: contactName,\n    company_name: company,\n    existing_notes: notes\n  }\n}];"
+        "jsCode": "// Match to Notion contact and get Drive folder ID\nconst bluedotData = $('Extract BlueDot Data').first().json;\nconst notionResults = $('Find Notion Contact').all();\n\nlet match = null;\nfor (const result of notionResults) {\n  const page = result.json;\n  const props = page.properties || {};\n  const email = props.Email?.email || '';\n  const name = props.Name?.title?.[0]?.plain_text || '';\n\n  if (bluedotData.client_email && email.toLowerCase() === bluedotData.client_email.toLowerCase()) {\n    match = page; break;\n  }\n  if (bluedotData.client_name && name.toLowerCase().includes(bluedotData.client_name.toLowerCase())) {\n    match = page; break;\n  }\n}\n\nif (!match) {\n  throw new Error('Could not match audit recording to any Notion contact. Client: ' + bluedotData.client_name + ' / ' + bluedotData.client_email);\n}\n\nconst props = match.properties || {};\nconst contactName = props.Name?.title?.[0]?.plain_text || bluedotData.client_name;\nconst company = props.Company?.rich_text?.[0]?.plain_text || '';\nconst notes = props.Notes?.rich_text?.[0]?.plain_text || '';\n\n// Extract Drive folder ID from Notes (stored by WF2 as 'Drive Folder: FOLDER_ID')\nlet storedFolderId = '';\nconst folderMatch = notes.match(/Drive Folder:\\s*([a-zA-Z0-9_-]+)/);\nif (folderMatch) {\n  storedFolderId = folderMatch[1];\n}\n\nreturn [{\n  json: {\n    ...bluedotData,\n    notion_page_id: match.id,\n    contact_name: contactName,\n    company_name: company,\n    existing_notes: notes,\n    stored_drive_folder_id: storedFolderId\n  }\n}];"
       },
       "id": "wf3-node-5",
       "name": "Match to Notion Contact",
@@ -83,13 +94,10 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://www.googleapis.com/drive/v3/files",
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files?q={{ encodeURIComponent(\"name contains '\" + ($json.company_name || $json.contact_name) + \"' and mimeType = 'application/vnd.google-apps.folder' and 'YOUR_CLIENTS_FOLDER_ID' in parents\") }}&fields={{ encodeURIComponent('files(id, name)') }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"q\": \"name contains '{{ $json.company_name || $json.contact_name }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ 'YOUR_CLIENTS_FOLDER_ID' }}' in parents\",\n  \"fields\": \"files(id, name)\"\n}",
         "options": {}
       },
       "id": "wf3-node-5b",
@@ -101,7 +109,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get the folder ID from search results, or create one if needed\nconst searchResult = $input.first().json;\nconst matchData = $('Match to Notion Contact').first().json;\n\nlet folderId = '';\nif (searchResult.files && searchResult.files.length > 0) {\n  folderId = searchResult.files[0].id;\n}\n\nreturn [{\n  json: {\n    ...matchData,\n    drive_folder_id: folderId,\n    needs_folder: !folderId\n  }\n}];"
+        "jsCode": "// Get the folder ID: prefer Notion-stored ID, then Drive search, else create\nconst searchResult = $input.first().json;\nconst matchData = $('Match to Notion Contact').first().json;\n\n// Priority 1: Folder ID stored in Notion by WF2\nlet folderId = matchData.stored_drive_folder_id || '';\n\n// Priority 2: Drive search results\nif (!folderId && searchResult.files && searchResult.files.length > 0) {\n  folderId = searchResult.files[0].id;\n}\n\nreturn [{\n  json: {\n    ...matchData,\n    drive_folder_id: folderId,\n    needs_folder: !folderId\n  }\n}];"
       },
       "id": "wf3-node-5c",
       "name": "Resolve Folder ID",
@@ -352,6 +360,9 @@
   ],
   "connections": {
     "BlueDot Webhook": {
+      "main": [[{ "node": "Verify BlueDot Auth", "type": "main", "index": 0 }]]
+    },
+    "Verify BlueDot Auth": {
       "main": [[{ "node": "Filter Audit Calls Only", "type": "main", "index": 0 }]]
     },
     "Filter Audit Calls Only": {

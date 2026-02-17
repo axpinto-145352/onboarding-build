@@ -19,6 +19,17 @@
     },
     {
       "parameters": {
+        "jsCode": "// Verify BlueDot webhook authenticity\n// BlueDot may use a shared secret or API key in headers\nconst BLUEDOT_SECRET = 'YOUR_BLUEDOT_WEBHOOK_SECRET';\n\nconst headers = $input.first().json.headers || {};\nconst authHeader = headers['x-webhook-secret'] || headers['authorization'] || headers['x-bluedot-signature'] || '';\n\nif (!authHeader || !authHeader.includes(BLUEDOT_SECRET)) {\n  throw new Error('BlueDot webhook authentication failed. Rejecting request.');\n}\n\nreturn $input.all();"
+      },
+      "id": "wf2-node-1b",
+      "name": "Verify BlueDot Auth",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [360, 300],
+      "notes": "Replace YOUR_BLUEDOT_WEBHOOK_SECRET with the secret configured in BlueDot webhook settings."
+    },
+    {
+      "parameters": {
         "conditions": {
           "options": { "caseSensitive": false },
           "combinator": "or",
@@ -170,7 +181,7 @@
           "propertyValues": [
             { "key": "Status", "selectValue": "Meeting Held" },
             { "key": "Audit Call", "checkboxValue": "={{ $json.needs_audit_call }}" },
-            { "key": "Notes", "richTextValue": "=Discovery Call Summary:\n{{ $json.meeting_summary }}\n\nAction Items:\n{{ $json.action_items.join('\\n• ') }}\n\nNext Steps: {{ $json.next_steps }}\n\nClient Priorities: {{ $json.client_priorities }}" },
+            { "key": "Notes", "richTextValue": "=Drive Folder: {{ $json.drive_folder_id }}\n\nDiscovery Call Summary:\n{{ $json.meeting_summary }}\n\nAction Items:\n{{ $json.action_items.join('\\n• ') }}\n\nNext Steps: {{ $json.next_steps }}\n\nClient Priorities: {{ $json.client_priorities }}" },
             { "key": "Action Items ", "richTextValue": "={{ $json.action_items.join('\\n') }}" },
             { "key": "Need to Follow Up Date", "dateValue": "={{ $json.follow_up_date || '' }}" }
           ]
@@ -223,6 +234,11 @@
   ],
   "connections": {
     "BlueDot Webhook": {
+      "main": [
+        [{ "node": "Verify BlueDot Auth", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verify BlueDot Auth": {
       "main": [
         [{ "node": "Filter Discovery Calls", "type": "main", "index": 0 }]
       ]

@@ -236,7 +236,8 @@
         "pageId": "={{ $('Validate Form Data').first().json.notion_page_id }}",
         "propertiesUi": {
           "propertyValues": [
-            { "key": "Status", "selectValue": "Contract Sent" }
+            { "key": "Status", "selectValue": "Contract Sent" },
+            { "key": "Last Contact Date", "dateValue": "={{ new Date().toISOString() }}" }
           ]
         },
         "options": {}
@@ -246,7 +247,7 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
       "position": [2450, 300],
-      "notes": "Updates the Notion contact status to 'Contract Sent'."
+      "notes": "Updates the Notion contact status to 'Contract Sent'. Also sets Last Contact Date so WF5 reminders calculate from the correct date."
     },
     {
       "parameters": {
@@ -256,6 +257,7 @@
         "propertiesUi": {
           "propertyValues": [
             { "key": "Project Name", "title": "={{ $('Validate Form Data').first().json.Project_Name }}" },
+            { "key": "Client", "relationValue": ["={{ $('Validate Form Data').first().json.notion_page_id }}"] },
             { "key": "Project Cost", "numberValue": "={{ parseFloat(String($('Validate Form Data').first().json.Project_Cost).replace(/[^0-9.]/g, '')) || 0 }}" },
             { "key": "Retainer", "numberValue": "={{ parseFloat(String($('Validate Form Data').first().json.Monthly_Retainer).replace(/[^0-9.]/g, '')) || 0 }}" },
             { "key": "Project Status", "selectValue": "Contract Sent" },

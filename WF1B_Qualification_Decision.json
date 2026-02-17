@@ -19,6 +19,17 @@
     },
     {
       "parameters": {
+        "jsCode": "// Verify Slack request signature using signing secret\nconst crypto = require('crypto');\nconst SLACK_SIGNING_SECRET = 'YOUR_SLACK_SIGNING_SECRET';\n\nconst raw = $input.first().json;\nconst headers = raw.headers || {};\nconst timestamp = headers['x-slack-request-timestamp'] || '';\nconst slackSig = headers['x-slack-signature'] || '';\n\nif (!timestamp || !slackSig) {\n  throw new Error('Missing Slack signature headers. Rejecting request.');\n}\n\n// Reject requests older than 5 minutes to prevent replay attacks\nconst now = Math.floor(Date.now() / 1000);\nif (Math.abs(now - parseInt(timestamp)) > 300) {\n  throw new Error('Slack request timestamp too old. Possible replay attack.');\n}\n\n// Reconstruct the request body for verification\nconst body = raw.rawBody || JSON.stringify(raw.body || raw);\nconst sigBasestring = 'v0:' + timestamp + ':' + body;\nconst computed = 'v0=' + crypto.createHmac('sha256', SLACK_SIGNING_SECRET).update(sigBasestring).digest('hex');\n\nif (!crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(slackSig))) {\n  throw new Error('Slack signature verification failed. Rejecting request.');\n}\n\nreturn $input.all();"
+      },
+      "id": "wf1b-node-1b",
+      "name": "Verify Slack Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [360, 300],
+      "notes": "Replace YOUR_SLACK_SIGNING_SECRET with the signing secret from your Slack app → Basic Information → App Credentials."
+    },
+    {
+      "parameters": {
         "jsCode": "// Parse Slack interaction payload\n// Slack sends interactions as application/x-www-form-urlencoded with a 'payload' JSON field\nconst raw = $input.first().json;\nlet interaction;\n\nif (raw.payload) {\n  interaction = typeof raw.payload === 'string' ? JSON.parse(raw.payload) : raw.payload;\n} else {\n  interaction = raw;\n}\n\nconst action = interaction.actions?.[0] || {};\nconst actionId = action.action_id || '';\nlet leadData = {};\n\ntry {\n  leadData = JSON.parse(action.value || '{}');\n} catch (e) {\n  leadData = {};\n}\n\nif (!actionId.includes('accept') && !actionId.includes('deny')) {\n  throw new Error('Unknown action: ' + actionId + '. This webhook only handles accept_lead and deny_lead actions.');\n}\n\nconst isAccept = actionId === 'accept_lead';\nconst responseUrl = interaction.response_url || '';\nconst channelId = interaction.channel?.id || '';\nconst messageTs = interaction.message?.ts || '';\n\nreturn [{\n  json: {\n    action: isAccept ? 'accept' : 'deny',\n    prospect_id: leadData.prospect_id || '',\n    notion_page_id: leadData.notion_page_id || '',\n    email: leadData.email || '',\n    full_name: leadData.full_name || '',\n    calendly_event_uuid: leadData.calendly_event_uuid || '',\n    response_url: responseUrl,\n    channel_id: channelId,\n    message_ts: messageTs\n  }\n}];"
       },
       "id": "wf1b-node-2",
@@ -158,6 +169,11 @@
   ],
   "connections": {
     "Slack Interaction Webhook": {
+      "main": [
+        [{ "node": "Verify Slack Signature", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verify Slack Signature": {
       "main": [
         [{ "node": "Parse Slack Interaction", "type": "main", "index": 0 }]
       ]

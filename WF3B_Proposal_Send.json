@@ -19,6 +19,17 @@
     },
     {
       "parameters": {
+        "jsCode": "// Verify Slack request signature using signing secret\nconst crypto = require('crypto');\nconst SLACK_SIGNING_SECRET = 'YOUR_SLACK_SIGNING_SECRET';\n\nconst raw = $input.first().json;\nconst headers = raw.headers || {};\nconst timestamp = headers['x-slack-request-timestamp'] || '';\nconst slackSig = headers['x-slack-signature'] || '';\n\nif (!timestamp || !slackSig) {\n  throw new Error('Missing Slack signature headers. Rejecting request.');\n}\n\nconst now = Math.floor(Date.now() / 1000);\nif (Math.abs(now - parseInt(timestamp)) > 300) {\n  throw new Error('Slack request timestamp too old. Possible replay attack.');\n}\n\nconst body = raw.rawBody || JSON.stringify(raw.body || raw);\nconst sigBasestring = 'v0:' + timestamp + ':' + body;\nconst computed = 'v0=' + crypto.createHmac('sha256', SLACK_SIGNING_SECRET).update(sigBasestring).digest('hex');\n\nif (!crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(slackSig))) {\n  throw new Error('Slack signature verification failed. Rejecting request.');\n}\n\nreturn $input.all();"
+      },
+      "id": "wf3b-node-1b",
+      "name": "Verify Slack Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [360, 300],
+      "notes": "Replace YOUR_SLACK_SIGNING_SECRET. Same secret as WF1B."
+    },
+    {
+      "parameters": {
         "jsCode": "// Parse Slack interaction\nconst raw = $input.first().json;\nlet interaction;\nif (raw.payload) {\n  interaction = typeof raw.payload === 'string' ? JSON.parse(raw.payload) : raw.payload;\n} else {\n  interaction = raw;\n}\n\nconst action = interaction.actions?.[0] || {};\nconst actionId = action.action_id || '';\n\nif (actionId !== 'send_proposal') {\n  throw new Error('This webhook only handles send_proposal actions. Received: ' + actionId);\n}\n\nlet data = {};\ntry {\n  data = JSON.parse(action.value || '{}');\n} catch (e) {\n  data = {};\n}\n\nreturn [{\n  json: {\n    notion_page_id: data.notion_page_id || '',\n    client_email: data.client_email || '',\n    contact_name: data.contact_name || '',\n    company_name: data.company_name || '',\n    doc_id: data.doc_id || '',\n    drive_folder_id: data.drive_folder_id || '',\n    project_name: data.project_name || '',\n    response_url: interaction.response_url || ''\n  }\n}];"
       },
       "id": "wf3b-node-2",
@@ -101,6 +112,9 @@
   ],
   "connections": {
     "Slack Interaction Webhook": {
+      "main": [[{ "node": "Verify Slack Signature", "type": "main", "index": 0 }]]
+    },
+    "Verify Slack Signature": {
       "main": [[{ "node": "Parse Interaction", "type": "main", "index": 0 }]]
     },
     "Parse Interaction": {

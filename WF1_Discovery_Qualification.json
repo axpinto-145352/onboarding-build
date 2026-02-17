@@ -19,6 +19,17 @@
     },
     {
       "parameters": {
+        "jsCode": "// Verify Calendly webhook signature\n// Calendly uses HMAC-SHA256 with the signing key from your webhook subscription\nconst crypto = require('crypto');\nconst SIGNING_KEY = 'YOUR_CALENDLY_WEBHOOK_SIGNING_KEY';\n\nconst signature = $input.first().json.headers?.['calendly-webhook-signature'] || '';\nconst body = JSON.stringify($input.first().json.body || $input.first().json);\n\nif (!signature) {\n  throw new Error('Missing Calendly webhook signature. Rejecting request.');\n}\n\n// Calendly signature format: t=timestamp,v1=signature\nconst parts = {};\nsignature.split(',').forEach(part => {\n  const [key, val] = part.split('=');\n  parts[key] = val;\n});\n\nconst timestamp = parts.t || '';\nconst expectedSig = parts.v1 || '';\n\nif (!timestamp || !expectedSig) {\n  throw new Error('Invalid Calendly signature format. Rejecting request.');\n}\n\nconst payload = timestamp + '.' + body;\nconst computed = crypto.createHmac('sha256', SIGNING_KEY).update(payload).digest('hex');\n\nif (computed !== expectedSig) {\n  throw new Error('Calendly webhook signature mismatch. Rejecting request.');\n}\n\n// Signature valid — pass through the original data\nreturn $input.all();"
+      },
+      "id": "wf1-node-1b",
+      "name": "Verify Calendly Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [360, 300],
+      "notes": "Replace YOUR_CALENDLY_WEBHOOK_SIGNING_KEY with the signing key from Calendly → Webhooks → Your subscription."
+    },
+    {
+      "parameters": {
         "conditions": {
           "combinator": "and",
           "conditions": [
@@ -139,6 +150,11 @@
   ],
   "connections": {
     "Calendly Webhook": {
+      "main": [
+        [{ "node": "Verify Calendly Signature", "type": "main", "index": 0 }]
+      ]
+    },
+    "Verify Calendly Signature": {
       "main": [
         [{ "node": "Filter Bookings Only", "type": "main", "index": 0 }]
       ]
