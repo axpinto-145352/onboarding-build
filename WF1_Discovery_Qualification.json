@@ -1,0 +1,175 @@
+{
+  "name": "WF1 - Discovery Call Booked + Lead Qualification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calendly-discovery-booked",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wf1-node-1",
+      "name": "Calendly Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "calendly-discovery-booked",
+      "notes": "Set this webhook URL in Calendly → Webhooks. Subscribe to 'invitee.created' events for your Discovery Call event type."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event || '' }}",
+              "rightValue": "invitee.created",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf1-node-2",
+      "name": "Filter Bookings Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300],
+      "notes": "Only process 'invitee.created' events. Ignores cancellations and reschedules."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract invitee data + qualification answers from Calendly webhook\nconst payload = $input.first().json;\nconst event = payload.payload || payload;\nconst invitee = event.invitee || event;\nconst questions = event.questions_and_answers || invitee.questions_and_answers || [];\n\nfunction findAnswer(questionText) {\n  const q = questions.find(q =>\n    q.question.toLowerCase().includes(questionText.toLowerCase())\n  );\n  return q ? q.answer : '';\n}\n\nconst nameParts = (invitee.name || '').split(' ');\nconst firstName = nameParts[0] || '';\nconst lastName = nameParts.slice(1).join(' ') || '';\n\n// Extract all Calendly custom question answers\nconst phone = findAnswer('phone') || invitee.phone || '';\nconst email = (invitee.email || '').toLowerCase().trim();\nconst company = findAnswer('company') || findAnswer('business') || findAnswer('organization') || '';\nconst revenue = findAnswer('revenue') || findAnswer('annual') || findAnswer('monthly revenue') || '';\nconst employees = findAnswer('employee') || findAnswer('team size') || findAnswer('how many') || '';\nconst painPoints = findAnswer('challenge') || findAnswer('pain') || findAnswer('problem') || findAnswer('struggle') || '';\nconst budget = findAnswer('budget') || findAnswer('invest') || '';\nconst timeline = findAnswer('timeline') || findAnswer('when') || findAnswer('start') || '';\nconst source = findAnswer('hear') || findAnswer('find') || findAnswer('referr') || '';\nconst title = findAnswer('title') || findAnswer('role') || findAnswer('position') || '';\nconst industry = findAnswer('industry') || findAnswer('sector') || '';\nconst currentTools = findAnswer('tool') || findAnswer('software') || findAnswer('platform') || '';\nconst manualProcesses = findAnswer('manual') || findAnswer('automat') || findAnswer('workflow') || '';\n\n// Parse revenue to a number for qualification\nfunction parseRevenue(val) {\n  if (!val) return 0;\n  const cleaned = String(val).replace(/[^0-9.kmb]/gi, '');\n  let num = parseFloat(cleaned) || 0;\n  if (/m/i.test(val)) num *= 1000000;\n  else if (/k/i.test(val)) num *= 1000;\n  else if (/b/i.test(val)) num *= 1000000000;\n  return num;\n}\n\nfunction parseEmployees(val) {\n  if (!val) return 0;\n  const cleaned = String(val).replace(/[^0-9]/g, '');\n  return parseInt(cleaned) || 0;\n}\n\nconst revenueNum = parseRevenue(revenue);\nconst employeeNum = parseEmployees(employees);\n\n// ─── QUALIFICATION CRITERIA ───\n// Adjust these thresholds to match your ideal client profile\nconst qualificationReasons = [];\nlet qualified = true;\n\n// Revenue check: minimum $500K annual (adjust as needed)\nif (revenue && revenueNum > 0 && revenueNum < 500000) {\n  qualified = false;\n  qualificationReasons.push('Revenue below $500K threshold: ' + revenue);\n}\n\n// Must have described pain points or manual processes\nif (!painPoints && !manualProcesses) {\n  qualificationReasons.push('No pain points or manual processes described');\n}\n\n// Budget indication (soft check - warn but don't auto-disqualify)\nif (budget && (budget.toLowerCase().includes('no') || budget.toLowerCase().includes('none') || budget.toLowerCase().includes('$0'))) {\n  qualified = false;\n  qualificationReasons.push('No budget indicated: ' + budget);\n}\n\nconst prospectId = 'VV-' + Date.now().toString(36).toUpperCase();\nconst eventUri = event.event?.uri || event.scheduled_event?.uri || event.uri || '';\nconst scheduledTime = event.event?.start_time || event.scheduled_event?.start_time || '';\n\nreturn [{\n  json: {\n    prospect_id: prospectId,\n    first_name: firstName,\n    last_name: lastName,\n    full_name: invitee.name || '',\n    email: email,\n    phone: phone,\n    company_name: company,\n    title: title,\n    industry: industry,\n    revenue: revenue,\n    revenue_numeric: revenueNum,\n    employees: employees,\n    employee_count: employeeNum,\n    pain_points: painPoints,\n    manual_processes: manualProcesses,\n    budget: budget,\n    timeline: timeline,\n    current_tools: currentTools,\n    source: source,\n    scheduled_time: scheduledTime,\n    event_uri: eventUri,\n    calendly_event_uuid: eventUri ? eventUri.split('/').pop() : '',\n    qualified: qualified,\n    qualification_reasons: qualificationReasons,\n    booked_date: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "wf1-node-3",
+      "name": "Extract & Qualify Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300],
+      "notes": "Extracts all invitee data from Calendly webhook including custom question answers. Evaluates qualification criteria. Adjust the thresholds in the QUALIFICATION CRITERIA section to match your ideal client profile."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_CONTACTS_DB_ID" },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Name", "title": "={{ $json.full_name }}" },
+            { "key": "Email", "email": "={{ $json.email }}" },
+            { "key": "Company", "richTextValue": "={{ $json.company_name }}" },
+            { "key": "Title", "richTextValue": "={{ $json.title }}" },
+            { "key": "Source", "selectValue": "={{ $json.source || 'Discovery Call' }}" },
+            { "key": "Status", "selectValue": "={{ $json.qualified ? 'Discovery Scheduled' : 'Pending Review' }}" },
+            { "key": "Call Booked", "checkboxValue": true },
+            { "key": "LI Connection Accepted", "checkboxValue": false },
+            { "key": "LI Connection Sent", "checkboxValue": false },
+            { "key": "Last Contact Date", "dateValue": "={{ $json.booked_date }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf1-node-4",
+      "name": "Create Notion Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [910, 300],
+      "notes": "Replace YOUR_NOTION_CONTACTS_DB_ID with your actual Notion Contacts database ID. Creates a new contact page with all Calendly data."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store the Notion page ID for downstream use\nconst notionPage = $input.first().json;\nconst leadData = $('Extract & Qualify Lead').first().json;\n\nreturn [{\n  json: {\n    ...leadData,\n    notion_page_id: notionPage.id || notionPage.pageId || ''\n  }\n}];"
+      },
+      "id": "wf1-node-4b",
+      "name": "Merge Notion ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qualified }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf1-node-5",
+      "name": "IF Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1350, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:white_check_mark: *New Qualified Discovery Call Booked*\n\nName: {{ $json.full_name }}\nCompany: {{ $json.company_name }}\nEmail: {{ $json.email }}\nPhone: {{ $json.phone }}\nRevenue: {{ $json.revenue }}\nScheduled: {{ $json.scheduled_time }}\nPain Points: {{ $json.pain_points }}\nBudget: {{ $json.budget }}\n\n_Lead qualified and added to Notion CRM._",
+        "otherOptions": {}
+      },
+      "id": "wf1-node-6",
+      "name": "Slack Notify Qualified",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1570, 200],
+      "notes": "Notifies #onboarding-alerts when a qualified lead books a discovery call."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"#onboarding-alerts\",\n  \"text\": \"Lead does not meet qualification - review needed\",\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": { \"type\": \"plain_text\", \"text\": \"Lead Qualification Review Needed\" }\n    },\n    {\n      \"type\": \"section\",\n      \"fields\": [\n        { \"type\": \"mrkdwn\", \"text\": \"*Name:*\\n{{ $json.full_name }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Company:*\\n{{ $json.company_name || 'N/A' }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Email:*\\n{{ $json.email }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Phone:*\\n{{ $json.phone || 'N/A' }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Revenue:*\\n{{ $json.revenue || 'N/A' }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Scheduled:*\\n{{ $json.scheduled_time }}\" }\n      ]\n    },\n    {\n      \"type\": \"section\",\n      \"text\": { \"type\": \"mrkdwn\", \"text\": \"*Disqualification Reasons:*\\n{{ $json.qualification_reasons.join('\\\\n• ') }}\" }\n    },\n    {\n      \"type\": \"section\",\n      \"text\": { \"type\": \"mrkdwn\", \"text\": \"*Pain Points:*\\n{{ $json.pain_points || 'None provided' }}\" }\n    },\n    {\n      \"type\": \"actions\",\n      \"block_id\": \"lead_qualification_actions\",\n      \"elements\": [\n        {\n          \"type\": \"button\",\n          \"text\": { \"type\": \"plain_text\", \"text\": \"Accept Anyway\" },\n          \"style\": \"primary\",\n          \"action_id\": \"accept_lead\",\n          \"value\": \"{{ JSON.stringify({ prospect_id: $json.prospect_id, notion_page_id: $json.notion_page_id, email: $json.email, full_name: $json.full_name, calendly_event_uuid: $json.calendly_event_uuid }).replace(/\\\"/g, '\\\\\\\"') }}\"\n        },\n        {\n          \"type\": \"button\",\n          \"text\": { \"type\": \"plain_text\", \"text\": \"Deny & Send Free Resource\" },\n          \"style\": \"danger\",\n          \"action_id\": \"deny_lead\",\n          \"value\": \"{{ JSON.stringify({ prospect_id: $json.prospect_id, notion_page_id: $json.notion_page_id, email: $json.email, full_name: $json.full_name, calendly_event_uuid: $json.calendly_event_uuid }).replace(/\\\"/g, '\\\\\\\"') }}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "wf1-node-7",
+      "name": "Slack Interactive - Accept or Deny",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 400],
+      "notes": "Sends a Slack message with Accept/Deny buttons for leads that don't meet qualification. HTTP Header Auth: Name=Authorization, Value=Bearer xoxb-YOUR_SLACK_BOT_TOKEN. You must also set your n8n webhook URL as the Slack Interactivity Request URL in your Slack app settings."
+    }
+  ],
+  "connections": {
+    "Calendly Webhook": {
+      "main": [
+        [{ "node": "Filter Bookings Only", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Bookings Only": {
+      "main": [
+        [{ "node": "Extract & Qualify Lead", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract & Qualify Lead": {
+      "main": [
+        [{ "node": "Create Notion Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Notion Contact": {
+      "main": [
+        [{ "node": "Merge Notion ID", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge Notion ID": {
+      "main": [
+        [{ "node": "IF Qualified?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF Qualified?": {
+      "main": [
+        [{ "node": "Slack Notify Qualified", "type": "main", "index": 0 }],
+        [{ "node": "Slack Interactive - Accept or Deny", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

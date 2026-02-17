@@ -1,0 +1,344 @@
+{
+  "name": "WF4 - Client Onboarding (Form → Contract + Invoice + Notion)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "SOW Contract Submission",
+        "formDescription": "Generate and send contract + invoice for a new client. Fields are pre-populated from Notion where possible.",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Notion_Page_ID", "requiredField": true, "placeholder": "Auto-filled from Notion" },
+            { "fieldLabel": "First_Name", "requiredField": true },
+            { "fieldLabel": "Last_Name", "requiredField": true },
+            { "fieldLabel": "Full_Client_Name", "requiredField": true },
+            { "fieldLabel": "Client_Email", "requiredField": true },
+            { "fieldLabel": "Client_Title" },
+            { "fieldLabel": "Phone" },
+            { "fieldLabel": "Company_Name", "requiredField": true },
+            { "fieldLabel": "Project_Name", "requiredField": true },
+            { "fieldLabel": "Project_Scope", "requiredField": true },
+            { "fieldLabel": "Company_Address" },
+            { "fieldLabel": "Company_State", "requiredField": true },
+            { "fieldLabel": "Project_Start_Date", "requiredField": true },
+            { "fieldLabel": "Project_End_Date", "requiredField": true },
+            { "fieldLabel": "Milestones", "requiredField": true, "placeholder": "Phase 1: Discovery, Phase 2: Design, Phase 3: Build, Phase 4: Test, Phase 5: Deploy" },
+            { "fieldLabel": "Project_Cost", "requiredField": true, "placeholder": "$5,000" },
+            { "fieldLabel": "Initial_Payment", "requiredField": true, "placeholder": "$2,500 (50% upfront)" },
+            { "fieldLabel": "Final_Payment", "requiredField": true, "placeholder": "$2,500 (50% on completion)" },
+            { "fieldLabel": "Monthly_Retainer", "requiredField": true, "placeholder": "$500/month" },
+            { "fieldLabel": "Compliances", "placeholder": "SOC2, ITAR, CMMC, etc." },
+            { "fieldLabel": "Has_Retainer", "requiredField": true, "placeholder": "Yes or No" },
+            { "fieldLabel": "Retainer_Description" },
+            { "fieldLabel": "Drive_Folder_ID", "placeholder": "Auto-filled - Google Drive folder ID" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-1",
+      "name": "Onboarding Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [250, 300],
+      "notes": "Form fields are pre-populated via URL parameters from Notion data. The Notion_Page_ID and Drive_Folder_ID are hidden fields passed through the URL."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate financial fields\nconst form = $input.first().json;\n\nfunction parseAmount(val) {\n  if (!val) return 0;\n  const cleaned = String(val).replace(/[^0-9.]/g, '');\n  return parseFloat(cleaned) || 0;\n}\n\nconst projectCost = parseAmount(form.Project_Cost);\nconst initialPayment = parseAmount(form.Initial_Payment);\nconst finalPayment = parseAmount(form.Final_Payment);\nconst retainerAmount = parseAmount(form.Monthly_Retainer);\n\nconst errors = [];\nif (projectCost <= 0) errors.push('Project_Cost must be positive');\nif (initialPayment <= 0) errors.push('Initial_Payment must be positive');\nif (finalPayment <= 0) errors.push('Final_Payment must be positive');\n\nconst hasRetainer = (form.Has_Retainer || '').toLowerCase().trim() === 'yes';\nif (hasRetainer && retainerAmount <= 0) {\n  errors.push('Monthly_Retainer must be positive when Has_Retainer = Yes');\n}\n\nif (errors.length > 0) {\n  throw new Error('Form validation failed: ' + errors.join('; '));\n}\n\nreturn [{\n  json: {\n    ...form,\n    _validated: true,\n    _project_cost_cents: Math.round(projectCost * 100),\n    _initial_payment_cents: Math.round(initialPayment * 100),\n    _final_payment_cents: Math.round(finalPayment * 100),\n    _retainer_cents: Math.round(retainerAmount * 100),\n    _has_retainer: hasRetainer,\n    notion_page_id: form.Notion_Page_ID || '',\n    drive_folder_id: form.Drive_Folder_ID || ''\n  }\n}];"
+      },
+      "id": "wf4-node-2",
+      "name": "Validate Form Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build SignWell fields array\nconst form = $json;\n\nconst fields = [];\nfor (let i = 1; i <= 2; i++) fields.push({ api_id: `Full_Client_Name${i}`, value: form.Full_Client_Name });\nfor (let i = 1; i <= 25; i++) fields.push({ api_id: `Company_Name${i}`, value: form.Company_Name });\nfor (let i = 1; i <= 24; i++) fields.push({ api_id: `Project_Name${i}`, value: form.Project_Name });\nfor (let i = 1; i <= 3; i++) fields.push({ api_id: `Project_Start_Date${i}`, value: form.Project_Start_Date });\nfor (let i = 1; i <= 3; i++) fields.push({ api_id: `Project_End_Date${i}`, value: form.Project_End_Date });\n\nfields.push({ api_id: 'Company_State1', value: form.Company_State || '' });\nfields.push({ api_id: 'Company_Address1', value: form.Company_Address || '' });\nfields.push({ api_id: 'Client_Title1', value: form.Client_Title || '' });\nfields.push({ api_id: 'Milestones1', value: form.Milestones || '' });\nfields.push({ api_id: 'Project_Cost1', value: form.Project_Cost || '' });\nfields.push({ api_id: 'Monthly_Retainer1', value: form.Monthly_Retainer || '' });\nfields.push({ api_id: 'Initial_Payment1', value: form.Initial_Payment || '' });\nfields.push({ api_id: 'Final_Payment1', value: form.Final_Payment || '' });\nfields.push({ api_id: 'Compliances1', value: form.Compliances || '' });\n\nreturn [{\n  json: {\n    template_id: 'YOUR_SIGNWELL_TEMPLATE_ID',\n    doc_name: `SOW - ${form.Company_Name} - ${form.Project_Name}`,\n    client_name: form.Full_Client_Name,\n    client_email: form.Client_Email,\n    fields: fields,\n    form_data: form\n  }\n}];"
+      },
+      "id": "wf4-node-3",
+      "name": "Build SignWell Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300],
+      "notes": "Replace YOUR_SIGNWELL_TEMPLATE_ID with your SignWell template ID."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.signwell.com/api/v1/document_templates/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"template_id\": \"{{ $json.template_id }}\",\n  \"name\": \"{{ $json.doc_name }}\",\n  \"recipients\": [\n    { \"id\": \"1\", \"name\": \"{{ $json.client_name }}\", \"email\": \"{{ $json.client_email }}\", \"role\": \"Client\" },\n    { \"id\": \"2\", \"name\": \"Anthony Pinto\", \"email\": \"anthony@veteranvectors.com\", \"role\": \"Contractor\" }\n  ],\n  \"fields\": {{ JSON.stringify($json.fields) }},\n  \"test_mode\": false\n}",
+        "options": {}
+      },
+      "id": "wf4-node-4",
+      "name": "SignWell Send Contract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "notes": "HTTP Header Auth: Name=X-Api-Key, Value=YOUR_SIGNWELL_API_KEY."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/customers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "={{ $('Validate Form Data').first().json.Full_Client_Name }}" },
+            { "name": "email", "value": "={{ $('Validate Form Data').first().json.Client_Email }}" },
+            { "name": "phone", "value": "={{ $('Validate Form Data').first().json.Phone || '' }}" },
+            { "name": "metadata[company]", "value": "={{ $('Validate Form Data').first().json.Company_Name }}" },
+            { "name": "metadata[project]", "value": "={{ $('Validate Form Data').first().json.Project_Name }}" },
+            { "name": "metadata[notion_page_id]", "value": "={{ $('Validate Form Data').first().json.notion_page_id }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-5",
+      "name": "Stripe Create Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300],
+      "notes": "HTTP Header Auth: Name=Authorization, Value=Bearer sk_live_YOUR_STRIPE_SECRET_KEY."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/invoiceitems",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customer", "value": "={{ $('Stripe Create Customer').first().json.id }}" },
+            { "name": "amount", "value": "={{ $('Validate Form Data').first().json._initial_payment_cents }}" },
+            { "name": "currency", "value": "usd" },
+            { "name": "description", "value": "={{ $('Validate Form Data').first().json.Project_Name }} - Initial Payment (50%)" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-6",
+      "name": "Stripe Create Invoice Item",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/invoices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customer", "value": "={{ $('Stripe Create Customer').first().json.id }}" },
+            { "name": "collection_method", "value": "send_invoice" },
+            { "name": "days_until_due", "value": "30" },
+            { "name": "auto_advance", "value": "false" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-7",
+      "name": "Stripe Create Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 300],
+      "notes": "auto_advance=false — invoice is created but NOT sent. WF6 sends it after contract is signed."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Validate Form Data').first().json._has_retainer }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf4-node-8",
+      "name": "IF Has Retainer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1790, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "unit_amount", "value": "={{ $('Validate Form Data').first().json._retainer_cents }}" },
+            { "name": "currency", "value": "usd" },
+            { "name": "recurring[interval]", "value": "month" },
+            { "name": "product_data[name]", "value": "={{ $('Validate Form Data').first().json.Company_Name }} - Monthly Retainer" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-9",
+      "name": "Stripe Create Retainer Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2010, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/subscriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customer", "value": "={{ $('Stripe Create Customer').first().json.id }}" },
+            { "name": "items[0][price]", "value": "={{ $json.id }}" },
+            { "name": "collection_method", "value": "send_invoice" },
+            { "name": "days_until_due", "value": "30" },
+            { "name": "pause_collection[behavior]", "value": "void" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-10",
+      "name": "Stripe Create Subscription (Paused)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 200],
+      "notes": "Subscription is created paused. WF6 resumes it after contract signing, so the retainer starts at the next billing cycle."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Validate Form Data').first().json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Contract Sent" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-11",
+      "name": "Update Notion - Contract Sent",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2450, 300],
+      "notes": "Updates the Notion contact status to 'Contract Sent'."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_PROJECTS_DB_ID" },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Project Name", "title": "={{ $('Validate Form Data').first().json.Project_Name }}" },
+            { "key": "Project Cost", "numberValue": "={{ parseFloat(String($('Validate Form Data').first().json.Project_Cost).replace(/[^0-9.]/g, '')) || 0 }}" },
+            { "key": "Retainer", "numberValue": "={{ parseFloat(String($('Validate Form Data').first().json.Monthly_Retainer).replace(/[^0-9.]/g, '')) || 0 }}" },
+            { "key": "Project Status", "selectValue": "Contract Sent" },
+            { "key": "Free or Paid", "selectValue": "Paid" },
+            { "key": "Start Date", "dateValue": "={{ $('Validate Form Data').first().json.Project_Start_Date }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf4-node-12",
+      "name": "Create Notion Project",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2670, 300],
+      "notes": "Creates a project record in the Notion Projects DB. Replace YOUR_NOTION_PROJECTS_DB_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store all IDs for reference\nconst form = $('Validate Form Data').first().json;\nconst signwell = $('SignWell Send Contract').first().json;\nconst stripe = $('Stripe Create Customer').first().json;\nconst invoice = $('Stripe Create Invoice').first().json;\n\nreturn [{\n  json: {\n    signwell_doc_id: signwell.id || '',\n    stripe_customer_id: stripe.id || '',\n    invoice_id: invoice.id || '',\n    notion_page_id: form.notion_page_id,\n    drive_folder_id: form.drive_folder_id,\n    client_name: form.Full_Client_Name,\n    company_name: form.Company_Name,\n    project_name: form.Project_Name,\n    project_cost: form.Project_Cost,\n    client_email: form.Client_Email,\n    contract_sent_date: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "wf4-node-13",
+      "name": "Collect All IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2890, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:page_facing_up: *Contract Sent: {{ $json.company_name }}*\n\nProject: {{ $json.project_name }}\nTotal: {{ $json.project_cost }}\nSignWell Doc: {{ $json.signwell_doc_id }}\nStripe Customer: {{ $json.stripe_customer_id }}\n\n_Contract sent via SignWell. Invoice created (will be sent after signing). Daily reminders will start._",
+        "otherOptions": {}
+      },
+      "id": "wf4-node-14",
+      "name": "Slack Notify Contract Sent",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [3110, 300]
+    }
+  ],
+  "connections": {
+    "Onboarding Form": {
+      "main": [[{ "node": "Validate Form Data", "type": "main", "index": 0 }]]
+    },
+    "Validate Form Data": {
+      "main": [[{ "node": "Build SignWell Fields", "type": "main", "index": 0 }]]
+    },
+    "Build SignWell Fields": {
+      "main": [[{ "node": "SignWell Send Contract", "type": "main", "index": 0 }]]
+    },
+    "SignWell Send Contract": {
+      "main": [[{ "node": "Stripe Create Customer", "type": "main", "index": 0 }]]
+    },
+    "Stripe Create Customer": {
+      "main": [[{ "node": "Stripe Create Invoice Item", "type": "main", "index": 0 }]]
+    },
+    "Stripe Create Invoice Item": {
+      "main": [[{ "node": "Stripe Create Invoice", "type": "main", "index": 0 }]]
+    },
+    "Stripe Create Invoice": {
+      "main": [[{ "node": "IF Has Retainer?", "type": "main", "index": 0 }]]
+    },
+    "IF Has Retainer?": {
+      "main": [
+        [{ "node": "Stripe Create Retainer Price", "type": "main", "index": 0 }],
+        [{ "node": "Update Notion - Contract Sent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Stripe Create Retainer Price": {
+      "main": [[{ "node": "Stripe Create Subscription (Paused)", "type": "main", "index": 0 }]]
+    },
+    "Stripe Create Subscription (Paused)": {
+      "main": [[{ "node": "Update Notion - Contract Sent", "type": "main", "index": 0 }]]
+    },
+    "Update Notion - Contract Sent": {
+      "main": [[{ "node": "Create Notion Project", "type": "main", "index": 0 }]]
+    },
+    "Create Notion Project": {
+      "main": [[{ "node": "Collect All IDs", "type": "main", "index": 0 }]]
+    },
+    "Collect All IDs": {
+      "main": [[{ "node": "Slack Notify Contract Sent", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

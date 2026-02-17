@@ -1,0 +1,230 @@
+{
+  "name": "WF5 - Daily Contract & Invoice Reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 24, "triggerAtHour": 9 }]
+        }
+      },
+      "id": "wf5-node-1",
+      "name": "Daily 9AM Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_CONTACTS_DB_ID" },
+        "filterType": "formula",
+        "formula": "={{ JSON.stringify({ property: 'Status', select: { equals: 'Contract Sent' } }) }}",
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "wf5-node-2",
+      "name": "Query Notion - Contract Sent",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [470, 300],
+      "notes": "Queries all Notion contacts with status 'Contract Sent'. Replace YOUR_NOTION_CONTACTS_DB_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process each unsigned contract and determine if reminder is needed\nconst contacts = $input.all();\nconst results = [];\n\nfor (const contact of contacts) {\n  const page = contact.json;\n  const props = page.properties || {};\n  const name = props.Name?.title?.[0]?.plain_text || 'Unknown';\n  const email = props.Email?.email || '';\n  const company = props.Company?.rich_text?.[0]?.plain_text || '';\n  const lastContactDate = props['Last Contact Date']?.date?.start || '';\n  const notes = props.Notes?.rich_text?.[0]?.plain_text || '';\n\n  if (!email) continue;\n\n  // Determine days since contract was sent\n  // We use Last Contact Date as proxy for contract sent date\n  const sentDate = lastContactDate ? new Date(lastContactDate) : null;\n  if (!sentDate || isNaN(sentDate.getTime())) continue;\n\n  const now = new Date();\n  const daysSinceSent = Math.floor((now - sentDate) / (1000 * 60 * 60 * 24));\n\n  // Check if we already sent a reminder today by looking at notes\n  const lastReminderMatch = notes.match(/Last reminder: (\\d{4}-\\d{2}-\\d{2})/);\n  const lastReminderDate = lastReminderMatch ? lastReminderMatch[1] : '';\n  const today = now.toISOString().split('T')[0];\n\n  if (lastReminderDate === today) continue; // Already sent today\n\n  let reminderType = 'none';\n  if (daysSinceSent >= 30) {\n    reminderType = 'expire';\n  } else if (daysSinceSent >= 14) {\n    reminderType = 'escalation';\n  } else if (daysSinceSent >= 1) {\n    reminderType = 'daily';\n  }\n\n  if (reminderType !== 'none') {\n    results.push({\n      json: {\n        notion_page_id: page.id,\n        name: name,\n        email: email,\n        company: company,\n        days_since_sent: daysSinceSent,\n        reminder_type: reminderType,\n        first_name: name.split(' ')[0]\n      }\n    });\n  }\n}\n\nif (results.length === 0) {\n  return [{ json: { no_reminders: true } }];\n}\n\nreturn results;"
+      },
+      "id": "wf5-node-3",
+      "name": "Calculate Reminders Needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.no_reminders }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "wf5-node-4",
+      "name": "Has Reminders?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "expire",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf5-node-5",
+      "name": "IF 30-Day Expire?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Declined" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf5-node-6",
+      "name": "Notion - Auto Expire",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1350, 200],
+      "notes": "Auto-expires contracts after 30 days unsigned. Marks as Declined in Notion."
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:warning: *Contract auto-expired after 30 days: {{ $json.company }}*\nClient: {{ $json.name }}\nDays unsigned: {{ $json.days_since_sent }}\n\n_Marked as Declined in Notion._",
+        "otherOptions": {}
+      },
+      "id": "wf5-node-7",
+      "name": "Slack - Expired Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1570, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "escalation",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf5-node-8",
+      "name": "IF 14-Day Escalation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1350, 400]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Following up: {{ $json.company }} Statement of Work",
+        "message": "=Hi {{ $json.first_name }},\n\nI wanted to follow up on the Statement of Work I sent over. I know things get busy, so just wanted to make sure it didn't slip through the cracks.\n\nIf you have any questions about the scope, timeline, or investment, I'm happy to hop on a quick call to discuss.\n\nIf the timing isn't right, no worries at all — just let me know and we can revisit when it makes sense.\n\nBest,\nAnthony Pinto\nVeteran Vectors LLC",
+        "options": {}
+      },
+      "id": "wf5-node-9",
+      "name": "Send Daily Reminder Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1570, 500],
+      "notes": "Daily reminder for contracts under 14 days."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Action needed: {{ $json.company }} — Statement of Work",
+        "message": "=Hi {{ $json.first_name }},\n\nI wanted to reach out one more time regarding the Statement of Work for your project. It's been about two weeks since I sent it over.\n\nI want to make sure we can lock in your project timeline. If there's anything you'd like to adjust in the scope or terms, let me know and I'll get a revised version to you right away.\n\nIf everything looks good, you can sign directly from the email you received from SignWell.\n\nLooking forward to hearing from you.\n\nAnthony Pinto\nVeteran Vectors LLC",
+        "options": {}
+      },
+      "id": "wf5-node-10",
+      "name": "Send 14-Day Escalation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1570, 350]
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:warning: *Contract unsigned 14+ days: {{ $json.company }}*\nClient: {{ $json.name }} ({{ $json.days_since_sent }} days)\n_Consider personal outreach._",
+        "otherOptions": {}
+      },
+      "id": "wf5-node-11",
+      "name": "Slack - Escalation Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1790, 350]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Notes", "richTextValue": "=Last reminder: {{ new Date().toISOString().split('T')[0] }} ({{ $json.reminder_type }}, day {{ $json.days_since_sent }})" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf5-node-12",
+      "name": "Log Reminder in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2010, 400],
+      "notes": "Logs the reminder date in Notion to prevent duplicate sends."
+    }
+  ],
+  "connections": {
+    "Daily 9AM Check": {
+      "main": [[{ "node": "Query Notion - Contract Sent", "type": "main", "index": 0 }]]
+    },
+    "Query Notion - Contract Sent": {
+      "main": [[{ "node": "Calculate Reminders Needed", "type": "main", "index": 0 }]]
+    },
+    "Calculate Reminders Needed": {
+      "main": [[{ "node": "Has Reminders?", "type": "main", "index": 0 }]]
+    },
+    "Has Reminders?": {
+      "main": [[{ "node": "IF 30-Day Expire?", "type": "main", "index": 0 }]]
+    },
+    "IF 30-Day Expire?": {
+      "main": [
+        [{ "node": "Notion - Auto Expire", "type": "main", "index": 0 }],
+        [{ "node": "IF 14-Day Escalation?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion - Auto Expire": {
+      "main": [[{ "node": "Slack - Expired Alert", "type": "main", "index": 0 }]]
+    },
+    "IF 14-Day Escalation?": {
+      "main": [
+        [{ "node": "Send 14-Day Escalation Email", "type": "main", "index": 0 }],
+        [{ "node": "Send Daily Reminder Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send 14-Day Escalation Email": {
+      "main": [[{ "node": "Slack - Escalation Alert", "type": "main", "index": 0 }]]
+    },
+    "Slack - Escalation Alert": {
+      "main": [[{ "node": "Log Reminder in Notion", "type": "main", "index": 0 }]]
+    },
+    "Send Daily Reminder Email": {
+      "main": [[{ "node": "Log Reminder in Notion", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

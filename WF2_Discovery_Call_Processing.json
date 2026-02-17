@@ -1,0 +1,288 @@
+{
+  "name": "WF2 - Post-Discovery Call (BlueDot → Drive + Notion CRM)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bluedot-discovery",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wf2-node-1",
+      "name": "BlueDot Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "bluedot-discovery",
+      "notes": "Set this URL in BlueDot → Automation → Integrations → Webhook. This handles DISCOVERY call transcripts. Audit calls go to WF3."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "discovery",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "intro",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "veteran vectors",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "wf2-node-2",
+      "name": "Filter Discovery Calls",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300],
+      "notes": "Processes recordings with 'discovery', 'intro', or 'veteran vectors' in the title. Audit calls should contain 'audit' or 'RAPID' and will be handled by WF3."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract transcript data and attendee info from BlueDot payload\nconst bluedot = $input.first().json;\n\nconst transcript = bluedot.transcript || bluedot.content || '';\nconst summary = bluedot.summary || bluedot.notes || '';\nconst attendees = bluedot.attendees || bluedot.participants || [];\nconst title = bluedot.title || bluedot.meeting_title || bluedot.name || '';\nconst recordingDate = bluedot.date || bluedot.created_at || new Date().toISOString();\n\n// Extract attendee emails (excluding Anthony's)\nconst clientAttendees = attendees.filter(a => {\n  const email = (a.email || '').toLowerCase();\n  return email && !email.includes('veteranvectors') && !email.includes('anthony');\n});\n\nconst clientEmail = clientAttendees.length > 0 ? clientAttendees[0].email?.toLowerCase() : '';\nconst clientName = clientAttendees.length > 0 ? (clientAttendees[0].name || '') : '';\n\nif (!clientEmail && !clientName) {\n  throw new Error('Could not identify client attendee in BlueDot recording: ' + title + '. Attendees: ' + JSON.stringify(attendees.map(a => a.name || a.email)));\n}\n\nreturn [{\n  json: {\n    transcript: transcript,\n    summary: summary,\n    meeting_title: title,\n    recording_date: recordingDate,\n    client_email: clientEmail,\n    client_name: clientName,\n    attendees: attendees\n  }\n}];"
+      },
+      "id": "wf2-node-3",
+      "name": "Extract BlueDot Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_CONTACTS_DB_ID" },
+        "filterType": "formula",
+        "formula": "={{ JSON.stringify({ or: [ { property: 'Email', email: { equals: $json.client_email } }, { property: 'Name', title: { contains: $json.client_name } } ] }) }}",
+        "returnAll": false,
+        "limit": 5,
+        "options": {}
+      },
+      "id": "wf2-node-4",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [910, 300],
+      "notes": "Queries the Notion Contacts DB to find the matching contact by email or name. Replace YOUR_NOTION_CONTACTS_DB_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match BlueDot attendee to Notion contact\nconst bluedotData = $('Extract BlueDot Data').first().json;\nconst notionResults = $('Find Notion Contact').all();\n\nlet match = null;\nfor (const result of notionResults) {\n  const page = result.json;\n  const props = page.properties || {};\n  const email = props.Email?.email || '';\n  const name = props.Name?.title?.[0]?.plain_text || '';\n\n  if (bluedotData.client_email && email.toLowerCase() === bluedotData.client_email.toLowerCase()) {\n    match = page;\n    break;\n  }\n  if (bluedotData.client_name && name.toLowerCase().includes(bluedotData.client_name.toLowerCase())) {\n    match = page;\n    break;\n  }\n}\n\nif (!match) {\n  throw new Error('Could not match BlueDot recording to any Notion contact. Client: ' + bluedotData.client_name + ' / ' + bluedotData.client_email);\n}\n\nconst props = match.properties || {};\nconst contactName = props.Name?.title?.[0]?.plain_text || bluedotData.client_name;\nconst company = props.Company?.rich_text?.[0]?.plain_text || '';\n\nreturn [{\n  json: {\n    ...bluedotData,\n    notion_page_id: match.id,\n    contact_name: contactName,\n    company_name: company\n  }\n}];"
+      },
+      "id": "wf2-node-5",
+      "name": "Match to Notion Contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "name": "={{ $json.company_name || $json.contact_name }} - Client Folder",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "list", "value": "YOUR_CLIENTS_FOLDER_ID" },
+        "options": {}
+      },
+      "id": "wf2-node-6",
+      "name": "Create Google Drive Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1350, 300],
+      "notes": "Replace YOUR_CLIENTS_FOLDER_ID with your root Clients folder in Google Drive. Creates a dedicated folder for this client."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare transcript as a text file for upload\nconst data = $('Match to Notion Contact').first().json;\nconst folderId = $('Create Google Drive Folder').first().json.id;\n\nconst transcriptContent = `Discovery Call Transcript\\n========================\\nDate: ${data.recording_date}\\nClient: ${data.contact_name}\\nCompany: ${data.company_name}\\n\\n--- Summary ---\\n${data.summary}\\n\\n--- Full Transcript ---\\n${data.transcript}`;\n\nreturn [{\n  json: {\n    drive_folder_id: folderId,\n    transcript_content: transcriptContent,\n    contact_name: data.contact_name,\n    company_name: data.company_name\n  },\n  binary: {\n    data: {\n      data: Buffer.from(transcriptContent).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: `Discovery Call Transcript - ${data.contact_name}.txt`\n    }\n  }\n}];"
+      },
+      "id": "wf2-node-7",
+      "name": "Prepare Transcript File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "=Discovery Call Transcript - {{ $('Match to Notion Contact').first().json.contact_name }}.txt",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.drive_folder_id }}" },
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "wf2-node-8",
+      "name": "Upload Transcript to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1790, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 2048,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a meeting analyst for Veteran Vectors, an AI automation consulting company. Extract structured notes from this discovery call transcript.\\n\\nReturn ONLY valid JSON with these keys:\\n{\\n  \\\"meeting_summary\\\": \\\"2-3 paragraph summary of the call\\\",\\n  \\\"action_items\\\": [\\\"list of action items with owner (Anthony or Client)\\\"],\\n  \\\"client_pain_points\\\": \\\"Summary of their current challenges and manual processes\\\",\\n  \\\"next_steps\\\": \\\"What was agreed for next steps\\\",\\n  \\\"needs_audit_call\\\": true/false,\\n  \\\"audit_call_focus\\\": \\\"What the audit call should focus on (if needed)\\\",\\n  \\\"proposal_notes\\\": \\\"Any preliminary info for a future proposal (scope, budget discussed, timeline)\\\",\\n  \\\"client_priorities\\\": \\\"What matters most to this client\\\",\\n  \\\"follow_up_date\\\": \\\"Suggested follow-up date if discussed, otherwise empty string\\\"\\n}\\n\\nTranscript:\\n\\n{{ $('Match to Notion Contact').first().json.transcript.substring(0, 15000) }}\\n\\nSummary:\\n\\n{{ $('Match to Notion Contact').first().json.summary }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "wf2-node-9",
+      "name": "Claude Extract Meeting Notes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2010, 300],
+      "notes": "Uses Claude to extract structured meeting notes, action items, and next steps. HTTP Header Auth: Name=x-api-key, Value=YOUR_ANTHROPIC_API_KEY."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Claude response\nconst aiResponse = $input.first().json;\nconst matchData = $('Match to Notion Contact').first().json;\nconst folderId = $('Prepare Transcript File').first().json.drive_folder_id;\n\nlet extracted;\ntry {\n  const content = aiResponse.content[0].text;\n  const cleaned = content.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/i, '').trim();\n  extracted = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Failed to parse Claude response: ' + e.message);\n}\n\nreturn [{\n  json: {\n    ...extracted,\n    notion_page_id: matchData.notion_page_id,\n    contact_name: matchData.contact_name,\n    company_name: matchData.company_name,\n    client_email: matchData.client_email,\n    drive_folder_id: folderId,\n    recording_date: matchData.recording_date\n  }\n}];"
+      },
+      "id": "wf2-node-10",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2230, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Meeting Held" },
+            { "key": "Audit Call", "checkboxValue": "={{ $json.needs_audit_call }}" },
+            { "key": "Notes", "richTextValue": "=Discovery Call Summary:\n{{ $json.meeting_summary }}\n\nAction Items:\n{{ $json.action_items.join('\\n• ') }}\n\nNext Steps: {{ $json.next_steps }}\n\nClient Priorities: {{ $json.client_priorities }}" },
+            { "key": "Action Items ", "richTextValue": "={{ $json.action_items.join('\\n') }}" },
+            { "key": "Need to Follow Up Date", "dateValue": "={{ $json.follow_up_date || '' }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf2-node-11",
+      "name": "Update Notion Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2450, 300],
+      "notes": "Updates the Notion contact with meeting summary, action items, and next steps from the discovery call."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_MEETINGS_DB_ID" },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Meeting Title", "title": "=Discovery Call - {{ $json.contact_name }}" },
+            { "key": "Date", "dateValue": "={{ $json.recording_date }}" },
+            { "key": "Meeting Category", "selectValue": "Discovery" },
+            { "key": "Meeting Type", "selectValue": "Discovery Call" },
+            { "key": "Attendee Email", "email": "={{ $json.client_email }}" },
+            { "key": "BlueDot Notes", "richTextValue": "={{ $json.meeting_summary }}\n\nAction Items:\n{{ $json.action_items.join('\\n• ') }}\n\nNext Steps: {{ $json.next_steps }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf2-node-12",
+      "name": "Create Notion Meeting Record",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2670, 300],
+      "notes": "Creates a new meeting record in the Notion Meetings DB. Replace YOUR_NOTION_MEETINGS_DB_ID."
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:memo: *Discovery Call Processed: {{ $json.contact_name }}*\n\nCompany: {{ $json.company_name }}\nNeeds Audit Call: {{ $json.needs_audit_call ? 'Yes' : 'No' }}\n\n*Summary:* {{ $json.meeting_summary.substring(0, 300) }}...\n\n*Action Items:*\n{{ $json.action_items.map(a => '• ' + a).join('\\n') }}\n\n*Next Steps:* {{ $json.next_steps }}\n\n:file_folder: Client folder created in Drive\n:page_facing_up: Transcript saved{{ $json.needs_audit_call ? '\\n\\n:calendar: _Book the audit call with this client._' : '' }}",
+        "otherOptions": {}
+      },
+      "id": "wf2-node-13",
+      "name": "Slack Notify Discovery Complete",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [2890, 300]
+    }
+  ],
+  "connections": {
+    "BlueDot Webhook": {
+      "main": [
+        [{ "node": "Filter Discovery Calls", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Discovery Calls": {
+      "main": [
+        [{ "node": "Extract BlueDot Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract BlueDot Data": {
+      "main": [
+        [{ "node": "Find Notion Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Notion Contact": {
+      "main": [
+        [{ "node": "Match to Notion Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Match to Notion Contact": {
+      "main": [
+        [{ "node": "Create Google Drive Folder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Google Drive Folder": {
+      "main": [
+        [{ "node": "Prepare Transcript File", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Transcript File": {
+      "main": [
+        [{ "node": "Upload Transcript to Drive", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upload Transcript to Drive": {
+      "main": [
+        [{ "node": "Claude Extract Meeting Notes", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude Extract Meeting Notes": {
+      "main": [
+        [{ "node": "Parse AI Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [{ "node": "Update Notion Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Notion Contact": {
+      "main": [
+        [{ "node": "Create Notion Meeting Record", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Notion Meeting Record": {
+      "main": [
+        [{ "node": "Slack Notify Discovery Complete", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

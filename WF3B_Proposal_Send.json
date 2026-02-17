@@ -1,0 +1,121 @@
+{
+  "name": "WF3B - Proposal Send (Slack Button → Email to Client)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-proposal-send",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wf3b-node-1",
+      "name": "Slack Interaction Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "slack-proposal-send",
+      "notes": "Receives Slack button clicks for 'Send Proposal to Client'. This shares the Interactivity Request URL with WF1B — Slack only allows one URL, so both WF1B and WF3B interactions route to a single dispatcher webhook, OR use separate action_id routing within one webhook. For simplicity, configure separate webhooks by action_id prefix in a single Slack app."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Slack interaction\nconst raw = $input.first().json;\nlet interaction;\nif (raw.payload) {\n  interaction = typeof raw.payload === 'string' ? JSON.parse(raw.payload) : raw.payload;\n} else {\n  interaction = raw;\n}\n\nconst action = interaction.actions?.[0] || {};\nconst actionId = action.action_id || '';\n\nif (actionId !== 'send_proposal') {\n  throw new Error('This webhook only handles send_proposal actions. Received: ' + actionId);\n}\n\nlet data = {};\ntry {\n  data = JSON.parse(action.value || '{}');\n} catch (e) {\n  data = {};\n}\n\nreturn [{\n  json: {\n    notion_page_id: data.notion_page_id || '',\n    client_email: data.client_email || '',\n    contact_name: data.contact_name || '',\n    company_name: data.company_name || '',\n    doc_id: data.doc_id || '',\n    drive_folder_id: data.drive_folder_id || '',\n    project_name: data.project_name || '',\n    response_url: interaction.response_url || ''\n  }\n}];"
+      },
+      "id": "wf3b-node-2",
+      "name": "Parse Interaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.doc_id }}/export?mimeType=application/pdf",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "id": "wf3b-node-3",
+      "name": "Export Proposal PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 300],
+      "notes": "Exports the latest version of the proposal (after Anthony's edits) as a PDF."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Parse Interaction').first().json.client_email }}",
+        "subject": "=Your Automation Proposal from Veteran Vectors — {{ $('Parse Interaction').first().json.project_name }}",
+        "message": "=Hi {{ $('Parse Interaction').first().json.contact_name.split(' ')[0] }},\n\nThank you for taking the time to walk through your operations during our audit call. Based on our conversation, I've put together a detailed proposal for {{ $('Parse Interaction').first().json.project_name }}.\n\nAttached you'll find the full proposal including:\n• Analysis of your current manual processes\n• Recommended automation solution and workflow architecture\n• ROI breakdown with projected time and cost savings\n• Project timeline and milestones\n• Investment details\n\nPlease review at your convenience. I'm happy to hop on a quick call to walk through any questions or discuss adjustments.\n\nLooking forward to hearing your thoughts.\n\nBest,\nAnthony Pinto\nVeteran Vectors LLC\nanthony@veteranvectors.com",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              { "property": "data" }
+            ]
+          }
+        }
+      },
+      "id": "wf3b-node-4",
+      "name": "Email Proposal to Client",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [910, 300],
+      "notes": "Sends the proposal PDF as an email attachment to the client."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Parse Interaction').first().json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Proposal Sent" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3b-node-5",
+      "name": "Update Notion - Proposal Sent",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1130, 300],
+      "notes": "Updates Notion contact status to 'Proposal Sent' after the proposal is emailed to the client."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Parse Interaction').first().json.response_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replace_original\": true,\n  \"text\": \":white_check_mark: *Proposal Sent to {{ $('Parse Interaction').first().json.contact_name }}*\\n\\nProject: {{ $('Parse Interaction').first().json.project_name }}\\nEmailed to: {{ $('Parse Interaction').first().json.client_email }}\\nNotion status: Proposal Sent\\n\\n_Waiting for client response._\"\n}",
+        "options": {}
+      },
+      "id": "wf3b-node-6",
+      "name": "Update Slack Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300]
+    }
+  ],
+  "connections": {
+    "Slack Interaction Webhook": {
+      "main": [[{ "node": "Parse Interaction", "type": "main", "index": 0 }]]
+    },
+    "Parse Interaction": {
+      "main": [[{ "node": "Export Proposal PDF", "type": "main", "index": 0 }]]
+    },
+    "Export Proposal PDF": {
+      "main": [[{ "node": "Email Proposal to Client", "type": "main", "index": 0 }]]
+    },
+    "Email Proposal to Client": {
+      "main": [[{ "node": "Update Notion - Proposal Sent", "type": "main", "index": 0 }]]
+    },
+    "Update Notion - Proposal Sent": {
+      "main": [[{ "node": "Update Slack Message", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

@@ -1,0 +1,122 @@
+{
+  "name": "WF7 - Weekly Thursday Client Check-ins",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 4" }]
+        }
+      },
+      "id": "wf7-node-1",
+      "name": "Every Thursday 9AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Fires every Thursday at 9 AM. Cron: 0 9 * * 4 (minute hour day month weekday)."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_PROJECTS_DB_ID" },
+        "filterType": "formula",
+        "formula": "={{ JSON.stringify({ property: 'Project Status', select: { equals: 'Active' } }) }}",
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "wf7-node-2",
+      "name": "Query Active Projects",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [470, 300],
+      "notes": "Queries all active projects from the Notion Projects DB. Replace YOUR_NOTION_PROJECTS_DB_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build check-in template for each active project\nconst projects = $input.all();\nconst results = [];\n\nfor (const project of projects) {\n  const page = project.json;\n  const props = page.properties || {};\n\n  const projectName = props['Project Name']?.title?.[0]?.plain_text || 'Unknown Project';\n  const clientRelation = props.Client?.relation?.[0]?.id || '';\n  const projectCost = props['Project Cost']?.number || 0;\n  const retainer = props.Retainer?.number || 0;\n  const startDate = props['Start Date']?.date?.start || '';\n  const status = props['Project Status']?.select?.name || 'Active';\n\n  results.push({\n    json: {\n      notion_project_id: page.id,\n      project_name: projectName,\n      client_relation_id: clientRelation,\n      project_cost: projectCost,\n      retainer: retainer,\n      start_date: startDate,\n      status: status\n    }\n  });\n}\n\nif (results.length === 0) {\n  return [{ json: { no_active_projects: true } }];\n}\n\nreturn results;"
+      },
+      "id": "wf7-node-3",
+      "name": "Process Active Projects",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.no_active_projects }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "wf7-node-4",
+      "name": "Has Active Projects?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the check-in template for each project\nconst project = $json;\nconst today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });\n\nconst template = `*Weekly Check-in: ${project.project_name}*\\n_${today}_\\n\\n` +\n  `*Project Status:*\\n[  ] On track  [  ] At risk  [  ] Blocked\\n\\n` +\n  `*Completed This Week:*\\n• \\n\\n` +\n  `*In Progress:*\\n• \\n\\n` +\n  `*Blocked / Needs from Client:*\\n• \\n\\n` +\n  `*Needs from Anthony:*\\n• \\n\\n` +\n  `*Next Week's Priorities:*\\n• \\n\\n` +\n  `*Notes / Updates:*\\n`;\n\nreturn [{\n  json: {\n    ...project,\n    checkin_template: template,\n    slack_channel: 'client-' + (project.project_name || '')\n      .toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 60)\n  }\n}];"
+      },
+      "id": "wf7-node-5",
+      "name": "Build Check-in Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300],
+      "notes": "Generates a templated check-in format for each active project. Anthony fills in the details."
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:clipboard: *Thursday Check-in Template*\n\n{{ $json.checkin_template }}\n\n_Fill this in and post to the client channel: #{{ $json.slack_channel }}_",
+        "otherOptions": {}
+      },
+      "id": "wf7-node-6",
+      "name": "Post Check-in to Alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1350, 300],
+      "notes": "Posts the check-in template to #onboarding-alerts for Anthony to fill in and then post to the client channel."
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:calendar: *Thursday Check-ins Ready*\n\n{{ $('Process Active Projects').all().length }} active project(s) need check-ins today.\n\n_Check-in templates posted above. Fill in each one and post to the respective client channel._",
+        "otherOptions": {}
+      },
+      "id": "wf7-node-7",
+      "name": "Summary Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1570, 300]
+    }
+  ],
+  "connections": {
+    "Every Thursday 9AM": {
+      "main": [[{ "node": "Query Active Projects", "type": "main", "index": 0 }]]
+    },
+    "Query Active Projects": {
+      "main": [[{ "node": "Process Active Projects", "type": "main", "index": 0 }]]
+    },
+    "Process Active Projects": {
+      "main": [[{ "node": "Has Active Projects?", "type": "main", "index": 0 }]]
+    },
+    "Has Active Projects?": {
+      "main": [[{ "node": "Build Check-in Template", "type": "main", "index": 0 }]]
+    },
+    "Build Check-in Template": {
+      "main": [[{ "node": "Post Check-in to Alerts", "type": "main", "index": 0 }]]
+    },
+    "Post Check-in to Alerts": {
+      "main": [[{ "node": "Summary Notification", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

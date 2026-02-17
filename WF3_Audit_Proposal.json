@@ -1,0 +1,423 @@
+{
+  "name": "WF3 - Post-Audit Call → Proposal + ROI Breakdown",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bluedot-audit",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wf3-node-1",
+      "name": "BlueDot Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "bluedot-audit",
+      "notes": "Set this URL in BlueDot → Automation → Webhook. This handles AUDIT call transcripts. Discovery calls go to WF2."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "audit",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "leftValue": "={{ $json.title || $json.meeting_title || $json.name || '' }}",
+              "rightValue": "RAPID",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "wf3-node-2",
+      "name": "Filter Audit Calls Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300],
+      "notes": "Only processes recordings with 'audit' or 'RAPID' in the title."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract transcript + attendee data\nconst bluedot = $input.first().json;\nconst transcript = bluedot.transcript || bluedot.content || '';\nconst summary = bluedot.summary || bluedot.notes || '';\nconst attendees = bluedot.attendees || bluedot.participants || [];\nconst title = bluedot.title || bluedot.meeting_title || bluedot.name || '';\nconst recordingDate = bluedot.date || bluedot.created_at || new Date().toISOString();\n\nconst clientAttendees = attendees.filter(a => {\n  const email = (a.email || '').toLowerCase();\n  return email && !email.includes('veteranvectors') && !email.includes('anthony');\n});\n\nconst clientEmail = clientAttendees.length > 0 ? clientAttendees[0].email?.toLowerCase() : '';\nconst clientName = clientAttendees.length > 0 ? (clientAttendees[0].name || '') : '';\n\nif (!clientEmail && !clientName) {\n  throw new Error('Could not identify client attendee in audit recording: ' + title);\n}\n\nreturn [{\n  json: {\n    transcript, summary, meeting_title: title, recording_date: recordingDate,\n    client_email: clientEmail, client_name: clientName, attendees\n  }\n}];"
+      },
+      "id": "wf3-node-3",
+      "name": "Extract BlueDot Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_CONTACTS_DB_ID" },
+        "filterType": "formula",
+        "formula": "={{ JSON.stringify({ or: [ { property: 'Email', email: { equals: $json.client_email } }, { property: 'Name', title: { contains: $json.client_name } } ] }) }}",
+        "returnAll": false,
+        "limit": 5,
+        "options": {}
+      },
+      "id": "wf3-node-4",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [910, 300],
+      "notes": "Replace YOUR_NOTION_CONTACTS_DB_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match to Notion contact and get Drive folder ID\nconst bluedotData = $('Extract BlueDot Data').first().json;\nconst notionResults = $('Find Notion Contact').all();\n\nlet match = null;\nfor (const result of notionResults) {\n  const page = result.json;\n  const props = page.properties || {};\n  const email = props.Email?.email || '';\n  const name = props.Name?.title?.[0]?.plain_text || '';\n\n  if (bluedotData.client_email && email.toLowerCase() === bluedotData.client_email.toLowerCase()) {\n    match = page; break;\n  }\n  if (bluedotData.client_name && name.toLowerCase().includes(bluedotData.client_name.toLowerCase())) {\n    match = page; break;\n  }\n}\n\nif (!match) {\n  throw new Error('Could not match audit recording to any Notion contact. Client: ' + bluedotData.client_name + ' / ' + bluedotData.client_email);\n}\n\nconst props = match.properties || {};\nconst contactName = props.Name?.title?.[0]?.plain_text || bluedotData.client_name;\nconst company = props.Company?.rich_text?.[0]?.plain_text || '';\nconst notes = props.Notes?.rich_text?.[0]?.plain_text || '';\n\n// Check Notion page content/children for Drive folder ID\n// The Drive folder ID should have been stored by WF2\n// We'll look for it in the page properties or pass it through\n\nreturn [{\n  json: {\n    ...bluedotData,\n    notion_page_id: match.id,\n    contact_name: contactName,\n    company_name: company,\n    existing_notes: notes\n  }\n}];"
+      },
+      "id": "wf3-node-5",
+      "name": "Match to Notion Contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q\": \"name contains '{{ $json.company_name || $json.contact_name }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ 'YOUR_CLIENTS_FOLDER_ID' }}' in parents\",\n  \"fields\": \"files(id, name)\"\n}",
+        "options": {}
+      },
+      "id": "wf3-node-5b",
+      "name": "Find Existing Drive Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300],
+      "notes": "Searches for the client's existing Drive folder created by WF2. Replace YOUR_CLIENTS_FOLDER_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the folder ID from search results, or create one if needed\nconst searchResult = $input.first().json;\nconst matchData = $('Match to Notion Contact').first().json;\n\nlet folderId = '';\nif (searchResult.files && searchResult.files.length > 0) {\n  folderId = searchResult.files[0].id;\n}\n\nreturn [{\n  json: {\n    ...matchData,\n    drive_folder_id: folderId,\n    needs_folder: !folderId\n  }\n}];"
+      },
+      "id": "wf3-node-5c",
+      "name": "Resolve Folder ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needs_folder }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf3-node-5d",
+      "name": "IF Needs Folder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1790, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "name": "={{ $('Match to Notion Contact').first().json.company_name || $('Match to Notion Contact').first().json.contact_name }} - Client Folder",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "list", "value": "YOUR_CLIENTS_FOLDER_ID" },
+        "options": {}
+      },
+      "id": "wf3-node-5e",
+      "name": "Fallback Create Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2010, 200],
+      "notes": "Creates a folder if WF2 didn't create one (e.g., no discovery call was held first)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge folder ID from lookup or creation\nconst resolveData = $('Resolve Folder ID').first().json;\nlet folderId = resolveData.drive_folder_id;\n\nif (!folderId) {\n  try { folderId = $('Fallback Create Folder').first().json.id; } catch (e) {}\n}\n\nif (!folderId) {\n  throw new Error('Could not find or create Drive folder for ' + resolveData.contact_name);\n}\n\nreturn [{ json: { ...resolveData, drive_folder_id: folderId } }];"
+      },
+      "id": "wf3-node-5f",
+      "name": "Merge Folder ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2230, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare audit transcript for upload\nconst data = $json;\nconst content = `Audit Call Transcript\\n====================\\nDate: ${data.recording_date}\\nClient: ${data.contact_name}\\nCompany: ${data.company_name}\\n\\n--- Summary ---\\n${data.summary}\\n\\n--- Full Transcript ---\\n${data.transcript}`;\n\nreturn [{\n  json: data,\n  binary: {\n    data: {\n      data: Buffer.from(content).toString('base64'),\n      mimeType: 'text/plain',\n      fileName: `Audit Call Transcript - ${data.contact_name}.txt`\n    }\n  }\n}];"
+      },
+      "id": "wf3-node-6",
+      "name": "Prepare Audit Transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "=Audit Call Transcript - {{ $json.contact_name }}.txt",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.drive_folder_id }}" },
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "wf3-node-7",
+      "name": "Upload Audit Transcript",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2670, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a proposal writer for Veteran Vectors, an AI automation consulting company that helps SMBs eliminate manual processes through n8n workflows. Generate a comprehensive proposal from this audit call transcript.\\n\\nReturn ONLY valid JSON with these exact keys:\\n{\\n  \\\"client_pain_points\\\": \\\"2-3 paragraph summary of current problems and manual processes\\\",\\n  \\\"recommended_solution\\\": \\\"Detailed description of the automation solution proposed\\\",\\n  \\\"tech_stack\\\": \\\"List of specific tools (n8n, Google Workspace, Stripe, Notion, etc.)\\\",\\n  \\\"workflow_breakdown\\\": [{ \\\"name\\\": \\\"Workflow name\\\", \\\"description\\\": \\\"What it automates\\\", \\\"triggers\\\": \\\"What triggers it\\\", \\\"tools\\\": \\\"Tools involved\\\" }],\\n  \\\"project_scope\\\": \\\"Concise scope statement\\\",\\n  \\\"project_name\\\": \\\"Short project name\\\",\\n  \\\"milestones\\\": \\\"Phase 1: Discovery, Phase 2: Design, Phase 3: Build, Phase 4: Test, Phase 5: Deploy\\\",\\n  \\\"timeline_weeks\\\": \\\"Estimated weeks\\\",\\n  \\\"estimated_project_cost\\\": \\\"Dollar amount if discussed\\\",\\n  \\\"initial_payment\\\": \\\"50% upfront amount\\\",\\n  \\\"final_payment\\\": \\\"Remaining 50% amount\\\",\\n  \\\"estimated_retainer\\\": \\\"Monthly retainer amount if discussed\\\",\\n  \\\"retainer_description\\\": \\\"What the retainer covers\\\",\\n  \\\"roi_hours_saved_monthly\\\": \\\"Estimated hours saved per month\\\",\\n  \\\"roi_annual_value\\\": \\\"Estimated annual dollar value of time saved\\\",\\n  \\\"roi_breakdown\\\": [{ \\\"process\\\": \\\"Process name\\\", \\\"current_hours\\\": \\\"Hours currently spent\\\", \\\"automated_hours\\\": \\\"Hours after automation\\\", \\\"savings\\\": \\\"Hours saved\\\", \\\"value\\\": \\\"Dollar value of savings\\\" }],\\n  \\\"compliances\\\": \\\"Any compliance requirements (SOC2, ITAR, CMMC, etc.)\\\",\\n  \\\"proposal_text\\\": \\\"Full proposal narrative (600-1000 words) covering: Executive Summary, Current State, Proposed Solution, Workflow Architecture, ROI Analysis, Timeline, Investment\\\"\\n}\\n\\nTranscript:\\n\\n{{ $('Merge Folder ID').first().json.transcript.substring(0, 15000) }}\\n\\nSummary:\\n\\n{{ $('Merge Folder ID').first().json.summary }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "wf3-node-8",
+      "name": "Claude Generate Proposal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2890, 300],
+      "notes": "Uses Claude to generate full proposal with ROI breakdown and workflow designs. HTTP Header Auth: Name=x-api-key, Value=YOUR_ANTHROPIC_API_KEY."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Claude response and merge with client data\nconst aiResponse = $input.first().json;\nconst matchData = $('Merge Folder ID').first().json;\n\nlet extracted;\ntry {\n  const content = aiResponse.content[0].text;\n  const cleaned = content.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/i, '').trim();\n  extracted = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Failed to parse Claude proposal: ' + e.message);\n}\n\nreturn [{\n  json: {\n    ...extracted,\n    notion_page_id: matchData.notion_page_id,\n    contact_name: matchData.contact_name,\n    company_name: matchData.company_name,\n    client_email: matchData.client_email,\n    drive_folder_id: matchData.drive_folder_id\n  }\n}];"
+      },
+      "id": "wf3-node-9",
+      "name": "Parse Proposal Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3110, 300]
+    },
+    {
+      "parameters": {
+        "operation": "copy",
+        "fileId": { "__rl": true, "mode": "id", "value": "YOUR_PROPOSAL_TEMPLATE_DOC_ID" },
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.drive_folder_id }}" },
+        "name": "=Proposal - {{ $json.company_name || $json.contact_name }}",
+        "options": {}
+      },
+      "id": "wf3-node-10",
+      "name": "Copy Proposal Template",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [3330, 300],
+      "notes": "Replace YOUR_PROPOSAL_TEMPLATE_DOC_ID. Template should have placeholders like {{CLIENT_NAME}}, {{PAIN_POINTS}}, {{ROI_BREAKDOWN}}, etc."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Google Docs batchUpdate replacements\nconst extracted = $('Parse Proposal Response').first().json;\nconst docId = $('Copy Proposal Template').first().json.id;\n\n// Build workflow breakdown text\nconst workflowText = (extracted.workflow_breakdown || []).map((w, i) =>\n  `${i + 1}. ${w.name}\\n   ${w.description}\\n   Trigger: ${w.triggers}\\n   Tools: ${w.tools}`\n).join('\\n\\n');\n\n// Build ROI breakdown text\nconst roiText = (extracted.roi_breakdown || []).map(r =>\n  `• ${r.process}: ${r.current_hours}hrs → ${r.automated_hours}hrs (${r.savings}hrs saved, ${r.value} value)`\n).join('\\n');\n\nconst replacements = {\n  '{{CLIENT_NAME}}': extracted.contact_name || '',\n  '{{COMPANY_NAME}}': extracted.company_name || '',\n  '{{DATE}}': new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),\n  '{{PROJECT_NAME}}': extracted.project_name || '',\n  '{{PAIN_POINTS}}': extracted.client_pain_points || '',\n  '{{RECOMMENDED_SOLUTION}}': extracted.recommended_solution || '',\n  '{{TECH_STACK}}': extracted.tech_stack || '',\n  '{{WORKFLOW_BREAKDOWN}}': workflowText || '',\n  '{{PROJECT_SCOPE}}': extracted.project_scope || '',\n  '{{MILESTONES}}': extracted.milestones || '',\n  '{{TIMELINE}}': extracted.timeline_weeks ? extracted.timeline_weeks + ' weeks' : 'TBD',\n  '{{PROJECT_COST}}': extracted.estimated_project_cost || 'TBD',\n  '{{INITIAL_PAYMENT}}': extracted.initial_payment || '',\n  '{{FINAL_PAYMENT}}': extracted.final_payment || '',\n  '{{MONTHLY_RETAINER}}': extracted.estimated_retainer || 'N/A',\n  '{{RETAINER_DESCRIPTION}}': extracted.retainer_description || '',\n  '{{ROI_HOURS_SAVED}}': extracted.roi_hours_saved_monthly || '',\n  '{{ROI_ANNUAL_VALUE}}': extracted.roi_annual_value || '',\n  '{{ROI_BREAKDOWN}}': roiText || '',\n  '{{COMPLIANCES}}': extracted.compliances || 'N/A',\n  '{{PROPOSAL_BODY}}': extracted.proposal_text || ''\n};\n\nconst requests = Object.entries(replacements).map(([placeholder, value]) => ({\n  replaceAllText: {\n    containsText: { text: placeholder, matchCase: true },\n    replaceText: String(value)\n  }\n}));\n\nreturn [{\n  json: {\n    doc_id: docId,\n    requests: requests,\n    drive_folder_id: extracted.drive_folder_id,\n    contact_name: extracted.contact_name,\n    company_name: extracted.company_name,\n    client_email: extracted.client_email,\n    notion_page_id: extracted.notion_page_id,\n    project_name: extracted.project_name || '',\n    estimated_project_cost: extracted.estimated_project_cost || '',\n    roi_hours_saved_monthly: extracted.roi_hours_saved_monthly || '',\n    roi_annual_value: extracted.roi_annual_value || ''\n  }\n}];"
+      },
+      "id": "wf3-node-11",
+      "name": "Build Template Replacements",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3550, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.doc_id }}:batchUpdate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"requests\": {{ JSON.stringify($json.requests) }} }",
+        "options": {}
+      },
+      "id": "wf3-node-12",
+      "name": "Populate Proposal Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3770, 300],
+      "notes": "Uses Google Docs API batchUpdate. Requires Google OAuth2 with Docs API scope."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $('Build Template Replacements').first().json.doc_id }}/export?mimeType=application/pdf",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "id": "wf3-node-13",
+      "name": "Export Proposal PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3990, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "=Proposal - {{ $('Build Template Replacements').first().json.company_name || 'Client' }}.pdf",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $('Build Template Replacements').first().json.drive_folder_id }}" },
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "wf3-node-14",
+      "name": "Upload Proposal PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [4210, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Build Template Replacements').first().json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Proposal Draft" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-15",
+      "name": "Update Notion - Proposal Draft",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [4430, 300],
+      "notes": "Sets Notion contact status to 'Proposal Draft'. Status stays here until Anthony reviews and clicks Send."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_MEETINGS_DB_ID" },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Meeting Title", "title": "=Audit Call - {{ $('Build Template Replacements').first().json.contact_name }}" },
+            { "key": "Date", "dateValue": "={{ $('Merge Folder ID').first().json.recording_date }}" },
+            { "key": "Meeting Category", "selectValue": "Audit" },
+            { "key": "Meeting Type", "selectValue": "Audit Call" },
+            { "key": "Attendee Email", "email": "={{ $('Build Template Replacements').first().json.client_email }}" },
+            { "key": "BlueDot Notes", "richTextValue": "={{ $('Merge Folder ID').first().json.summary }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-16",
+      "name": "Create Notion Meeting Record",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [4650, 300],
+      "notes": "Replace YOUR_NOTION_MEETINGS_DB_ID."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"#onboarding-alerts\",\n  \"text\": \"Proposal ready for review\",\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": { \"type\": \"plain_text\", \"text\": \"Proposal Ready for Review\" }\n    },\n    {\n      \"type\": \"section\",\n      \"fields\": [\n        { \"type\": \"mrkdwn\", \"text\": \"*Client:*\\n{{ $('Build Template Replacements').first().json.contact_name }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Company:*\\n{{ $('Build Template Replacements').first().json.company_name }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Project:*\\n{{ $('Build Template Replacements').first().json.project_name }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*Est. Cost:*\\n{{ $('Build Template Replacements').first().json.estimated_project_cost }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*ROI (hrs saved/mo):*\\n{{ $('Build Template Replacements').first().json.roi_hours_saved_monthly }}\" },\n        { \"type\": \"mrkdwn\", \"text\": \"*ROI (annual value):*\\n{{ $('Build Template Replacements').first().json.roi_annual_value }}\" }\n      ]\n    },\n    {\n      \"type\": \"section\",\n      \"text\": { \"type\": \"mrkdwn\", \"text\": \"*Review the proposal:*\\nhttps://docs.google.com/document/d/{{ $('Build Template Replacements').first().json.doc_id }}/edit\" }\n    },\n    {\n      \"type\": \"actions\",\n      \"block_id\": \"proposal_review_actions\",\n      \"elements\": [\n        {\n          \"type\": \"button\",\n          \"text\": { \"type\": \"plain_text\", \"text\": \"Send Proposal to Client\" },\n          \"style\": \"primary\",\n          \"action_id\": \"send_proposal\",\n          \"value\": \"{{ JSON.stringify({ notion_page_id: $('Build Template Replacements').first().json.notion_page_id, client_email: $('Build Template Replacements').first().json.client_email, contact_name: $('Build Template Replacements').first().json.contact_name, company_name: $('Build Template Replacements').first().json.company_name, doc_id: $('Build Template Replacements').first().json.doc_id, drive_folder_id: $('Build Template Replacements').first().json.drive_folder_id, project_name: $('Build Template Replacements').first().json.project_name }).replace(/\\\"/g, '\\\\\\\"') }}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "wf3-node-17",
+      "name": "Slack - Proposal Review + Send Button",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4870, 300],
+      "notes": "Sends Slack message with proposal details, Google Doc edit link, and a 'Send Proposal to Client' button. HTTP Header Auth: Name=Authorization, Value=Bearer xoxb-YOUR_SLACK_BOT_TOKEN."
+    }
+  ],
+  "connections": {
+    "BlueDot Webhook": {
+      "main": [[{ "node": "Filter Audit Calls Only", "type": "main", "index": 0 }]]
+    },
+    "Filter Audit Calls Only": {
+      "main": [[{ "node": "Extract BlueDot Data", "type": "main", "index": 0 }]]
+    },
+    "Extract BlueDot Data": {
+      "main": [[{ "node": "Find Notion Contact", "type": "main", "index": 0 }]]
+    },
+    "Find Notion Contact": {
+      "main": [[{ "node": "Match to Notion Contact", "type": "main", "index": 0 }]]
+    },
+    "Match to Notion Contact": {
+      "main": [[{ "node": "Find Existing Drive Folder", "type": "main", "index": 0 }]]
+    },
+    "Find Existing Drive Folder": {
+      "main": [[{ "node": "Resolve Folder ID", "type": "main", "index": 0 }]]
+    },
+    "Resolve Folder ID": {
+      "main": [[{ "node": "IF Needs Folder?", "type": "main", "index": 0 }]]
+    },
+    "IF Needs Folder?": {
+      "main": [
+        [{ "node": "Fallback Create Folder", "type": "main", "index": 0 }],
+        [{ "node": "Merge Folder ID", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fallback Create Folder": {
+      "main": [[{ "node": "Merge Folder ID", "type": "main", "index": 0 }]]
+    },
+    "Merge Folder ID": {
+      "main": [[{ "node": "Prepare Audit Transcript", "type": "main", "index": 0 }]]
+    },
+    "Prepare Audit Transcript": {
+      "main": [[{ "node": "Upload Audit Transcript", "type": "main", "index": 0 }]]
+    },
+    "Upload Audit Transcript": {
+      "main": [[{ "node": "Claude Generate Proposal", "type": "main", "index": 0 }]]
+    },
+    "Claude Generate Proposal": {
+      "main": [[{ "node": "Parse Proposal Response", "type": "main", "index": 0 }]]
+    },
+    "Parse Proposal Response": {
+      "main": [[{ "node": "Copy Proposal Template", "type": "main", "index": 0 }]]
+    },
+    "Copy Proposal Template": {
+      "main": [[{ "node": "Build Template Replacements", "type": "main", "index": 0 }]]
+    },
+    "Build Template Replacements": {
+      "main": [[{ "node": "Populate Proposal Template", "type": "main", "index": 0 }]]
+    },
+    "Populate Proposal Template": {
+      "main": [[{ "node": "Export Proposal PDF", "type": "main", "index": 0 }]]
+    },
+    "Export Proposal PDF": {
+      "main": [[{ "node": "Upload Proposal PDF", "type": "main", "index": 0 }]]
+    },
+    "Upload Proposal PDF": {
+      "main": [[{ "node": "Update Notion - Proposal Draft", "type": "main", "index": 0 }]]
+    },
+    "Update Notion - Proposal Draft": {
+      "main": [[{ "node": "Create Notion Meeting Record", "type": "main", "index": 0 }]]
+    },
+    "Create Notion Meeting Record": {
+      "main": [[{ "node": "Slack - Proposal Review + Send Button", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

@@ -1,0 +1,199 @@
+{
+  "name": "WF1B - Lead Qualification Decision (Slack Accept/Deny)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-lead-decision",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wf1b-node-1",
+      "name": "Slack Interaction Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "slack-lead-decision",
+      "notes": "Set this webhook URL as your Slack app's Interactivity Request URL: Settings → Interactivity & Shortcuts → Request URL. Slack sends interaction payloads here when buttons are clicked."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Slack interaction payload\n// Slack sends interactions as application/x-www-form-urlencoded with a 'payload' JSON field\nconst raw = $input.first().json;\nlet interaction;\n\nif (raw.payload) {\n  interaction = typeof raw.payload === 'string' ? JSON.parse(raw.payload) : raw.payload;\n} else {\n  interaction = raw;\n}\n\nconst action = interaction.actions?.[0] || {};\nconst actionId = action.action_id || '';\nlet leadData = {};\n\ntry {\n  leadData = JSON.parse(action.value || '{}');\n} catch (e) {\n  leadData = {};\n}\n\nif (!actionId.includes('accept') && !actionId.includes('deny')) {\n  throw new Error('Unknown action: ' + actionId + '. This webhook only handles accept_lead and deny_lead actions.');\n}\n\nconst isAccept = actionId === 'accept_lead';\nconst responseUrl = interaction.response_url || '';\nconst channelId = interaction.channel?.id || '';\nconst messageTs = interaction.message?.ts || '';\n\nreturn [{\n  json: {\n    action: isAccept ? 'accept' : 'deny',\n    prospect_id: leadData.prospect_id || '',\n    notion_page_id: leadData.notion_page_id || '',\n    email: leadData.email || '',\n    full_name: leadData.full_name || '',\n    calendly_event_uuid: leadData.calendly_event_uuid || '',\n    response_url: responseUrl,\n    channel_id: channelId,\n    message_ts: messageTs\n  }\n}];"
+      },
+      "id": "wf1b-node-2",
+      "name": "Parse Slack Interaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "accept",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf1b-node-3",
+      "name": "IF Accept?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Parse Slack Interaction').first().json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Discovery Scheduled" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf1b-node-4",
+      "name": "Notion Update - Accepted",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [910, 200],
+      "notes": "Updates the Notion contact status to 'Discovery Scheduled' when Anthony accepts an unqualified lead."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Parse Slack Interaction').first().json.response_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replace_original\": true,\n  \"text\": \":white_check_mark: *Lead Accepted:* {{ $('Parse Slack Interaction').first().json.full_name }}\\nStatus updated to Discovery Scheduled in Notion.\"\n}",
+        "options": {}
+      },
+      "id": "wf1b-node-5",
+      "name": "Update Slack Message - Accepted",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 200],
+      "notes": "Updates the original Slack message to show the decision. Uses Slack response_url (no auth needed)."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.calendly.com/scheduled_events/{{ $('Parse Slack Interaction').first().json.calendly_event_uuid }}/cancellation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"reason\": \"Thank you for your interest. We've determined this may not be the best fit at this time, but we'd love to share some free resources with you.\" }",
+        "options": {}
+      },
+      "id": "wf1b-node-6",
+      "name": "Cancel Calendly Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 400],
+      "notes": "Cancels the Calendly booking. HTTP Header Auth: Name=Authorization, Value=Bearer YOUR_CALENDLY_PERSONAL_TOKEN. Requires Calendly API v2 scope."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Parse Slack Interaction').first().json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Declined" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf1b-node-7",
+      "name": "Notion Update - Declined",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1130, 400],
+      "notes": "Marks the contact as 'Declined' in Notion CRM."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Parse Slack Interaction').first().json.email }}",
+        "subject": "A Gift from Veteran Vectors — 100 Automated Workflows",
+        "message": "=Hi {{ $('Parse Slack Interaction').first().json.full_name.split(' ')[0] }},\n\nThank you for your interest in working with Veteran Vectors. After reviewing your needs, we think the best way we can help right now is by sharing our free resource.\n\nAttached you'll find our \"100 Automated Workflows\" guide — it's packed with automation blueprints that you can implement on your own to start saving time immediately.\n\nInside you'll find:\n• Ready-to-use workflow templates for common business processes\n• Step-by-step implementation guides\n• ROI calculators for each automation\n• Tool recommendations for every budget\n\nIf your needs change in the future or you'd like hands-on help implementing any of these, don't hesitate to reach out.\n\nWishing you the best,\nAnthony Pinto\nVeteran Vectors LLC\nanthony@veteranvectors.com",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "data"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wf1b-node-8",
+      "name": "Send Leadmatic Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1350, 400],
+      "notes": "Sends the templated email with the '100 Automated Workflows Leadmatic' PDF attached. You need to either: (1) Add a Google Drive download node before this to fetch the PDF, or (2) Store the PDF as a static binary in n8n. Replace attachment config with your preferred method."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Parse Slack Interaction').first().json.response_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replace_original\": true,\n  \"text\": \":no_entry: *Lead Declined:* {{ $('Parse Slack Interaction').first().json.full_name }}\\n• Calendly booking cancelled\\n• Free leadmatic resource emailed\\n• Marked as Declined in Notion\"\n}",
+        "options": {}
+      },
+      "id": "wf1b-node-9",
+      "name": "Update Slack Message - Denied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 400]
+    }
+  ],
+  "connections": {
+    "Slack Interaction Webhook": {
+      "main": [
+        [{ "node": "Parse Slack Interaction", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Slack Interaction": {
+      "main": [
+        [{ "node": "IF Accept?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF Accept?": {
+      "main": [
+        [{ "node": "Notion Update - Accepted", "type": "main", "index": 0 }],
+        [{ "node": "Cancel Calendly Event", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion Update - Accepted": {
+      "main": [
+        [{ "node": "Update Slack Message - Accepted", "type": "main", "index": 0 }]
+      ]
+    },
+    "Cancel Calendly Event": {
+      "main": [
+        [{ "node": "Notion Update - Declined", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion Update - Declined": {
+      "main": [
+        [{ "node": "Send Leadmatic Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Leadmatic Email": {
+      "main": [
+        [{ "node": "Update Slack Message - Denied", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}

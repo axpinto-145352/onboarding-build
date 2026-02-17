@@ -1,361 +1,265 @@
-# Veteran Vectors — Client Onboarding Automation Architecture (v2 — Optimized)
+# Veteran Vectors — Client Pipeline Automation Architecture (v3)
 
-## Complete Workflow Map (Post-Audit Rebuild)
+## Complete Workflow Map (Full Pipeline Rebuild)
 
----
-
-## The Pipeline at a Glance
-
-```
-CLIENT BOOKS     →  YOU DO THE    →  BLUEDOT         →  YOU REVIEW    →  YOU SUBMIT     →  REMINDERS   →  CLIENT SIGNS  →  INVOICE SENT  →  FULL
-AUDIT CALL          AUDIT CALL       PROCESSES           PROPOSAL        ONBOARDING        IF NEEDED      CONTRACT        + ONBOARDING      ONBOARDING
-                                     TRANSCRIPT                          FORM
-
-   WF1                (manual)         WF2              (manual)          WF3               WF4          (manual)          WF5
-   Calendly                            BlueDot                            n8n Form           Schedule      SignWell         SignWell
-   webhook                             webhook                            trigger            trigger       (client)         webhook
-```
-
-**Key change from v1:** Invoice is now sent AFTER contract signing (WF5), not alongside the contract (WF3).
+**Key changes from v2:**
+- Notion CRM is now the single source of truth (Google Sheets removed)
+- Discovery call + lead qualification added as entry point
+- Slack interactive buttons for accept/deny and proposal sending
+- Discovery and audit calls are separate workflows
+- Retainer subscription created paused, resumed post-signing
+- Weekly Thursday check-ins for active clients
+- Daily contract reminders (not tiered)
 
 ---
 
-## Workflow 1: Audit Call Booked (Calendly Trigger)
-
-**Trigger:** Client books an audit call via Calendly
-
-**v2 improvements:** Event type filtering, duplicate detection, Prospect_ID generation, Slack notification
+## Pipeline at a Glance
 
 ```
-[Calendly Webhook] ──► [Filter: invitee.created only]
-                              │
-                         Other events ── (stop)
-                              │
-                         YES ──► [Extract Invitee Data]
-                                  - Name, Email, Company
-                                  - Generate Prospect_ID (VV-xxxx)
-                                        │
-                                        ▼
-                                 [Read Prospects Sheet]
-                                 Check for existing email
-                                        │
-                                        ▼
-                                 [IF Duplicate?]
-                                   │            │
-                                  YES          NO
-                                   │            │
-                                   ▼            ▼
-                            [Update Row]  [Append New Row]
-                                   │            │
-                                   ▼            ▼
-                            [Slack: "New audit call booked"]
+LEAD BOOKS      QUALIFY     DISCOVERY    AUDIT        PROPOSAL     CONTRACT    REMINDERS   SIGNED      WEEKLY
+DISCOVERY  ──►  ACCEPT/ ──► CALL     ──► CALL     ──► REVIEW + ──► + INVOICE ──► DAILY  ──► FULL     ──► THURSDAY
+CALL            DENY        PROCESSED   PROCESSED    SEND                              ONBOARD     CHECK-INS
+
+ WF1            WF1B        WF2         WF3          WF3B         WF4         WF5        WF6         WF7
+ Calendly       Slack       BlueDot     BlueDot      Slack        n8n Form    Schedule   SignWell     Schedule
+ webhook        button      webhook     webhook      button       trigger     trigger    webhook     trigger
 ```
 
 ---
 
-## Workflow 2: Audit Call Complete → Folder + Proposal + Pre-filled Form (BlueDot Trigger)
+## Workflow 1: Discovery Call Booked + Lead Qualification
 
-**Trigger:** BlueDot webhook fires after audit call recording is processed
-
-**v2 improvements:** Hard-stop on match failure (no fallback), idempotency check, Claude AI + Google Docs proposal template, sequential data flow
+**Trigger:** Calendly webhook (invitee.created for Discovery Call)
 
 ```
-[BlueDot Webhook] ──► [Filter: "audit" in title?]
-                            │
-                       NO ──┘ (stop)
-                            │
-                       YES ──► [Read Prospects Sheet]
-                                  (match by name/email)
-                                     │
-                                     ▼
-                              [Match to Prospect]
-                              ⚠ HARD STOP if no match found
-                              ⚠ SKIP if already has Drive_Folder_ID
-                                     │
-                                     ▼
-                              [Create Client Drive Folder]
-                                     │
-                                     ▼
-                              [Claude API — Extract Proposal Content]
-                              Anthropic Claude extracts structured
-                              proposal data from transcript
-                                     │
-                                     ▼
-                              [Parse AI Response]
-                                     │
-                                     ▼
-                              [Copy Proposal Template]
-                              Copies Google Doc template to client folder
-                                     │
-                                     ▼
-                              [Build Template Replacements]
-                              Maps Claude output to template placeholders
-                                     │
-                                     ▼
-                              [Populate Proposal Template]
-                              Google Docs batchUpdate replaces placeholders
-                                     │
-                                     ▼
-                              [Export Proposal as PDF]
-                              Exports populated Google Doc as PDF
-                                     │
-                                     ▼
-                              [Upload Proposal PDF to Client Folder]
-                                     │
-                                     ▼
-                              [Build Pre-filled Form URL]
-                                     │
-                                     ▼
-                              [Update Prospects Sheet]  ◄── MOVED: Now runs AFTER all steps
-                              - Status: "Proposal Sent"
-                              - Drive_Folder_ID, Proposal_Link, Form_Link
-                                     │
-                                     ▼
-                              [Slack Notify Anthony]
-                              + Google Docs edit link (REVIEW FIRST)
-                              + Pre-filled form link (USE AFTER REVIEW)
+[Calendly Webhook] → [Filter: invitee.created]
+                          │
+                     [Extract & Qualify Lead]
+                     - Parse all Calendly custom questions
+                     - Evaluate: revenue, budget, pain points
+                     - Generate Prospect_ID
+                          │
+                     [Create Notion Contact]
+                     - All extracted data stored
+                          │
+                     [IF Qualified?]
+                       │           │
+                      YES         NO
+                       │           │
+                       ▼           ▼
+              [Slack Notify]  [Slack Interactive]
+              "Qualified       Accept/Deny buttons
+               lead booked"    with lead details
 ```
 
 ---
 
-## Workflow 3: Client Onboarding (n8n Form Trigger)
+## Workflow 1B: Lead Qualification Decision
 
-**Trigger:** Anthony submits the pre-filled onboarding form AFTER reviewing the proposal
-
-**v2 improvements:** Form validation, pre-computed financial amounts, invoice created but NOT sent, full ISO timestamps
+**Trigger:** Slack button click (Accept or Deny)
 
 ```
-[n8n Form Submit] ──► [Validate Form Data]  ◄── NEW
-                      Parse & validate all financial fields
-                      Normalize Yes/No fields to booleans
-                      Convert amounts to cents
-                              │
-                              ▼
-                      [Read Prospects Sheet]
-                      Lookup Drive_Folder_ID
-                              │
-                              ▼
-                      [IF Needs Folder?]
-                        │            │
-                       YES          NO
-                        │            │
-                        ▼            │
-                  [Fallback          │
-                   Create Folder]    │
-                        │            │
-                        ▼            ▼
-                      [Merge Folder ID]
-                              │
-                              ▼
-                      [Build SignWell Fields]
-                              │
-                              ▼
-                      [SignWell API — Send Contract]
-                              │
-                              ▼
-                      [Stripe — Create Customer]
-                              │
-                              ▼
-                      [Stripe — Create Invoice Item]  ◄── Uses pre-validated cents
-                              │
-                              ▼
-                      [Stripe — Create Invoice]  ◄── auto_advance=false (NOT SENT)
-                              │
-                              ▼
-                      [IF Retainer = Yes]
-                        │            │
-                       YES          NO
-                        │            │
-                        ▼            │
-                  [Create Price +    │
-                   Subscription]     │
-                        │            │
-                        ▼            ▼
-                      [Log to Client Tracker Sheet]
-                      - Full ISO timestamp for Contract_Sent_Date
-                      - Invoice_ID (for WF5 to send later)
-                      - Last_Reminder_Sent column
-                      - Project_End_Date
-                              │
-                              ▼
-                      [Slack: "Contract sent — invoice ready but not sent"]
+[Slack Webhook] → [Parse Interaction]
+                       │
+                  [IF Accept?]
+                    │        │
+                   YES      NO
+                    │        │
+                    ▼        ▼
+            [Notion:     [Cancel Calendly]
+             Discovery        │
+             Scheduled]  [Notion: Declined]
+                    │        │
+                    ▼   [Send Leadmatic Email]
+            [Update       (100 Workflows PDF)
+             Slack]           │
+                         [Update Slack]
 ```
 
 ---
 
-## Workflow 4: Contract Reminders (Schedule Trigger)
+## Workflow 2: Post-Discovery Call Processing
 
-**Trigger:** Runs every 24 hours at 9 AM
-
-**v2 improvements:** Accurate ISO timing, reminder tracking to prevent duplicates, 14-day escalation, 30-day auto-expire
+**Trigger:** BlueDot webhook (discovery call transcript)
 
 ```
-[Schedule Trigger] ──► [Read Client Tracker]
-                        Filter: Status = "Contract Sent"
-                              │
-                              ▼
-                      [Calculate Reminder Timing]
-                      Uses full ISO timestamp
-                      Checks Last_Reminder_Sent to prevent duplicates
-                              │
-                              ▼
-                      [Route to correct action]
-                              │
-                   ┌──────────┼──────────┬──────────┐
-                   ▼          ▼          ▼          ▼
-             [48 hours]  [7 days]   [14 days]  [30 days]
-             Friendly    Firmer     Slack       Auto-expire
-             email       email      escalation  + update status
-                   │          │          │          │
-                   ▼          ▼          ▼          ▼
-                      [Log Reminder Sent]  ◄── Prevents duplicate sends
-```
-
----
-
-## Workflow 5: Contract Signed → Full Onboarding (SignWell Webhook)
-
-**Trigger:** SignWell webhook fires when all parties have signed
-
-**v2 improvements:** Invoice sent here, race condition fixed, row lookup by SignWell_Doc_ID, checklist shared with client, calendar end date
-
-```
-[SignWell Webhook] ──► [Filter: "completed" event]
-                              │
-                              ▼
-                      [Extract SignWell Data]
-                              │
-                              ▼
-                      [Read Client Tracker + Match Record]
-                              │
-                              ▼
-                      [Stripe Send Invoice]  ◄── MOVED FROM WF3
-                              │
-                              ▼
-                      [Download Signed PDF → Upload to Drive]
-                              │
-                              ▼
-                ┌─────────────┴─────────────┐
-                │                            │
-        [Create Slack Channel]       [Copy Onboarding Checklist]
-        + Set topic                         │
-        + Post welcome message       [Share With Client]  ◄── NEW
-                │                            │
-                │                    [Create Weekly Reminder]
-                │                    with UNTIL date  ◄── FIXED
-                │                            │
-                └─────────────┬─────────────┘
-                              │
-                              ▼
-                      [Send Welcome Email]  ◄── FIXED: Single convergence point
-                              │
-                              ▼
-                      [Update Tracker: "Onboarded"]
-                      lookupColumn: SignWell_Doc_ID  ◄── FIXED
-                              │
-                              ▼
-                      [Slack: "Fully onboarded!"]
+[BlueDot Webhook] → [Filter: "discovery"/"intro" in title]
+                          │
+                     [Extract BlueDot Data]
+                     [Find Notion Contact (by email/name)]
+                     [Match to Notion Contact]
+                          │
+                     [Create Google Drive Folder]
+                     [Upload Transcript]
+                          │
+                     [Claude: Extract meeting notes]
+                     - Meeting summary
+                     - Action items
+                     - Next steps
+                     - Needs audit call?
+                          │
+                     [Update Notion Contact]
+                     - Status: "Meeting Held"
+                     - Notes, action items
+                          │
+                     [Create Notion Meeting Record]
+                          │
+                     [Slack: "Discovery call processed"]
 ```
 
 ---
 
-## Data Flow Summary
+## Workflow 3: Post-Audit Call + Proposal Generation
+
+**Trigger:** BlueDot webhook (audit call transcript)
 
 ```
-CALENDLY          BLUEDOT           N8N FORM          SIGNWELL
-(booking)         (transcript)      (you review)      (signature)
-    │                 │                  │                 │
-    ▼                 ▼                  ▼                 ▼
-┌──────────────────────────────────────────────────────────────┐
-│               PROSPECTS SHEET (Tab 1)                        │
-│  Prospect_ID | Name | Email | Company | Status |             │
-│  Drive_Folder_ID | Proposal_Link | Form_Link                │
-├──────────────────────────────────────────────────────────────┤
-│               CLIENT TRACKER (Tab 2)                         │
-│  Client | Project | Cost | SignWell_Doc_ID | Stripe IDs |    │
-│  Invoice_ID | Drive_Folder_ID | Status | Contract_Sent_Date │
-│  Last_Reminder_Sent | Project_End_Date                       │
-└──────────────────────────────────────────────────────────────┘
-                         │
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-   GOOGLE DRIVE       STRIPE         SLACK
-   Client Folder/     Customer       #client-{company}
-   ├── Proposal.pdf   Invoice        #onboarding-alerts
-   ├── Signed SOW     Subscription
-   └── Checklist *    (* shared)     GOOGLE CALENDAR
-                                     Weekly Reminder (with end date)
+[BlueDot Webhook] → [Filter: "audit"/"RAPID" in title]
+                          │
+                     [Match to Notion Contact]
+                     [Find/Create Drive Folder]
+                          │
+                     [Upload Audit Transcript]
+                          │
+                     [Claude: Generate Full Proposal]
+                     - Pain points, solution, tech stack
+                     - Workflow breakdown (per automation)
+                     - ROI: hours saved, annual value
+                     - ROI breakdown per process
+                     - Cost estimate, milestones, timeline
+                          │
+                     [Copy Proposal Template → Populate → PDF]
+                     [Upload PDF to Drive]
+                          │
+                     [Notion: "Proposal Draft"]
+                     [Create Meeting Record]
+                          │
+                     [Slack: proposal details + [Send Proposal] button]
 ```
 
 ---
 
-## Prospects Sheet Columns (Updated v2)
+## Workflow 3B: Proposal Send
 
-| Column | Header | Populated By |
-|--------|--------|-------------|
-| A | Prospect_ID | WF1 (NEW) |
-| B | First_Name | WF1 |
-| C | Last_Name | WF1 |
-| D | Full_Name | WF1 |
-| E | Email | WF1 |
-| F | Company_Name | WF1 |
-| G | Client_Title | WF1 |
-| H | Company_Address | WF1 |
-| I | Company_City | WF1 |
-| J | Company_State | WF1 |
-| K | Company_Zipcode | WF1 |
-| L | Scheduled_Time | WF1 |
-| M | Event_URI | WF1 |
-| N | Status | WF1 → WF2 |
-| O | Booked_Date | WF1 (now full ISO) |
-| P | Proposal_Link | WF2 |
-| Q | Form_Link | WF2 |
-| R | Drive_Folder_ID | WF2 |
+**Trigger:** Slack button click ("Send Proposal to Client")
 
-## Client Tracker Columns (Updated v2)
-
-| Column | Header | Populated By |
-|--------|--------|-------------|
-| A | Client_Name | WF3 |
-| B | Email | WF3 |
-| C | Company | WF3 |
-| D | Project | WF3 |
-| E | Project_Cost | WF3 |
-| F | Monthly_Retainer | WF3 |
-| G | SignWell_Doc_ID | WF3 |
-| H | Stripe_Customer_ID | WF3 |
-| I | Invoice_ID | WF3 (NEW — for WF5 to send) |
-| J | Drive_Folder_ID | WF3 |
-| K | Status | WF3 → WF4 → WF5 |
-| L | Contract_Sent_Date | WF3 (now full ISO) |
-| M | Signed_Date | WF5 |
-| N | Slack_Channel | WF5 |
-| O | Last_Reminder_Sent | WF4 (NEW) |
-| P | Project_End_Date | WF3 (NEW) |
+```
+[Slack Webhook] → [Parse] → [Export latest PDF (with edits)]
+                                    │
+                              [Email Proposal to Client]
+                                    │
+                              [Notion: "Proposal Sent"]
+                              [Update Slack message]
+```
 
 ---
 
-## Import Order
+## Workflow 4: Client Onboarding (Contract + Invoice)
 
-| Order | File | Why This Order |
-|-------|------|----------------|
-| 1 | WF1_Calendly_Booking.json | Standalone, no dependencies |
-| 2 | WF3_Onboarding_Form.json | Need the form ID for WF2 |
-| 3 | WF2_BlueDot_Proposal.json | References WF3's form ID |
-| 4 | WF4_Contract_Reminders.json | Standalone, reads Client Tracker |
-| 5 | WF5_Post_Signing.json | Last, needs everything else set up |
+**Trigger:** Anthony submits pre-filled n8n form
+
+```
+[n8n Form] → [Validate Financial Fields]
+                   │
+              [Build SignWell Fields] → [Send Contract]
+                   │
+              [Stripe: Customer] → [Invoice Item] → [Invoice (DRAFT)]
+                   │
+              [IF Retainer?]
+                │         │
+               YES       NO
+                │         │
+           [Price +       │
+            Subscription  │
+            (PAUSED)]     │
+                │         │
+                ▼         ▼
+         [Notion: "Contract Sent"]
+         [Create Notion Project]
+         [Slack: "Contract sent"]
+```
 
 ---
 
-## Placeholders to Replace Before Import
+## Workflow 5: Daily Contract & Invoice Reminders
 
-| Placeholder | Where | What to Put |
-|-------------|-------|-------------|
-| `YOUR_SPREADSHEET_ID` | All workflows | Google Sheet ID |
-| `YOUR_CLIENTS_FOLDER_ID` | WF2, WF3 | Root Clients folder in Drive |
-| `YOUR_PROPOSAL_TEMPLATE_DOC_ID` | WF2 | Google Doc proposal template ID |
-| `YOUR_ANTHROPIC_API_KEY` | WF2 | Anthropic API key for Claude |
-| `YOUR_FORM_ID` | WF2 | n8n form URL path from WF3 |
-| `YOUR_SIGNWELL_TEMPLATE_ID` | WF3 | SignWell template ID |
-| `YOUR_CHECKLIST_TEMPLATE_DOC_ID` | WF5 | Google Doc checklist template |
-| `YOUR_CALENDLY_LINK` | WF5 | Kickoff call Calendly link |
+**Trigger:** Daily at 9 AM
+
+```
+[Schedule] → [Query Notion: "Contract Sent"]
+                   │
+              [Calculate days since sent]
+              [Check if already reminded today]
+                   │
+              ┌────┼────────────┐
+              ▼    ▼            ▼
+         [< 14d] [14+d]      [30+d]
+         Daily   Escalation  Auto-expire
+         email   email +     Notion: "Declined"
+                 Slack alert
+              │    │            │
+              ▼    ▼            ▼
+         [Log reminder in Notion]
+```
+
+---
+
+## Workflow 6: Post-Signing Full Onboarding
+
+**Trigger:** SignWell webhook (document.completed)
+
+```
+[SignWell Webhook] → [Filter: completed] → [Match Notion Contact]
+                                                  │
+                          [Stripe: Find customer + draft invoice]
+                          [Stripe: SEND invoice (half upfront)]
+                          [Stripe: Resume retainer subscription]
+                                                  │
+                          [Download signed PDF → Upload to Drive]
+                                                  │
+                          [Create Slack channel (private)]
+                          [Post welcome message]
+                                                  │
+                          [Send welcome email (kickoff link)]
+                                                  │
+                          [Notion: "Project Started"]
+                          [Create Thursday calendar reminder (26 weeks)]
+                                                  │
+                          [Slack: "Fully onboarded!"]
+```
+
+---
+
+## Workflow 7: Weekly Thursday Check-ins
+
+**Trigger:** Every Thursday at 9 AM
+
+```
+[Schedule] → [Query Notion: Active Projects]
+                   │
+              [For each project: Build check-in template]
+              - Project status (on track / at risk / blocked)
+              - Completed this week
+              - In progress
+              - Blocked / needs from client
+              - Needs from Anthony
+              - Next week's priorities
+                   │
+              [Post templates to #onboarding-alerts]
+              [Summary: "X projects need check-ins today"]
+
+              Anthony fills in each template and posts to #client-{company}
+```
+
+---
+
+## Architecture Rules
+
+1. **Notion is the CRM and single source of truth.** All status tracking, contact data, and project data lives in Notion.
+2. **Google Drive is the document store.** Transcripts, proposals, signed contracts.
+3. **Stripe is the payment system.** Invoice created draft in WF4, sent in WF6. Retainer paused in WF4, resumed in WF6.
+4. **One-way status flow.** Statuses only move forward.
+5. **Manual gates are sacred.** Proposal review (WF3→WF3B) and form submission (WF4) always require Anthony's action.
+6. **Fail loud.** Workflows throw errors on unexpected data rather than silently proceeding.
+7. **Idempotency.** WF6 skips if already "Project Started". WF5 skips if reminded today.
+8. **Credentials in n8n only.** All API keys via n8n credential storage.

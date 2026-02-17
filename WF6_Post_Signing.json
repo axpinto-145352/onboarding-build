@@ -1,0 +1,470 @@
+{
+  "name": "WF6 - Contract Signed → Invoice + Retainer + Full Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "signwell-signed",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "wf6-node-1",
+      "name": "SignWell Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "signwell-signed",
+      "notes": "In SignWell: Settings → Webhooks → Add webhook URL. Subscribe to 'document.completed' event."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event || $json.event_type || '' }}",
+              "rightValue": "completed",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        }
+      },
+      "id": "wf6-node-2",
+      "name": "Filter Completed Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract SignWell data\nconst payload = $input.first().json;\nconst doc = payload.data || payload.document || payload;\n\nconst clientRecipient = (doc.recipients || []).find(r => r.role === 'Client') || {};\n\nreturn [{\n  json: {\n    signwell_doc_id: doc.id || '',\n    doc_name: doc.name || doc.title || '',\n    completed_pdf_url: doc.completed_pdf || doc.pdf_url || doc.file_url || '',\n    client_name: clientRecipient.name || '',\n    client_email: (clientRecipient.email || '').toLowerCase()\n  }\n}];"
+      },
+      "id": "wf6-node-3",
+      "name": "Extract SignWell Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_CONTACTS_DB_ID" },
+        "filterType": "formula",
+        "formula": "={{ JSON.stringify({ property: 'Email', email: { equals: $json.client_email } }) }}",
+        "returnAll": false,
+        "limit": 3,
+        "options": {}
+      },
+      "id": "wf6-node-4",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [910, 300],
+      "notes": "Replace YOUR_NOTION_CONTACTS_DB_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Match SignWell doc to Notion contact\nconst signwell = $('Extract SignWell Data').first().json;\nconst notionResults = $('Find Notion Contact').all();\n\nlet match = null;\nfor (const result of notionResults) {\n  const page = result.json;\n  const props = page.properties || {};\n  const email = (props.Email?.email || '').toLowerCase();\n  if (email === signwell.client_email) {\n    match = page; break;\n  }\n}\n\nif (!match) {\n  throw new Error('Could not match SignWell doc to Notion contact. Email: ' + signwell.client_email);\n}\n\nconst props = match.properties || {};\nconst status = props.Status?.select?.name || '';\n\n// Idempotency: skip if already onboarded\nif (status === 'Project Started' || status === 'Onboarded') {\n  throw new Error('Client already onboarded. Skipping duplicate SignWell webhook.');\n}\n\nconst name = props.Name?.title?.[0]?.plain_text || signwell.client_name;\nconst company = props.Company?.rich_text?.[0]?.plain_text || '';\n\n// Build Slack channel name\nconst channelName = 'client-' + (company || name)\n  .toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 60);\n\nreturn [{\n  json: {\n    ...signwell,\n    notion_page_id: match.id,\n    contact_name: name,\n    company_name: company,\n    slack_channel_name: channelName\n  }\n}];"
+      },
+      "id": "wf6-node-5",
+      "name": "Match & Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "mode": "id", "value": "YOUR_NOTION_PROJECTS_DB_ID" },
+        "filterType": "formula",
+        "formula": "={{ JSON.stringify({ property: 'Project Status', select: { equals: 'Contract Sent' } }) }}",
+        "returnAll": false,
+        "limit": 10,
+        "options": {}
+      },
+      "id": "wf6-node-5b",
+      "name": "Find Notion Project",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1350, 300],
+      "notes": "Finds the project record created by WF4. Replace YOUR_NOTION_PROJECTS_DB_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find the matching project and extract Stripe IDs from project metadata\n// Since Stripe IDs are stored as metadata during WF4, we need to look them up\nconst matchData = $('Match & Validate').first().json;\nconst projects = $('Find Notion Project').all();\n\n// For Stripe invoice ID and customer ID, we need to query Stripe\n// using the client email since we stored it in customer metadata\nreturn [{\n  json: {\n    ...matchData,\n    needs_stripe_lookup: true\n  }\n}];"
+      },
+      "id": "wf6-node-5c",
+      "name": "Prepare Stripe Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.stripe.com/v1/customers?email={{ encodeURIComponent($json.client_email) }}&limit=1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "wf6-node-6",
+      "name": "Stripe Find Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1790, 300],
+      "notes": "Finds the Stripe customer by email. HTTP Header Auth: Name=Authorization, Value=Bearer sk_live_YOUR_STRIPE_SECRET_KEY."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the customer ID and find their draft invoice\nconst matchData = $('Prepare Stripe Lookup').first().json;\nconst stripeResult = $('Stripe Find Customer').first().json;\n\nconst customer = stripeResult.data?.[0];\nif (!customer) {\n  throw new Error('No Stripe customer found for email: ' + matchData.client_email);\n}\n\nreturn [{\n  json: {\n    ...matchData,\n    stripe_customer_id: customer.id\n  }\n}];"
+      },
+      "id": "wf6-node-6b",
+      "name": "Extract Stripe Customer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2010, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.stripe.com/v1/invoices?customer={{ $json.stripe_customer_id }}&status=draft&limit=1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "wf6-node-7",
+      "name": "Stripe Find Draft Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract invoice ID and send it\nconst matchData = $('Extract Stripe Customer').first().json;\nconst invoiceResult = $('Stripe Find Draft Invoice').first().json;\n\nconst invoice = invoiceResult.data?.[0];\nif (!invoice) {\n  throw new Error('No draft invoice found for customer: ' + matchData.stripe_customer_id);\n}\n\nreturn [{\n  json: {\n    ...matchData,\n    invoice_id: invoice.id\n  }\n}];"
+      },
+      "id": "wf6-node-7b",
+      "name": "Extract Invoice ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $json.invoice_id }}/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "wf6-node-8",
+      "name": "Stripe Send Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2670, 300],
+      "notes": "Sends the half-upfront invoice now that the contract is signed."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.stripe.com/v1/subscriptions?customer={{ $('Extract Stripe Customer').first().json.stripe_customer_id }}&status=paused&limit=1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "wf6-node-8b",
+      "name": "Find Paused Subscription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2890, 300],
+      "notes": "Finds the paused retainer subscription created by WF4."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resume subscription if found\nconst result = $input.first().json;\nconst sub = result.data?.[0];\n\nreturn [{\n  json: {\n    has_subscription: !!sub,\n    subscription_id: sub?.id || ''\n  }\n}];"
+      },
+      "id": "wf6-node-8c",
+      "name": "Check Subscription",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3110, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_subscription }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "wf6-node-8d",
+      "name": "IF Has Subscription?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3330, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/subscriptions/{{ $json.subscription_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "pause_collection", "value": "" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf6-node-8e",
+      "name": "Resume Retainer Subscription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3550, 200],
+      "notes": "Resumes the paused subscription so the monthly retainer starts billing."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Extract Invoice ID').first().json.completed_pdf_url }}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "id": "wf6-node-9",
+      "name": "Download Signed PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3550, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q\": \"name contains '{{ $('Extract Invoice ID').first().json.company_name || $('Extract Invoice ID').first().json.contact_name }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ 'YOUR_CLIENTS_FOLDER_ID' }}' in parents\",\n  \"fields\": \"files(id, name)\"\n}",
+        "options": {}
+      },
+      "id": "wf6-node-9b",
+      "name": "Find Client Drive Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3770, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const searchResult = $input.first().json;\nconst folderId = searchResult.files?.[0]?.id || '';\nif (!folderId) {\n  throw new Error('No Drive folder found for client. Cannot upload signed contract.');\n}\nreturn [{ json: { drive_folder_id: folderId } }];"
+      },
+      "id": "wf6-node-9c",
+      "name": "Extract Folder ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3990, 400]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "name": "=Signed SOW - {{ $('Extract Invoice ID').first().json.company_name || 'Client' }}.pdf",
+        "driveId": { "__rl": true, "mode": "list", "value": "MY_DRIVE" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.drive_folder_id }}" },
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "wf6-node-10",
+      "name": "Upload Signed Contract",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [4210, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/conversations.create",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $('Match & Validate').first().json.slack_channel_name }}\",\n  \"is_private\": true\n}",
+        "options": {}
+      },
+      "id": "wf6-node-11",
+      "name": "Create Slack Channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4430, 300],
+      "notes": "Creates a private Slack channel for the client project. HTTP Header Auth: Name=Authorization, Value=Bearer xoxb-YOUR_SLACK_BOT_TOKEN."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"{{ $json.channel.id }}\",\n  \"text\": \"Welcome to the {{ $('Match & Validate').first().json.company_name }} project channel!\\n\\nClient: {{ $('Match & Validate').first().json.contact_name }}\\n\\nContract signed. Invoice sent. Let's go.\"\n}",
+        "options": {}
+      },
+      "id": "wf6-node-12",
+      "name": "Post Welcome Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4650, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Match & Validate').first().json.client_email }}",
+        "subject": "=Welcome to Veteran Vectors — Let's Get Started",
+        "message": "=Hi {{ $('Match & Validate').first().json.contact_name.split(' ')[0] }},\n\nGreat news — your Statement of Work is fully signed and we're ready to roll.\n\nHere's what happens next:\n\n1. Your initial invoice has been sent via Stripe — you'll receive a separate email with payment details.\n\n2. Your monthly retainer will begin billing at the start of next month.\n\n3. Book your kickoff call here: https://calendly.com/YOUR_CALENDLY_LINK/kickoff\n\nDuring the kickoff call, we'll walk through the project timeline, confirm priorities, and make sure we have everything needed to hit the ground running.\n\nYour signed contract has been saved to your project folder for reference.\n\nLooking forward to building this with you.\n\nAnthony Pinto\nVeteran Vectors LLC\nanthony@veteranvectors.com",
+        "options": {}
+      },
+      "id": "wf6-node-13",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [4870, 300],
+      "notes": "Replace YOUR_CALENDLY_LINK with your kickoff call Calendly link."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Match & Validate').first().json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Project Started" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf6-node-14",
+      "name": "Update Notion - Project Started",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [5090, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"summary\": \"Thursday check-in: {{ $('Match & Validate').first().json.company_name }}\",\n  \"description\": \"Weekly project status check-in\\nClient: {{ $('Match & Validate').first().json.contact_name }}\\nEmail: {{ $('Match & Validate').first().json.client_email }}\",\n  \"start\": {\n    \"dateTime\": \"{{ DateTime.now().plus({ days: (4 - DateTime.now().weekday + 7) % 7 || 7 }).set({ hour: 9, minute: 0, second: 0 }).toISO() }}\",\n    \"timeZone\": \"America/Denver\"\n  },\n  \"end\": {\n    \"dateTime\": \"{{ DateTime.now().plus({ days: (4 - DateTime.now().weekday + 7) % 7 || 7 }).set({ hour: 9, minute: 30, second: 0 }).toISO() }}\",\n    \"timeZone\": \"America/Denver\"\n  },\n  \"recurrence\": [\"RRULE:FREQ=WEEKLY;BYDAY=TH;COUNT=26\"],\n  \"reminders\": {\n    \"useDefault\": false,\n    \"overrides\": [{ \"method\": \"popup\", \"minutes\": 30 }]\n  }\n}",
+        "options": {}
+      },
+      "id": "wf6-node-15",
+      "name": "Create Thursday Calendar Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5310, 300],
+      "notes": "Creates a recurring Thursday check-in calendar event. Repeats for 26 weeks (~6 months)."
+    },
+    {
+      "parameters": {
+        "channel": "#onboarding-alerts",
+        "text": "=:white_check_mark: *{{ $('Match & Validate').first().json.company_name }} is fully onboarded!*\n\n• Contract signed\n• Invoice sent (half upfront)\n• Retainer subscription activated\n• Signed contract saved to Drive\n• Private Slack channel created\n• Welcome email sent\n• Weekly Thursday check-in scheduled\n\n_Kickoff call link sent to {{ $('Match & Validate').first().json.contact_name }}._",
+        "otherOptions": {}
+      },
+      "id": "wf6-node-16",
+      "name": "Slack Final Confirmation",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [5530, 300]
+    }
+  ],
+  "connections": {
+    "SignWell Webhook": {
+      "main": [[{ "node": "Filter Completed Only", "type": "main", "index": 0 }]]
+    },
+    "Filter Completed Only": {
+      "main": [[{ "node": "Extract SignWell Data", "type": "main", "index": 0 }]]
+    },
+    "Extract SignWell Data": {
+      "main": [[{ "node": "Find Notion Contact", "type": "main", "index": 0 }]]
+    },
+    "Find Notion Contact": {
+      "main": [[{ "node": "Match & Validate", "type": "main", "index": 0 }]]
+    },
+    "Match & Validate": {
+      "main": [[{ "node": "Find Notion Project", "type": "main", "index": 0 }]]
+    },
+    "Find Notion Project": {
+      "main": [[{ "node": "Prepare Stripe Lookup", "type": "main", "index": 0 }]]
+    },
+    "Prepare Stripe Lookup": {
+      "main": [[{ "node": "Stripe Find Customer", "type": "main", "index": 0 }]]
+    },
+    "Stripe Find Customer": {
+      "main": [[{ "node": "Extract Stripe Customer", "type": "main", "index": 0 }]]
+    },
+    "Extract Stripe Customer": {
+      "main": [[{ "node": "Stripe Find Draft Invoice", "type": "main", "index": 0 }]]
+    },
+    "Stripe Find Draft Invoice": {
+      "main": [[{ "node": "Extract Invoice ID", "type": "main", "index": 0 }]]
+    },
+    "Extract Invoice ID": {
+      "main": [[{ "node": "Stripe Send Invoice", "type": "main", "index": 0 }]]
+    },
+    "Stripe Send Invoice": {
+      "main": [[{ "node": "Find Paused Subscription", "type": "main", "index": 0 }]]
+    },
+    "Find Paused Subscription": {
+      "main": [[{ "node": "Check Subscription", "type": "main", "index": 0 }]]
+    },
+    "Check Subscription": {
+      "main": [[{ "node": "IF Has Subscription?", "type": "main", "index": 0 }]]
+    },
+    "IF Has Subscription?": {
+      "main": [
+        [{ "node": "Resume Retainer Subscription", "type": "main", "index": 0 }],
+        [{ "node": "Download Signed PDF", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resume Retainer Subscription": {
+      "main": [[{ "node": "Download Signed PDF", "type": "main", "index": 0 }]]
+    },
+    "Download Signed PDF": {
+      "main": [[{ "node": "Find Client Drive Folder", "type": "main", "index": 0 }]]
+    },
+    "Find Client Drive Folder": {
+      "main": [[{ "node": "Extract Folder ID", "type": "main", "index": 0 }]]
+    },
+    "Extract Folder ID": {
+      "main": [[{ "node": "Upload Signed Contract", "type": "main", "index": 0 }]]
+    },
+    "Upload Signed Contract": {
+      "main": [[{ "node": "Create Slack Channel", "type": "main", "index": 0 }]]
+    },
+    "Create Slack Channel": {
+      "main": [[{ "node": "Post Welcome Message", "type": "main", "index": 0 }]]
+    },
+    "Post Welcome Message": {
+      "main": [[{ "node": "Send Welcome Email", "type": "main", "index": 0 }]]
+    },
+    "Send Welcome Email": {
+      "main": [[{ "node": "Update Notion - Project Started", "type": "main", "index": 0 }]]
+    },
+    "Update Notion - Project Started": {
+      "main": [[{ "node": "Create Thursday Calendar Reminder", "type": "main", "index": 0 }]]
+    },
+    "Create Thursday Calendar Reminder": {
+      "main": [[{ "node": "Slack Final Confirmation", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+}
