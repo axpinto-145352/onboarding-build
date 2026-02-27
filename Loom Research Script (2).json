@@ -1,0 +1,698 @@
+{
+  "name": "Loom Research Script",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        416,
+        432
+      ],
+      "id": "6376f2a0-62ea-4f01-a62d-f07c09a93261",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2544,
+        496
+      ],
+      "id": "a20674d0-4120-4fb6-8ecd-c9cab08b6496",
+      "name": "Wait Between Items",
+      "webhookId": "5437d6e2-2773-418f-b4ef-8a29e76de946"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1821875734,
+          "mode": "list",
+          "cachedResultName": "Prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit#gid=1821875734"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRangeA1",
+              "range": "N:N"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1056,
+        432
+      ],
+      "id": "f449a73f-47a1-41de-bfec-7a4442143355",
+      "name": "Prompts2",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=INPUTS:\n\nName: {{ $json.fullName }}\nCompany: {{ $json.experiences[0].companyName }}\nCompany Title: {{ $json.experiences[0].title }}\nCompany Description: {{ $json.experiences[0].jobDescription }}\nLI Profile Headline: {{ $json.headline }}\n\n{{ $('Loop Over Items1').item.json['Loom Video Research Prompt'] }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        496
+      ],
+      "id": "ea4051bd-189e-4a42-a68c-2caba2ad4301",
+      "name": "Message a model1",
+      "credentials": {
+        "anthropicApi": {
+          "id": "au1c518sMzUt89ul",
+          "name": "VV Claude"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 126409621,
+          "mode": "list",
+          "cachedResultName": "Loom Videos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit#gid=126409621"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Run",
+              "lookupValue": "Yes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        640,
+        432
+      ],
+      "id": "267e64e0-758e-40b8-aa3c-13b8f449e372",
+      "name": "Get LI Deets1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "Run actor and get dataset",
+        "actorId": {
+          "__rl": true,
+          "value": "2SyF0bVxmgGr8IVCZ",
+          "mode": "list",
+          "cachedResultName": "✨Mass Linkedin Profile Scraper with Email 📧 (No Cookies) (dev_fusion/Linkedin-Profile-Scraper)",
+          "cachedResultUrl": "https://console.apify.com/actors/2SyF0bVxmgGr8IVCZ/input"
+        },
+        "customBody": "={\n    \"profileUrls\": [\n        \"{{ $json['LI Profile'] }}\"\n    ]\n}"
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        496
+      ],
+      "id": "8d11cdbe-4ffb-4434-9b83-ef36fd6b42cc",
+      "name": "Run an Actor and get dataset1",
+      "credentials": {
+        "apifyApi": {
+          "id": "8HrOAzWZHeGNrHbZ",
+          "name": "Apify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "98148783-e571-467e-81dd-9babf189b633",
+              "leftValue": "={{ $json['Done?'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1424,
+        496
+      ],
+      "id": "f378a474-741b-4c53-9952-93085892b36c",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1632,
+        480
+      ],
+      "id": "81ff198b-dcef-42fa-89ea-b9e8e10d4d01",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 126409621,
+          "mode": "list",
+          "cachedResultName": "Loom Videos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit#gid=126409621"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Loop Over Items1').item.json.Name }}",
+            "Script": "={{ $json.content[0].text }}",
+            "Done?": "Done",
+            "Run": "Done"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "LI Profile",
+              "displayName": "LI Profile",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Script",
+              "displayName": "Script",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Done?",
+              "displayName": "Done?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Run",
+              "displayName": "Run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2352,
+        496
+      ],
+      "id": "cbbca58a-3ad3-42c7-8e7f-0c403683be50",
+      "name": "Update Loom Videos Sheet1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2462b165-61b6-4541-89e2-7c50c50d5e38",
+              "leftValue": "={{ $json.Run }}",
+              "rightValue": "Yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "977893db-6d2d-4b41-93fb-a2c701585a01",
+              "leftValue": "={{ $json.Name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        624,
+        624
+      ],
+      "id": "076582e9-c416-4a92-955e-12430531a173",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 126409621,
+          "mode": "list",
+          "cachedResultName": "Loom Videos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit#gid=126409621"
+        },
+        "event": "rowUpdate",
+        "options": {
+          "columnsToWatch": [
+            "Run"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        416,
+        624
+      ],
+      "id": "20a21481-aa4b-41f8-85d6-adb76751af6f",
+      "name": "Google Sheets Trigger1",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "uIBJOZhW3WjUilpV",
+          "name": "VV Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1821875734,
+          "mode": "list",
+          "cachedResultName": "Prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit#gid=1821875734"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRangeA1",
+              "range": "N:N"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1072,
+        608
+      ],
+      "id": "54884606-77fd-4ce9-9e4f-d9b0d01e649e",
+      "name": "Prompts3",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let results = [];\n\n// Manual branch\ntry {\n  const prompts = $('Prompts2').all();\n  const liDeets = $('Get LI Deets1').all();\n  \n  results = prompts.map((prompt, i) => {\n    return { json: { ...liDeets[i]?.json, ...prompt.json } };\n  });\n} catch(e) {}\n\n// GS Trigger branch\ntry {\n  const prompts1 = $('Prompts3').all();\n  const if1Data = $('If3').all();\n  \n  const gsResults = prompts1.map((prompt, i) => {\n    return { json: { ...if1Data[i]?.json, ...prompt.json } };\n  });\n  \n  results = results.concat(gsResults);\n} catch(e) {}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        496
+      ],
+      "id": "4bdd23f7-a82d-420c-9a0f-634cbb5a1f3c",
+      "name": "Merge Data1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        432
+      ],
+      "id": "ef1f2f88-b026-48f1-a927-aed880dc6ed7",
+      "name": "Wait",
+      "webhookId": "76e94d6b-879f-4a73-99f7-70bacd3e6501"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        864,
+        608
+      ],
+      "id": "02481ec2-5726-4173-8310-56bbdb6f0697",
+      "name": "Wait1",
+      "webhookId": "cd7a819d-0930-4be1-b65f-690896d7cd44"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get LI Deets1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Between Items": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompts2": {
+      "main": [
+        [
+          {
+            "node": "Merge Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Update Loom Videos Sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get LI Deets1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run an Actor and get dataset1": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Run an Actor and get dataset1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Loom Videos Sheet1": {
+      "main": [
+        [
+          {
+            "node": "Wait Between Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Trigger1": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompts3": {
+      "main": [
+        [
+          {
+            "node": "Merge Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Data1": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Prompts2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Prompts3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "0ik7bxH6inr6XsQt",
+    "timezone": "America/Los_Angeles",
+    "callerPolicy": "workflowsFromSameOwner",
+    "binaryMode": "separate"
+  },
+  "versionId": "20c4e0f0-ca17-465f-97d4-a760faf00ad3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ea0340db5b8064116e794e0185a0bdec41ba3c48ebfd47c8bd55e58fde2a2625"
+  },
+  "id": "J5uWTIskY_QsilLF7Dkm4",
+  "tags": []
+}
