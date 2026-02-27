@@ -1,5 +1,5 @@
 {
-  "name": "WF0 - Lead Scoring & Tiering (LinkedIn → Apollo → Score → Google Sheet)",
+  "name": "WF0 - Lead Scoring & Tiering (LinkedIn → Apollo → Score)",
   "nodes": [
     {
       "parameters": {},
@@ -123,30 +123,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build scoring summary from accumulated results (includes fallback-path leads)\nlet allScored = [];\ntry { allScored = allScored.concat($('Score & Tier Lead').all()); } catch(e) {}\ntry { allScored = allScored.concat($('Fallback Score (No Apollo)').all()); } catch(e) {}\n\nlet tier1 = 0;\nlet tier2 = 0;\nlet tier3 = 0;\nlet tier4 = 0;\nlet unscored = 0;\nlet belowICP = 0;\nlet totalScore = 0;\nlet topLeads = [];\n\nfor (const item of allScored) {\n  const lead = item.json;\n  totalScore += lead.score;\n  if (lead.employee_count > 0 && lead.employee_count < 10) {\n    belowICP++;\n  }\n  topLeads.push({ name: lead.name, score: lead.score, tier: lead.tier, company: lead.company_name || '?', employees: lead.employee_count || '?' });\n  \n  switch(lead.tier) {\n    case 'Tier 1': tier1++; break;\n    case 'Tier 2': tier2++; break;\n    case 'Tier 3': tier3++; break;\n    case 'Tier 4': tier4++; break;\n    default: unscored++; break;\n  }\n}\n\nconst total = allScored.length;\nconst avgScore = total > 0 ? (totalScore / total).toFixed(1) : 0;\n\ntopLeads.sort((a, b) => b.score - a.score);\nconst top10 = topLeads.slice(0, 10)\n  .map((l, i) => {\n    const parts = l.name.split(' ');\n    const display = parts[0] + (parts[1] ? ' ' + parts[1][0] + '.' : '');\n    const flag = (typeof l.employees === 'number' && l.employees > 0 && l.employees < 10) ? ' :small_orange_diamond:' : '';\n    return `${i + 1}. ${display} — *${l.score}/13* (${l.tier}) — ${l.employees} employees${flag}`;\n  })\n  .join('\\n');\n\nconst loomCount = tier1 + tier2;\nconst loomMinutes = loomCount * 3;\nconst loomHours = (loomMinutes / 60).toFixed(1);\n\nconst summary = `:bar_chart: *Lead Scoring Complete*\\n\\n` +\n  `*${total} leads scored* | Avg score: ${avgScore}/13\\n\\n` +\n  `:fire: *Tier 1 — Loom Priority* (10-13): ${tier1} leads\\n` +\n  `:movie_camera: *Tier 2 — Loom Video* (7-9): ${tier2} leads\\n` +\n  `:memo: *Tier 3 — Personalized Text* (4-6): ${tier3} leads\\n` +\n  `:envelope: *Tier 4 — Template* (0-3): ${tier4} leads\\n` +\n  (unscored > 0 ? `:warning: *Unscored (Apollo failed):* ${unscored} leads — review in sheet\\n` : '') +\n  (belowICP > 0 ? `:small_orange_diamond: *Below ICP (<10 employees):* ${belowICP} leads — check Flags column\\n` : '') +\n  `\\n:clock3: *Estimated Loom time:* ${loomCount} videos × 3 min = *${loomHours} hours*\\n\\n` +\n  `---\\n:trophy: *Top 10:*\\n${top10}\\n\\n_Full details in the Google Sheet._`;\n\nreturn [{ json: { summary, total, tier1_count: tier1, tier2_count: tier2, tier3_count: tier3, tier4_count: tier4, unscored_count: unscored, below_icp_count: belowICP, loom_count: loomCount, loom_hours: loomHours } }];"
-      },
-      "id": "wf0-node-8",
-      "name": "Build Summary",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1790, 300],
-      "notes": "Aggregates scoring results into a summary with tier breakdown and top 10 leads by employee count + revenue score."
-    },
-    {
-      "parameters": {
-        "channel": "#onboarding-alerts",
-        "text": "={{ $json.summary }}",
-        "otherOptions": {}
-      },
-      "id": "wf0-node-9",
-      "name": "Post Scoring Summary",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.2,
-      "position": [2010, 300],
-      "notes": "Posts the scoring summary to #onboarding-alerts so Anthony knows which leads to prioritize for Loom videos."
-    },
-    {
-      "parameters": {
         "jsCode": "// Fallback when Apollo fails — score title from sheet data if available\nconst lead = $('Loop Over Leads').first().json;\n\nlet score = 0;\nlet scoreBreakdown = ['Apollo enrichment failed — scoring title from sheet only'];\n\nconst titleLower = (lead.title || '').toLowerCase();\nif (titleLower.includes('ceo') || titleLower.includes('founder') || titleLower.includes('owner')) {\n  score += 3;\n  scoreBreakdown.push('CEO/Founder/Owner (from sheet): +3');\n} else if (titleLower.includes('coo') || titleLower.includes('president') || titleLower.includes('vp')) {\n  score += 2;\n  scoreBreakdown.push('COO/President/VP (from sheet): +2');\n} else if (titleLower.includes('director') || titleLower.includes('head of')) {\n  score += 1;\n  scoreBreakdown.push('Director/Head (from sheet): +1');\n}\n\n// Tier assignment uses same thresholds as main path\nlet tier = '';\nlet outreachType = '';\nif (score >= 4) {\n  tier = 'Tier 3';\n  outreachType = 'Personalized Text';\n} else if (score > 0) {\n  tier = 'Tier 4';\n  outreachType = 'Template Outreach — Needs Manual Review';\n} else {\n  tier = 'Tier 4';\n  outreachType = 'Needs Manual Review';\n}\n\nreturn [{\n  json: {\n    name: lead.name,\n    first_name: lead.first_name,\n    last_name: lead.last_name,\n    linkedin_url: lead.linkedin_url,\n    row_index: lead.row_index,\n    company_name: lead.company || '',\n    person_title: lead.title || '',\n    employee_count: 0,\n    annual_revenue: 0,\n    revenue_display: 'Unknown',\n    score: score,\n    max_score: 13,\n    tier: tier,\n    outreach_type: outreachType,\n    score_breakdown: scoreBreakdown.join(' | '),\n    flags: 'APOLLO FAILED',\n    apollo_failed: true\n  }\n}];"
       },
       "id": "wf0-node-10",
@@ -197,7 +173,7 @@
     },
     "Loop Over Leads": {
       "main": [
-        [{ "node": "Build Summary", "type": "main", "index": 0 }],
+        [],
         [{ "node": "Apollo Enrichment", "type": "main", "index": 0 }]
       ]
     },
@@ -218,9 +194,6 @@
     },
     "Fallback Score (No Apollo)": {
       "main": [[{ "node": "Write Scores to Sheet", "type": "main", "index": 0 }]]
-    },
-    "Build Summary": {
-      "main": [[{ "node": "Post Scoring Summary", "type": "main", "index": 0 }]]
     }
   },
   "settings": { "executionOrder": "v1" },
