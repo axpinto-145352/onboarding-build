@@ -1,263 +1,146 @@
-# Veteran Vectors — Pipeline Flowmap
+# Veteran Vectors — Pipeline Flowmap v3
 
-## Inputs → Automations → Outputs (Sequential)
+## Full Pipeline: Calendly → Notion CRM → Client Onboarding
 
 ```
 ════════════════════════════════════════════════════════════════════════════════
- WF1: AUDIT CALL BOOKED                                    Trigger: Calendly
+ WF1: DISCOVERY CALL BOOKED + LEAD QUALIFICATION          Trigger: Calendly
 ════════════════════════════════════════════════════════════════════════════════
 
- INPUT                    AUTOMATION                    OUTPUT
- ─────                    ──────────                    ──────
- Calendly webhook    ──►  Filter: invitee.created   ──► Prospects Sheet row
- (invitee.created)        only                          - Prospect_ID
-                          │                             - Name, Email, Company
-                          ├─ Extract invitee data       - Status: "Audit Scheduled"
-                          ├─ Check duplicate email       │
-                          ├─ IF duplicate?               ├─► Slack #onboarding-alerts
-                          │  YES → update row            │   "New audit call booked"
-                          │  NO  → append new row        │
-                          └─ Slack notify                │
-                                                         ▼
-                     ┌─────── GATE: Anthony conducts the audit call (manual) ──────┐
-                     └─────────────────────────────────────────────────────────────┘
-                                                         │
+ Calendly webhook → Filter bookings → Extract data + qualify → Create Notion
+ Contact → IF qualified → Slack notify | IF not → Slack Accept/Deny buttons
+
 ════════════════════════════════════════════════════════════════════════════════
- WF2: PROPOSAL GENERATION                              Trigger: BlueDot
+ WF1B: QUALIFICATION DECISION                     Trigger: Slack button click
 ════════════════════════════════════════════════════════════════════════════════
 
- INPUT                    AUTOMATION                    OUTPUT
- ─────                    ──────────                    ──────
- BlueDot webhook     ──►  Filter: title contains    ──► Google Drive
- (transcript ready)       "audit" OR "RAPID" OR         - Client folder created
-                          "discovery" OR                - Proposal Google Doc
-                          "veteran vectors"             - Proposal PDF
-                          │                              │
-                          ├─ Read Prospects Sheet        ├─► Prospects Sheet updated
-                          ├─ Match to Prospect           │   - Status: "Proposal Draft"
-                          │  ⚠ HARD STOP if no match    │   - Proposal_Link (Google Doc)
-                          │  ⚠ SKIP if already drafted   │   - Form_Link (pre-filled)
-                          │                              │   - Drive_Folder_ID
-                          ├─ Create client Drive folder  │
-                          ├─ Claude API: extract         ├─► Slack #onboarding-alerts
-                          │  proposal from transcript    │   "DRAFT Proposal Ready"
-                          ├─ Parse AI response           │   + Google Doc edit link
-                          ├─ Copy proposal template      │   + Pre-filled form link
-                          ├─ Populate template           │
-                          │  (batchUpdate placeholders)  │
-                          ├─ Export Google Doc → PDF      │
-                          ├─ Upload PDF to Drive folder   │
-                          ├─ Build pre-filled form URL    │
-                          ├─ Update Prospects Sheet       │
-                          └─ Slack notify                 │
-                                                          ▼
-                     ┌─────── GATE: Anthony reviews proposal in Google Docs ───────┐
-                     │  - Edit content, fix pricing, verify scope                  │
-                     │  - Client has NOT received anything yet                     │
-                     │  - Only proceed when proposal is correct                    │
-                     └─────────────────────────────────────────────────────────────┘
-                                                          │
+ Slack button → Parse → IF Accept: Notion "Discovery Scheduled"
+                         IF Deny: Cancel Calendly + Send Leadmatic + Notion "Declined"
+
 ════════════════════════════════════════════════════════════════════════════════
- WF3: CONTRACT + INVOICING                             Trigger: n8n Form
+ WF2: POST-DISCOVERY CALL                             Trigger: BlueDot
 ════════════════════════════════════════════════════════════════════════════════
 
- INPUT                    AUTOMATION                    OUTPUT
- ─────                    ──────────                    ──────
- Anthony submits     ──►  Validate financial fields ──► SignWell
- pre-filled form          (parse $, convert cents)      - Contract sent to client
- (from Slack link)        │                              │
-                          ├─ Read Prospects Sheet        ├─► Stripe
-                          ├─ Lookup Drive Folder ID      │   - Customer created
-                          ├─ IF no folder? fallback      │   - Invoice created
-                          │                              │   - auto_advance=false
-                          ├─ Build SignWell fields        │     (NOT sent yet)
-                          ├─ SignWell: send contract      │   - Retainer subscription
-                          │                              │     (if applicable)
-                          ├─ Stripe: create customer     │
-                          ├─ Stripe: invoice item        ├─► Client Tracker row
-                          ├─ Stripe: create invoice      │   - Status: "Contract Sent"
-                          │  (auto_advance=false)        │   - SignWell_Doc_ID
-                          │                              │   - Stripe_Customer_ID
-                          ├─ IF retainer? → create       │   - Invoice_ID
-                          │  price + subscription        │   - Contract_Sent_Date (ISO)
-                          │                              │
-                          ├─ Log to Client Tracker       ├─► Slack #onboarding-alerts
-                          └─ Slack notify                    "Contract sent, invoice ready"
-                                                          │
-                     ┌─────── GATE: Client must sign the contract ─────────────────┐
-                     │  WF4 sends reminders while waiting                          │
-                     └─────────────────────────────────────────────────────────────┘
-                                                          │
+ BlueDot webhook → Filter discovery → Match Notion → Create Drive folder →
+ Upload transcript → Claude extract notes → Update Notion (Meeting Held) →
+ Create Meeting record → Slack notify
+
 ════════════════════════════════════════════════════════════════════════════════
- WF4: CONTRACT REMINDERS                               Trigger: Daily 9 AM
+ WF3: POST-AUDIT CALL + PROPOSAL                     Trigger: BlueDot
 ════════════════════════════════════════════════════════════════════════════════
 
- INPUT                    AUTOMATION                    OUTPUT
- ─────                    ──────────                    ──────
- Schedule trigger    ──►  Read Client Tracker       ──► Gmail
- (every 24hr, 9 AM)      Filter: Status =               - 48hr: friendly reminder
-                          "Contract Sent"                - 7 day: firmer reminder
-                          │                              │
-                          ├─ Calculate hours since   ──► Slack (14-day only)
-                          │  Contract_Sent_Date          "Contract unsigned 14 days"
-                          │  Check Last_Reminder_Sent    │
-                          │                          ──► Client Tracker updated
-                          ├─ 48hr  → friendly email      - Last_Reminder_Sent logged
-                          ├─ 7day  → firmer email        - Status: "Contract Expired"
-                          ├─ 14day → Slack escalation      (30-day only)
-                          ├─ 30day → auto-expire         │
-                          │                              │
-                          └─ Log reminder sent           │
-                                                         │
-              ┌──────── No client action needed — fully automated ─────────┐
-              │  48hr + 7day emails: auto-sent (professional templates)    │
-              │  14day: Slack alert to Anthony (decide next action)        │
-              │  30day: auto-expire (no client email, internal only)       │
-              └────────────────────────────────────────────────────────────┘
-                                                         │
-                     ┌─────── GATE: Client signs in SignWell ──────────────────────┐
-                     └─────────────────────────────────────────────────────────────┘
-                                                         │
+ BlueDot webhook → Filter audit → Match Notion → Find/create Drive folder →
+ Upload transcript → Claude generate proposal + ROI → Copy + populate template →
+ Export PDF → Upload to Drive → Notion "Proposal Draft" → Create Meeting →
+ Slack with [Send Proposal] button
+
 ════════════════════════════════════════════════════════════════════════════════
- WF5: POST-SIGNING ONBOARDING                         Trigger: SignWell
+ WF3B: PROPOSAL DELIVERY                          Trigger: Slack button click
 ════════════════════════════════════════════════════════════════════════════════
 
- INPUT                    AUTOMATION                    OUTPUT
- ─────                    ──────────                    ──────
- SignWell webhook    ──►  Filter: "completed" event ──► Stripe
- (document.completed)     │                             - Invoice SENT (post-signing)
-                          ├─ Read Client Tracker          │
-                          ├─ Match by SignWell_Doc_ID    ├─► Google Drive
-                          │  ⚠ SKIP if "Onboarded"      │   - Signed PDF uploaded
-                          │  ⚠ STOP if no Invoice_ID    │
-                          │  ⚠ STOP if no Folder_ID     ├─► Slack
-                          │                              │   - #client-{company} created
-                          ├─ Stripe: send invoice        │   - Channel topic set
-                          ├─ Download signed PDF         │   - Welcome message posted
-                          ├─ Upload to client folder     │
-                          │                              ├─► Google Drive
-                          │  SEQUENTIAL (no parallel):   │   - Onboarding checklist
-                          ├─ Create Slack channel         │     copied + shared with client
-                          ├─ Set channel topic           │
-                          ├─ Post welcome message        ├─► Google Calendar
-                          ├─ Copy onboarding checklist   │   - Weekly reminder
-                          ├─ Share checklist with client  │     (with end date)
-                          ├─ Create weekly reminder      │
-                          │                              ├─► Gmail
-                          ├─ Send welcome email (ONCE)   │   - Welcome email to client
-                          ├─ Update tracker: "Onboarded" │     (kickoff link + next steps)
-                          └─ Slack final confirmation    │
-                                                         ├─► Client Tracker updated
-                                                         │   - Status: "Onboarded"
-                                                         │   - Signed_Date
-                                                         │   - Slack_Channel
-                                                         │
-                                                         └─► Slack #onboarding-alerts
-                                                             "Fully onboarded!"
+ Slack button → Export latest PDF → Email to client → Notion "Proposal Sent" →
+ Update Slack message
+
+════════════════════════════════════════════════════════════════════════════════
+ WF4: CLIENT ONBOARDING (CONTRACT + INVOICE)          Trigger: n8n Form
+════════════════════════════════════════════════════════════════════════════════
+
+ Form submit → Validate → SignWell contract → Stripe customer + invoice (DRAFT) →
+ IF retainer: Stripe subscription (PAUSED) → Notion "Contract Sent" →
+ Create Notion Project → Slack notify
+
+════════════════════════════════════════════════════════════════════════════════
+ WF5: CONTRACT & INVOICE REMINDERS                    Trigger: Daily 9 AM
+════════════════════════════════════════════════════════════════════════════════
+
+ Query Notion "Contract Sent" → Calculate days → Daily reminder email →
+ 14-day Slack escalation → 30-day auto-expire → Log in Notion
+
+════════════════════════════════════════════════════════════════════════════════
+ WF6: POST-SIGNING FULL ONBOARDING                   Trigger: SignWell
+════════════════════════════════════════════════════════════════════════════════
+
+ SignWell webhook → Match Notion → Stripe send invoice + resume retainer →
+ Upload signed PDF → Create Slack channel → Welcome email →
+ Notion "Project Started" → Thursday calendar → Slack confirmation
+
+════════════════════════════════════════════════════════════════════════════════
+ WF7: WEEKLY THURSDAY CHECK-INS                       Trigger: Thursday 9 AM
+════════════════════════════════════════════════════════════════════════════════
+
+ Query Active Projects → Build check-in template per project →
+ Post to #onboarding-alerts → Anthony fills in and posts to client channel
 ```
 
 ---
 
-## Sequential Gate Chain
+## Gate Chain
 
 ```
-Calendly          BlueDot           Anthony            Anthony          Client           SignWell
-booking           transcript        reviews            submits          signs             webhook
-  │                  │              proposal            form             contract            │
-  ▼                  ▼                 │                  │                │                 ▼
-┌────┐  ───►  ┌────┐  ───►  ┌─────────┐  ───►  ┌────┐  ───►  ┌────┐  ───►  ┌────┐
-│WF1 │  GATE  │WF2 │  GATE  │ MANUAL  │  GATE  │WF3 │  GATE  │WF4 │  GATE  │WF5 │
-│    │  ────  │    │  ────  │ REVIEW  │  ────  │    │  ────  │    │  ────  │    │
-└────┘ audit  └────┘ human  └─────────┘ human  └────┘ client └────┘ client └────┘
-       call    draft  review  edits in   submit  signs   waits  signs   fires
-       done    ready  needed  Google Doc  form   contract        contract auto
-```
-
-**Every gate is either a hard human action or a hard external event. Nothing auto-advances past a gate.**
-
----
-
-## Data Flow Between Systems
-
-```
-                  GOOGLE SHEETS                         GOOGLE DRIVE
-              ┌──────────────────┐                 ┌──────────────────┐
-              │  Prospects Tab   │                 │  Clients Folder  │
-              │  ──────────────  │                 │  ──────────────  │
-  WF1 WRITE → │  Prospect_ID    │                 │                  │
-  WF1 WRITE → │  Name, Email    │    WF2 CREATE → │  {Company}/      │
-  WF1 WRITE → │  Company        │    WF2 UPLOAD → │  ├─ Proposal.doc │
-  WF2 WRITE → │  Status         │    WF2 UPLOAD → │  ├─ Proposal.pdf │
-  WF2 WRITE → │  Proposal_Link  │    WF5 UPLOAD → │  ├─ Signed SOW   │
-  WF2 WRITE → │  Form_Link      │    WF5 COPY  → │  └─ Checklist    │
-  WF2 WRITE → │  Drive_Folder_ID│                 │                  │
-              │                  │                 └──────────────────┘
-              │  Client Tracker  │
-              │  ──────────────  │                       SLACK
-  WF3 WRITE → │  Client_Name    │                 ┌──────────────────┐
-  WF3 WRITE → │  SignWell_Doc_ID│    WF1 POST  → │  #onboarding-    │
-  WF3 WRITE → │  Invoice_ID    │    WF2 POST  → │    alerts         │
-  WF3 WRITE → │  Stripe IDs    │    WF3 POST  → │  (all WF notifs)  │
-  WF4 WRITE → │  Last_Reminder │    WF4 POST  → │                  │
-  WF5 WRITE → │  Status        │    WF5 POST  → │  #client-{co}    │
-  WF5 WRITE → │  Signed_Date   │    WF5 CREATE→ │  (per client)    │
-              └──────────────────┘                 └──────────────────┘
-
-                   STRIPE                            EXTERNAL APIs
-              ┌──────────────────┐                 ┌──────────────────┐
-  WF3 CREATE → │  Customer       │                 │  Calendly        │
-  WF3 CREATE → │  Invoice Item   │    WF1 RECV ← │  (webhook in)    │
-  WF3 CREATE → │  Invoice (DRAFT)│                 │                  │
-  WF3 CREATE → │  Subscription?  │                 │  BlueDot         │
-  WF5 SEND  → │  Invoice (LIVE) │    WF2 RECV ← │  (webhook in)    │
-              └──────────────────┘                 │                  │
-                                                   │  SignWell        │
-                ANTHROPIC CLAUDE                   │  WF3 SEND  →   │
-              ┌──────────────────┐    WF5 RECV ← │  (webhook in)    │
-  WF2 CALL  → │  Sonnet 4       │                 │                  │
-  WF2 RECV ← │  Proposal JSON  │                 │  Google Docs API │
-              └──────────────────┘    WF2 CALL  → │  (batchUpdate)   │
-                                                   │                  │
-                GOOGLE CALENDAR                    │  Gmail           │
-              ┌──────────────────┐    WF4 SEND  → │  (reminders)     │
-  WF5 CREATE → │  Weekly reminder│    WF5 SEND  → │  (welcome email) │
-              │  (with end date) │                 └──────────────────┘
-              └──────────────────┘
+Calendly     Anthony      BlueDot       Anthony      BlueDot
+booking      conducts     processes     books        processes
+discovery    discovery    transcript    audit call   transcript
+  │            │             │             │             │
+  ▼            ▼             ▼             ▼             ▼
+┌────┐ GATE ┌──────┐ GATE ┌────┐ GATE ┌──────┐ GATE ┌────┐
+│WF1 │─────►│MANUAL│─────►│WF2 │─────►│MANUAL│─────►│WF3 │
+│WF1B│      │ CALL │      │    │      │ CALL │      │    │
+└────┘      └──────┘      └────┘      └──────┘      └────┘
+                                                        │
+  Anthony      Anthony      Client        SignWell     Weekly
+  reviews      submits      signs         webhook      auto
+  proposal     form         contract        │            │
+     │            │            │             ▼            ▼
+     ▼            ▼            ▼          ┌────┐      ┌────┐
+  ┌─────┐ GATE ┌────┐ GATE ┌────┐ GATE  │WF6 │ auto │WF7 │
+  │WF3B │─────►│WF4 │─────►│WF5 │──────►│    │─────►│    │
+  └─────┘      └────┘      └────┘       └────┘      └────┘
 ```
 
 ---
 
-## Status Lifecycle (Single Source of Truth: Google Sheets)
+## Notion CRM Status Lifecycle
 
 ```
-PROSPECTS SHEET STATUS:
+"Pending Review" → "Discovery Scheduled" → "Meeting Held" → "Proposal Draft"
+     WF1              WF1/WF1B                 WF2               WF3
+       │
+       └─► "Declined" (deny or 30-day expire)
 
-  "Audit Scheduled"  ──►  "Proposal Draft"  ──►  (manual review happens outside Sheets)
-        WF1                     WF2
-
-CLIENT TRACKER STATUS:
-
-  "Contract Sent"  ──►  "Onboarded"     (happy path)
-       WF3                  WF5
-         │
-         ├──►  "Contract Expired"        (30-day timeout)
-         │          WF4
-         │
-         └──►  (no "Contract Declined"   (not yet built)
-                 status — future WF)
+"Proposal Draft" → "Proposal Sent" → "Contract Sent" → "Project Started"
+     WF3               WF3B               WF4               WF6
 ```
 
 ---
 
-## Gates Summary
+## Placeholder Reference
 
-| Gate | Where | Type | What Blocks |
-|------|-------|------|-------------|
-| G1: Audit Call | Between WF1 → WF2 | MANUAL | Anthony must conduct the call. BlueDot fires only after. |
-| G2: Proposal Review | Between WF2 → WF3 | MANUAL | Anthony must review Google Doc. Status stays "Proposal Draft". Client sees nothing. |
-| G3: Form Submit | WF3 trigger | MANUAL | Anthony must click form link and submit. Sends contract + creates invoice. |
-| G4: Client Signature | Between WF3 → WF5 | EXTERNAL | Client must sign in SignWell. WF4 sends reminders while waiting. |
-| G5: Idempotency | WF2 Match to Prospect | AUTO | Blocks duplicate BlueDot webhooks from creating duplicate proposals. |
-| G6: Idempotency | WF5 Match Client Record | AUTO | Blocks duplicate SignWell webhooks from re-onboarding. |
-| G7: Invoice Guard | WF5 Match Client Record | AUTO | Blocks onboarding if Invoice_ID is missing (prevents Stripe errors). |
-| G8: Folder Guard | WF5 Match Client Record | AUTO | Blocks onboarding if Drive_Folder_ID is missing (prevents upload errors). |
+| Placeholder | Workflows | What to Put |
+|-------------|-----------|-------------|
+| `YOUR_NOTION_CONTACTS_DB_ID` | WF1, WF2, WF3, WF5, WF6 | Notion Contacts database ID |
+| `YOUR_NOTION_PROJECTS_DB_ID` | WF4, WF6, WF7 | Notion Projects database ID |
+| `YOUR_NOTION_MEETINGS_DB_ID` | WF2, WF3 | Notion Meetings database ID |
+| `YOUR_CLIENTS_FOLDER_ID` | WF2, WF3, WF6 | Root Clients folder in Google Drive |
+| `YOUR_PROPOSAL_TEMPLATE_DOC_ID` | WF3 | Google Doc proposal template ID |
+| `YOUR_SIGNWELL_TEMPLATE_ID` | WF4 | SignWell template ID |
+| `YOUR_CALENDLY_LINK` | WF6 | Kickoff call Calendly link |
+| `YOUR_CALENDLY_PERSONAL_TOKEN` | WF1B | Calendly API token for cancellations |
+| Slack Bot Token | WF1, WF1B, WF3, WF3B, WF6 | xoxb- Slack Bot token |
+| Stripe Secret Key | WF4, WF6 | sk_live_ Stripe key |
+| Anthropic API Key | WF2, WF3 | Claude API key |
+
+---
+
+## Import Order
+
+| Order | File | Reason |
+|-------|------|--------|
+| 1 | WF1_Discovery_Qualification.json | Entry point, no dependencies |
+| 2 | WF1B_Qualification_Decision.json | Handles WF1 buttons |
+| 3 | WF2_Discovery_Call_Processing.json | Post-discovery |
+| 4 | WF3_Audit_Proposal.json | Post-audit |
+| 5 | WF3B_Proposal_Send.json | Handles WF3 button |
+| 6 | WF4_Client_Onboarding.json | Contract + invoice |
+| 7 | WF5_Reminders.json | Daily reminders |
+| 8 | WF6_Post_Signing.json | Full onboarding |
+| 9 | WF7_Weekly_Checkins.json | Thursday check-ins |
