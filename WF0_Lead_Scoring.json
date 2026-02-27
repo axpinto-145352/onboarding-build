@@ -312,14 +312,48 @@
     },
     {
       "parameters": {
-        "jsCode": "// Score lead from Apify LinkedIn profile data\n// Scoring: employee count (0-5) + revenue (0-5) + title (0-3) = max 13 pts\nconst apify = $input.first().json;\nconst lead = $('Loop Over Items').first().json;\n\n// === EXTRACT DATA FROM APIFY SCRAPE ===\nconst personTitle = apify.experiences?.[0]?.title || apify.headline || '';\nconst companyName = apify.experiences?.[0]?.companyName || '';\nconst fullName = apify.fullName || lead.Name || '';\n\n// Parse employee count — Apify scrapers return this in various field names/formats\nlet employeeCount = 0;\nconst empSources = [\n  apify.experiences?.[0]?.companyEmployees,\n  apify.experiences?.[0]?.companySize,\n  apify.experiences?.[0]?.companyStaffCountRange,\n  apify.experiences?.[0]?.companyEmployeeCount,\n  apify.companySize,\n  apify.employeesCount\n];\nfor (const empRaw of empSources) {\n  if (empRaw == null) continue;\n  if (typeof empRaw === 'number' && empRaw > 0) {\n    employeeCount = empRaw;\n    break;\n  }\n  if (typeof empRaw === 'string') {\n    // Parse ranges like \"51-200 employees\", \"10,001+\", \"51-200\"\n    const rangeMatch = empRaw.match(/(\\d[\\d,]*)\\s*[-–]\\s*(\\d[\\d,]*)/);\n    if (rangeMatch) {\n      const low = parseInt(rangeMatch[1].replace(/,/g, ''));\n      const high = parseInt(rangeMatch[2].replace(/,/g, ''));\n      employeeCount = Math.round((low + high) / 2);\n      break;\n    }\n    const numMatch = empRaw.match(/(\\d[\\d,]*)/);\n    if (numMatch) {\n      employeeCount = parseInt(numMatch[1].replace(/,/g, ''));\n      break;\n    }\n  }\n}\n\n// Revenue — not available from LinkedIn profiles.\n// If you add a Revenue column to the sheet, uncomment the line below:\n// const revenue = Number(lead.Revenue) || 0;\nlet revenue = 0;\n\n// ============ SCORING ALGORITHM (max 13 pts) ============\nlet score = 0;\nlet scoreBreakdown = [];\n\n// 1. Employee Count (max 5 pts)\nif (employeeCount >= 50 && employeeCount <= 200) {\n  score += 5; scoreBreakdown.push('Employees 50-200: +5');\n} else if (employeeCount >= 20 && employeeCount < 50) {\n  score += 4; scoreBreakdown.push('Employees 20-49: +4');\n} else if (employeeCount >= 10 && employeeCount < 20) {\n  score += 3; scoreBreakdown.push('Employees 10-19: +3');\n} else if (employeeCount > 200) {\n  score += 3; scoreBreakdown.push('Employees 200+: +3');\n} else if (employeeCount >= 5 && employeeCount < 10) {\n  score += 2; scoreBreakdown.push('Employees 5-9 (below ICP): +2');\n} else if (employeeCount > 0) {\n  score += 1; scoreBreakdown.push('Employees <5: +1');\n} else {\n  scoreBreakdown.push('Employees unknown: +0');\n}\n\n// 2. Revenue (max 5 pts)\nif (revenue >= 10000000) {\n  score += 5; scoreBreakdown.push('Revenue $10M+: +5');\n} else if (revenue >= 5000000) {\n  score += 4; scoreBreakdown.push('Revenue $5-10M: +4');\n} else if (revenue >= 1000000) {\n  score += 3; scoreBreakdown.push('Revenue $1-5M: +3');\n} else if (revenue > 0) {\n  score += 1; scoreBreakdown.push('Revenue <$1M: +1');\n} else {\n  scoreBreakdown.push('Revenue unknown: +0');\n}\n\n// 3. Title (max 3 pts)\nconst titleLower = personTitle.toLowerCase();\nif (/\\b(ceo|founder|co-founder|owner)\\b/.test(titleLower)) {\n  score += 3; scoreBreakdown.push('CEO/Founder/Owner: +3');\n} else if (/\\b(coo|president|vp|vice president|chief)\\b/.test(titleLower)) {\n  score += 2; scoreBreakdown.push('COO/President/VP/Chief: +2');\n} else if (/\\b(director|head of)\\b/.test(titleLower)) {\n  score += 1; scoreBreakdown.push('Director/Head: +1');\n} else if (personTitle) {\n  scoreBreakdown.push('Other title: +0');\n} else {\n  scoreBreakdown.push('Title unknown: +0');\n}\n\n// ============ FLAGS ============\nconst flags = [];\nif (employeeCount > 0 && employeeCount < 10) {\n  flags.push('BELOW ICP: ' + employeeCount + ' employees');\n}\n\n// ============ TIER ASSIGNMENT ============\nlet tier, outreachType;\nif (score >= 10) {\n  tier = 'Tier 1'; outreachType = 'Loom Video (Priority)';\n} else if (score >= 7) {\n  tier = 'Tier 2'; outreachType = 'Loom Video';\n} else if (score >= 4) {\n  tier = 'Tier 3'; outreachType = 'Personalized Text';\n} else {\n  tier = 'Tier 4'; outreachType = 'Template Outreach';\n}\n\n// Pass through ALL Apify data (so Claude prompt still works)\n// plus scoring fields prefixed with _ to avoid collisions\nreturn [{\n  json: {\n    ...apify,\n    _score: score,\n    _tier: tier,\n    _outreach_type: outreachType,\n    _employee_count: employeeCount,\n    _revenue: revenue,\n    _company_name: companyName,\n    _person_title: personTitle,\n    _score_breakdown: scoreBreakdown.join(' | '),\n    _flags: flags.join(' | '),\n    _full_name: fullName\n  }\n}];"
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Estimate the annual revenue for this company. Use your knowledge of the industry, company size, and comparable companies.\n\nCompany: {{ $json.experiences[0].companyName }}\nEmployee Count (from LinkedIn): {{ $json.experiences[0].companyEmployees || $json.experiences[0].companySize || 'Unknown' }}\nTitle of Contact: {{ $json.experiences[0].title }}\nCompany Description: {{ $json.experiences[0].jobDescription }}\nHeadline: {{ $json.headline }}\n\nRespond with ONLY a JSON object, no other text:\n{\n  \"revenue_estimate\": <number in USD, integer, no commas>,\n  \"confidence\": \"<low|medium|high>\",\n  \"reasoning\": \"<one sentence>\"\n}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokensToSample": 200,
+          "temperature": 0.1,
+          "systemMessage": "You are a revenue estimation assistant. Given a company name, employee count, industry, and description, estimate annual revenue in USD. Use these heuristics:\n- Revenue per employee varies by industry: SaaS ~$200-300K, services ~$100-200K, manufacturing ~$150-250K, retail ~$150-200K.\n- Apply maturity adjustments: startups (<5yr) skew lower, established companies skew higher.\n- If employee count is unknown, estimate from the company description and title seniority.\n- Never return 0 — always provide your best estimate.\n- Return ONLY valid JSON. No markdown, no explanation outside the JSON."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [2010, 400],
+      "id": "wf0-node-17",
+      "name": "Estimate Revenue",
+      "credentials": {
+        "anthropicApi": {
+          "id": "au1c518sMzUt89ul",
+          "name": "VV Claude"
+        }
+      },
+      "notes": "Lightweight Claude call to estimate company revenue from Apify profile data. Uses industry heuristics and revenue-per-employee benchmarks. Returns JSON with revenue_estimate, confidence, and reasoning. Max 200 tokens — fast and cheap."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Score lead from Apify data + Claude revenue estimate\n// Scoring: employee count (0-5) + revenue (0-5) + title (0-3) = max 13 pts\nconst revenueResponse = $input.first().json;\nconst apify = $('Apify LinkedIn Scrape').first().json;\nconst lead = $('Loop Over Items').first().json;\n\n// === PARSE CLAUDE REVENUE ESTIMATE ===\nlet revenue = 0;\nlet revenueConfidence = 'none';\nlet revenueReasoning = '';\ntry {\n  const responseText = revenueResponse.content?.[0]?.text || revenueResponse.text || '';\n  // Strip markdown code fences if present\n  const cleaned = responseText.replace(/```json\\n?|```\\n?/g, '').trim();\n  const parsed = JSON.parse(cleaned);\n  revenue = Number(parsed.revenue_estimate) || 0;\n  revenueConfidence = parsed.confidence || 'unknown';\n  revenueReasoning = parsed.reasoning || '';\n} catch(e) {\n  revenueReasoning = 'Failed to parse revenue estimate';\n}\n\n// === EXTRACT DATA FROM APIFY SCRAPE ===\nconst personTitle = apify.experiences?.[0]?.title || apify.headline || '';\nconst companyName = apify.experiences?.[0]?.companyName || '';\nconst fullName = apify.fullName || lead.Name || '';\n\n// Parse employee count from Apify\nlet employeeCount = 0;\nconst empSources = [\n  apify.experiences?.[0]?.companyEmployees,\n  apify.experiences?.[0]?.companySize,\n  apify.experiences?.[0]?.companyStaffCountRange,\n  apify.experiences?.[0]?.companyEmployeeCount,\n  apify.companySize,\n  apify.employeesCount\n];\nfor (const empRaw of empSources) {\n  if (empRaw == null) continue;\n  if (typeof empRaw === 'number' && empRaw > 0) {\n    employeeCount = empRaw;\n    break;\n  }\n  if (typeof empRaw === 'string') {\n    const rangeMatch = empRaw.match(/(\\d[\\d,]*)\\s*[-–]\\s*(\\d[\\d,]*)/);\n    if (rangeMatch) {\n      const low = parseInt(rangeMatch[1].replace(/,/g, ''));\n      const high = parseInt(rangeMatch[2].replace(/,/g, ''));\n      employeeCount = Math.round((low + high) / 2);\n      break;\n    }\n    const numMatch = empRaw.match(/(\\d[\\d,]*)/);\n    if (numMatch) {\n      employeeCount = parseInt(numMatch[1].replace(/,/g, ''));\n      break;\n    }\n  }\n}\n\n// ============ SCORING ALGORITHM (max 13 pts) ============\nlet score = 0;\nlet scoreBreakdown = [];\n\n// 1. Employee Count (max 5 pts)\nif (employeeCount >= 50 && employeeCount <= 200) {\n  score += 5; scoreBreakdown.push('Employees 50-200: +5');\n} else if (employeeCount >= 20 && employeeCount < 50) {\n  score += 4; scoreBreakdown.push('Employees 20-49: +4');\n} else if (employeeCount >= 10 && employeeCount < 20) {\n  score += 3; scoreBreakdown.push('Employees 10-19: +3');\n} else if (employeeCount > 200) {\n  score += 3; scoreBreakdown.push('Employees 200+: +3');\n} else if (employeeCount >= 5 && employeeCount < 10) {\n  score += 2; scoreBreakdown.push('Employees 5-9 (below ICP): +2');\n} else if (employeeCount > 0) {\n  score += 1; scoreBreakdown.push('Employees <5: +1');\n} else {\n  scoreBreakdown.push('Employees unknown: +0');\n}\n\n// 2. Revenue (max 5 pts) — from Claude estimate\nif (revenue >= 10000000) {\n  score += 5; scoreBreakdown.push('Revenue $10M+ (est ' + revenueConfidence + '): +5');\n} else if (revenue >= 5000000) {\n  score += 4; scoreBreakdown.push('Revenue $5-10M (est ' + revenueConfidence + '): +4');\n} else if (revenue >= 1000000) {\n  score += 3; scoreBreakdown.push('Revenue $1-5M (est ' + revenueConfidence + '): +3');\n} else if (revenue > 0) {\n  score += 1; scoreBreakdown.push('Revenue <$1M (est ' + revenueConfidence + '): +1');\n} else {\n  scoreBreakdown.push('Revenue unknown: +0');\n}\n\n// 3. Title (max 3 pts)\nconst titleLower = personTitle.toLowerCase();\nif (/\\b(ceo|founder|co-founder|owner)\\b/.test(titleLower)) {\n  score += 3; scoreBreakdown.push('CEO/Founder/Owner: +3');\n} else if (/\\b(coo|president|vp|vice president|chief)\\b/.test(titleLower)) {\n  score += 2; scoreBreakdown.push('COO/President/VP/Chief: +2');\n} else if (/\\b(director|head of)\\b/.test(titleLower)) {\n  score += 1; scoreBreakdown.push('Director/Head: +1');\n} else if (personTitle) {\n  scoreBreakdown.push('Other title: +0');\n} else {\n  scoreBreakdown.push('Title unknown: +0');\n}\n\n// ============ FLAGS ============\nconst flags = [];\nif (employeeCount > 0 && employeeCount < 10) {\n  flags.push('BELOW ICP: ' + employeeCount + ' employees');\n}\n\n// ============ TIER ASSIGNMENT ============\nlet tier, outreachType;\nif (score >= 10) {\n  tier = 'Tier 1'; outreachType = 'Loom Video (Priority)';\n} else if (score >= 7) {\n  tier = 'Tier 2'; outreachType = 'Loom Video';\n} else if (score >= 4) {\n  tier = 'Tier 3'; outreachType = 'Personalized Text';\n} else {\n  tier = 'Tier 4'; outreachType = 'Template Outreach';\n}\n\nconst revenueDisplay = revenue > 0\n  ? '$' + (revenue / 1000000).toFixed(1) + 'M (' + revenueConfidence + ')'\n  : 'Unknown';\n\n// Pass through ALL Apify data (so Claude Research Script prompt still works)\nreturn [{\n  json: {\n    ...apify,\n    _score: score,\n    _tier: tier,\n    _outreach_type: outreachType,\n    _employee_count: employeeCount,\n    _revenue: revenue,\n    _revenue_display: revenueDisplay,\n    _revenue_reasoning: revenueReasoning,\n    _company_name: companyName,\n    _person_title: personTitle,\n    _score_breakdown: scoreBreakdown.join(' | '),\n    _flags: flags.join(' | '),\n    _full_name: fullName\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2010, 400],
+      "position": [2230, 400],
       "id": "wf0-node-13",
       "name": "Score Lead",
-      "notes": "Scores from Apify profile data. Employee count parsed from LinkedIn company size range. Revenue defaults to 0 (not on LinkedIn — add a Revenue column to the sheet and uncomment the line in the code if you want to score on it manually). Title from current experience.\n\nScoring (max 13 pts):\n• Employee count (0-5): 50-200=5, 20-49=4, 10-19=3, 200+=3, 5-9=2 (below ICP), <5=1\n• Revenue (0-5): $10M+=5, $5-10M=4, $1-5M=3, <$1M=1\n• Title (0-3): CEO/Founder/Owner=3, COO/VP/President=2, Director=1\n\nTiers: T1 (10-13) Loom Priority | T2 (7-9) Loom | T3 (4-6) Text | T4 (0-3) Template"
+      "notes": "Scores from Apify profile data + Claude revenue estimate.\n\nScoring (max 13 pts):\n• Employee count (0-5): 50-200=5, 20-49=4, 10-19=3, 200+=3, 5-9=2 (below ICP), <5=1\n• Revenue (0-5): $10M+=5, $5-10M=4, $1-5M=3, <$1M=1 — estimated by Claude\n• Title (0-3): CEO/Founder/Owner=3, COO/VP/President=2, Director=1\n\nTiers: T1 (10-13) Loom Priority | T2 (7-9) Loom | T3 (4-6) Text | T4 (0-3) Template"
     },
     {
       "parameters": {
@@ -342,7 +376,7 @@
       },
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
-      "position": [2230, 400],
+      "position": [2450, 400],
       "id": "wf0-node-14",
       "name": "Claude Research Script",
       "credentials": {
@@ -383,6 +417,7 @@
             "Title": "={{ $('Score Lead').first().json._person_title }}",
             "Score Breakdown": "={{ $('Score Lead').first().json._score_breakdown }}",
             "Flags": "={{ $('Score Lead').first().json._flags }}",
+            "Revenue Est": "={{ $('Score Lead').first().json._revenue_display }}",
             "Done?": "Done",
             "Run": "Done"
           },
@@ -399,6 +434,7 @@
             { "id": "Title", "displayName": "Title", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
             { "id": "Score Breakdown", "displayName": "Score Breakdown", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
             { "id": "Flags", "displayName": "Flags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Revenue Est", "displayName": "Revenue Est", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
             { "id": "Done?", "displayName": "Done?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
             { "id": "Run", "displayName": "Run", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
           ],
@@ -409,7 +445,7 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [2450, 400],
+      "position": [2670, 400],
       "id": "wf0-node-15",
       "name": "Write Scores & Script to Sheet",
       "retryOnFail": true,
@@ -429,7 +465,7 @@
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2670, 400],
+      "position": [2890, 400],
       "id": "wf0-node-16",
       "name": "Wait Between Items",
       "webhookId": "5437d6e2-2773-418f-b4ef-8a29e76de946"
@@ -473,6 +509,9 @@
       ]
     },
     "Apify LinkedIn Scrape": {
+      "main": [[{ "node": "Estimate Revenue", "type": "main", "index": 0 }]]
+    },
+    "Estimate Revenue": {
       "main": [[{ "node": "Score Lead", "type": "main", "index": 0 }]]
     },
     "Score Lead": {
