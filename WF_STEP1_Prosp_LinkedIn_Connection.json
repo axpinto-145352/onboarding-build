@@ -1,0 +1,559 @@
+{
+  "name": "WF STEP1 - Prosp.ai LinkedIn Connection Tracking",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prosp-linkedin-events",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "step1-node-1",
+      "name": "Prosp.ai Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "prosp-linkedin-events",
+      "notes": "Receives all Prosp.ai campaign events: connection_sent, connection_accepted, message_sent, reply_received. Configure this webhook URL in your Prosp.ai campaign settings under Webhooks/Integrations."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "parse-event-type",
+              "name": "event_type",
+              "value": "={{ $json.body.event || $json.body.type || $json.body.action || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-name",
+              "name": "full_name",
+              "value": "={{ $json.body.prospect?.name || $json.body.prospect?.first_name + ' ' + ($json.body.prospect?.last_name || '') || $json.body.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-first-name",
+              "name": "first_name",
+              "value": "={{ ($json.body.prospect?.first_name || ($json.body.prospect?.name || $json.body.name || '').split(' ')[0] || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-last-name",
+              "name": "last_name",
+              "value": "={{ ($json.body.prospect?.last_name || ($json.body.prospect?.name || $json.body.name || '').split(' ').slice(1).join(' ') || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-linkedin-url",
+              "name": "linkedin_url",
+              "value": "={{ $json.body.prospect?.linkedin_url || $json.body.prospect?.linkedinUrl || $json.body.linkedin_url || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-email",
+              "name": "email",
+              "value": "={{ $json.body.prospect?.email || $json.body.email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-company",
+              "name": "company",
+              "value": "={{ $json.body.prospect?.company || $json.body.prospect?.company_name || $json.body.company || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-title",
+              "name": "title",
+              "value": "={{ $json.body.prospect?.title || $json.body.prospect?.job_title || $json.body.title || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-campaign",
+              "name": "campaign_name",
+              "value": "={{ $json.body.campaign?.name || $json.body.campaign_name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-message",
+              "name": "message_content",
+              "value": "={{ $json.body.message?.content || $json.body.message?.text || $json.body.message || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step1-node-2",
+      "name": "Parse Prosp.ai Event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300],
+      "notes": "Normalizes Prosp.ai webhook payload into consistent fields. Handles multiple possible field name formats from Prosp.ai API."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "connection_sent",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Connection Sent"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "connection_accepted",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Connection Accepted"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "reply_received",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Reply Received"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "step1-node-3",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [690, 300],
+      "notes": "Routes events to appropriate handlers: connection_sent creates new contact, connection_accepted updates and triggers research, reply_received marks as responded."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": \"{{ $json.linkedin_url }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "step1-node-4a",
+      "name": "Check Existing Contact (Sent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 140],
+      "notes": "Checks if a Notion contact already exists with this LinkedIn URL to prevent duplicates."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step1-node-5a",
+      "name": "Contact Exists? (Sent)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1130, 140],
+      "notes": "If no existing contact found, creates new one. Otherwise updates existing."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_CONTACTS_DB_ID\" },\n  \"properties\": {\n    \"Name\": { \"title\": [{ \"text\": { \"content\": \"{{ $('Parse Prosp.ai Event').item.json.full_name }}\" } }] },\n    \"Email\": { \"email\": \"{{ $('Parse Prosp.ai Event').item.json.email }}\" },\n    \"LinkedIn Profile\": { \"url\": \"{{ $('Parse Prosp.ai Event').item.json.linkedin_url }}\" },\n    \"Company\": { \"rich_text\": [{ \"text\": { \"content\": \"{{ $('Parse Prosp.ai Event').item.json.company }}\" } }] },\n    \"Title\": { \"rich_text\": [{ \"text\": { \"content\": \"{{ $('Parse Prosp.ai Event').item.json.title }}\" } }] },\n    \"LI Connection Sent\": { \"checkbox\": true },\n    \"Source\": { \"select\": { \"name\": \"LI Loom Outreach\" } },\n    \"Status\": { \"select\": { \"name\": \"Connection Sent\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } },\n    \"Notes\": { \"rich_text\": [{ \"text\": { \"content\": \"Campaign: {{ $('Parse Prosp.ai Event').item.json.campaign_name }}\" } }] }\n  }\n}",
+        "options": {}
+      },
+      "id": "step1-node-6a",
+      "name": "Create Notion Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 60],
+      "notes": "Creates new contact in Notion CRM with LinkedIn profile, connection sent flag, and LI Loom Outreach source."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Check Existing Contact (Sent)').item.json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"LI Connection Sent\": { \"checkbox\": true },\n    \"Status\": { \"select\": { \"name\": \"Connection Sent\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step1-node-7a",
+      "name": "Update Existing Contact (Sent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 220],
+      "notes": "Updates existing contact to mark connection as sent."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": \"{{ $json.linkedin_url }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "step1-node-4b",
+      "name": "Find Contact (Accepted)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 340],
+      "notes": "Finds existing Notion contact to update when connection is accepted."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step1-node-5b",
+      "name": "Contact Found? (Accepted)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1130, 340]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Find Contact (Accepted)').item.json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"LI Connection Accepted\": { \"checkbox\": true },\n    \"Status\": { \"select\": { \"name\": \"Connection Accepted\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step1-node-6b",
+      "name": "Update Notion (Connection Accepted)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 340],
+      "notes": "Updates contact status to 'Connection Accepted' and sets the LI Connection Accepted checkbox."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "YOUR_N8N_WEBHOOK_BASE_URL/webhook/loom-research-trigger",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notion_page_id\": \"{{ $('Find Contact (Accepted)').item.json.results[0].id }}\",\n  \"full_name\": \"{{ $('Parse Prosp.ai Event').item.json.full_name }}\",\n  \"linkedin_url\": \"{{ $('Parse Prosp.ai Event').item.json.linkedin_url }}\",\n  \"company\": \"{{ $('Parse Prosp.ai Event').item.json.company }}\",\n  \"title\": \"{{ $('Parse Prosp.ai Event').item.json.title }}\"\n}",
+        "options": { "timeout": 5000 }
+      },
+      "id": "step1-node-7b",
+      "name": "Trigger Loom Research (WF_STEP3)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 340],
+      "notes": "Triggers the Loom Research Script workflow (WF_STEP3) asynchronously. Replace YOUR_N8N_WEBHOOK_BASE_URL with your n8n instance URL.",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": \"{{ $json.linkedin_url }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "step1-node-4c",
+      "name": "Find Contact (Reply)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 540],
+      "notes": "Finds contact in Notion when a LinkedIn reply is received."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step1-node-5c",
+      "name": "Contact Found? (Reply)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1130, 540]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Find Contact (Reply)').item.json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Responded\": { \"checkbox\": true },\n    \"Status\": { \"select\": { \"name\": \"Responded\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step1-node-6c",
+      "name": "Update Notion (Responded)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 540],
+      "notes": "Updates contact status to 'Responded' and sets the Responded checkbox when a LinkedIn reply is received."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Prosp.ai Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Prosp.ai Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Prosp.ai Event": {
+      "main": [
+        [
+          {
+            "node": "Route by Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Event Type": {
+      "main": [
+        [
+          {
+            "node": "Check Existing Contact (Sent)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Contact (Accepted)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Contact (Reply)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Existing Contact (Sent)": {
+      "main": [
+        [
+          {
+            "node": "Contact Exists? (Sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Exists? (Sent)": {
+      "main": [
+        [
+          {
+            "node": "Create Notion Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Existing Contact (Sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Contact (Accepted)": {
+      "main": [
+        [
+          {
+            "node": "Contact Found? (Accepted)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Found? (Accepted)": {
+      "main": [
+        [
+          {
+            "node": "Update Notion (Connection Accepted)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion (Connection Accepted)": {
+      "main": [
+        [
+          {
+            "node": "Trigger Loom Research (WF_STEP3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Contact (Reply)": {
+      "main": [
+        [
+          {
+            "node": "Contact Found? (Reply)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Found? (Reply)": {
+      "main": [
+        [
+          {
+            "node": "Update Notion (Responded)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "step1-v1-0",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "",
+  "tags": []
+}
