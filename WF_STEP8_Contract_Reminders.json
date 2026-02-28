@@ -22,7 +22,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Check if today is an 'every other day' — use even/odd day of year\nconst dayOfYear = Math.floor(($now - new Date($now.getFullYear(), 0, 0)) / 86400000);\nconst isReminderDay = dayOfYear % 2 === 0;\nreturn [{ json: { isReminderDay, dayOfYear, today: $now.toISODate() } }];"
+        "jsCode": "// Check if today is an 'every other day' — use even/odd day of year\n// $now is a Luxon DateTime in n8n, use .ordinal for day-of-year\nconst dayOfYear = $now.ordinal;\nconst isReminderDay = dayOfYear % 2 === 0;\nreturn [{ json: { isReminderDay, dayOfYear, today: $now.toISODate() } }];"
       },
       "id": "step8-node-1b",
       "name": "Check If Reminder Day",
@@ -281,6 +281,9 @@
     },
     "Log Reminder in Notion": {
       "main": [[ { "node": "Loop Over Contacts", "type": "main", "index": 0 } ]]
+    },
+    "Auto-Expire in Notion": {
+      "main": [[ { "node": "Loop Over Contacts", "type": "main", "index": 0 } ]]
     }
   },
   "active": false,
@@ -290,7 +293,7 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step8-v1-0",
+  "versionId": "step8-v2-0",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []

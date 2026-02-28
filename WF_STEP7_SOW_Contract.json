@@ -406,6 +406,42 @@
       "typeVersion": 4.2,
       "position": [2230, 300],
       "notes": "Creates a Notion Project record linked to the Client contact (fixes DATA-05 from audit)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect Stripe IDs from previous nodes — handles cases where subscription may not exist\nconst customerId = $('Stripe: Create Customer').first()?.json?.id || '';\nlet invoiceId = '';\nlet subscriptionId = '';\ntry { invoiceId = $('Stripe: Create Invoice (Draft)').first()?.json?.id || ''; } catch(e) {}\ntry { subscriptionId = $('Stripe: Create Subscription (Paused)').first()?.json?.id || ''; } catch(e) {}\nreturn [{ json: { stripe_customer_id: customerId, stripe_invoice_id: invoiceId, stripe_subscription_id: subscriptionId } }];"
+      },
+      "id": "step7-node-19",
+      "name": "Collect Stripe IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2230, 600],
+      "notes": "Collects all Stripe IDs (customer, invoice, subscription) for persistence to Notion."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('SOW Contract Form').item.json.Notion_Contact_ID }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Stripe Customer ID\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.stripe_customer_id || '') }} } }] },\n    \"Stripe Invoice ID\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.stripe_invoice_id || '') }} } }] },\n    \"Stripe Subscription ID\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.stripe_subscription_id || '') }} } }] }\n  }\n}",
+        "options": {}
+      },
+      "id": "step7-node-20",
+      "name": "Save Stripe IDs to Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2450, 600],
+      "notes": "Persists Stripe customer, invoice, and subscription IDs to the Notion contact. These are used by WF_STEP9 to finalize billing after contract signing."
     }
   ],
   "pinData": {},
@@ -444,7 +480,10 @@
       "main": [[ { "node": "Create Notion Project", "type": "main", "index": 0 } ]]
     },
     "Has Fixed Cost?": {
-      "main": [[ { "node": "Stripe: Create Customer", "type": "main", "index": 0 } ]]
+      "main": [
+        [ { "node": "Stripe: Create Customer", "type": "main", "index": 0 } ],
+        [ { "node": "Update Notion (Contract Sent)", "type": "main", "index": 0 } ]
+      ]
     },
     "Stripe: Create Customer": {
       "main": [[ { "node": "Stripe: Invoice Item", "type": "main", "index": 0 } ]]
@@ -457,11 +496,18 @@
     },
     "Has Retainer?": {
       "main": [
-        [ { "node": "Stripe: Create Retainer Price", "type": "main", "index": 0 } ]
+        [ { "node": "Stripe: Create Retainer Price", "type": "main", "index": 0 } ],
+        [ { "node": "Collect Stripe IDs", "type": "main", "index": 0 } ]
       ]
     },
     "Stripe: Create Retainer Price": {
       "main": [[ { "node": "Stripe: Create Subscription (Paused)", "type": "main", "index": 0 } ]]
+    },
+    "Stripe: Create Subscription (Paused)": {
+      "main": [[ { "node": "Collect Stripe IDs", "type": "main", "index": 0 } ]]
+    },
+    "Collect Stripe IDs": {
+      "main": [[ { "node": "Save Stripe IDs to Notion", "type": "main", "index": 0 } ]]
     }
   },
   "active": false,
@@ -471,7 +517,7 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step7-v1-0",
+  "versionId": "step7-v2-0",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []

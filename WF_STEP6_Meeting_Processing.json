@@ -184,29 +184,36 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-api-key", "value": "YOUR_ANTHROPIC_API_KEY" },
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "Content-Type", "value": "application/json" }
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a business consultant for Veteran Vectors, an automation consulting firm. Analyze this discovery call transcript and produce:\n\n1. MEETING SUMMARY (2-3 paragraphs)\n2. KEY PAIN POINTS (bulleted list)\n3. ACTION ITEMS (numbered list with owner: Anthony or Client)\n4. BUDGET/TIMELINE mentioned\n5. NEXT STEPS\n6. PRELIMINARY PROPOSAL OUTLINE - Based on the pain points and needs discussed, outline a preliminary proposal with:\n   - Recommended automations/solutions\n   - Estimated scope\n   - Suggested timeline\n   - Approximate value/ROI\n\nTRANSCRIPT:\n{{ $('Extract BlueDot Data').item.json.transcript.substring(0, 12000) }}"
+            }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5-20250929\",\n  \"max_tokens\": 4000,\n  \"messages\": [{\n    \"role\": \"user\",\n    \"content\": \"You are a business consultant for Veteran Vectors, an automation consulting firm. Analyze this discovery call transcript and produce:\\n\\n1. MEETING SUMMARY (2-3 paragraphs)\\n2. KEY PAIN POINTS (bulleted list)\\n3. ACTION ITEMS (numbered list with owner: Anthony or Client)\\n4. BUDGET/TIMELINE mentioned\\n5. NEXT STEPS\\n6. PRELIMINARY PROPOSAL OUTLINE - Based on the pain points and needs discussed, outline a preliminary proposal with:\\n   - Recommended automations/solutions\\n   - Estimated scope\\n   - Suggested timeline\\n   - Approximate value/ROI\\n\\nTRANSCRIPT:\\n{{ $('Extract BlueDot Data').item.json.transcript.replace(/\\\"/g, '\\\\\\\"').substring(0, 12000) }}\"\n  }]\n}",
-        "options": { "timeout": 60000 }
+        "options": {
+          "maxTokens": 4000,
+          "temperature": 0.2
+        }
       },
       "id": "step6-node-9",
       "name": "Claude: Extract Notes + Proposal Brief",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
       "position": [2010, 240],
-      "notes": "Uses Claude Sonnet to extract meeting notes, action items, and generate a preliminary proposal outline from the transcript."
+      "credentials": {
+        "anthropicApi": {
+          "id": "au1c518sMzUt89ul",
+          "name": "VV Claude"
+        }
+      },
+      "notes": "Uses Claude Sonnet (native node with VV Claude credential) to extract meeting notes, action items, and generate a preliminary proposal outline. Standardized to match Loom Research Script pattern."
     },
     {
       "parameters": {
@@ -223,7 +230,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Meeting Held\" } },\n    \"Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($json.content?.[0]?.text || '').substring(0, 2000)) }} } }] },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Meeting Held\" } },\n    \"Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000)) }} } }] },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
         "options": {}
       },
       "id": "step6-node-10",
@@ -248,7 +255,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": \"{{ $('Extract BlueDot Data').item.json.meeting_title }}\" } }] },\n    \"Date\": { \"date\": { \"start\": \"{{ $('Extract BlueDot Data').item.json.meeting_date }}\" } },\n    \"Meeting Type\": { \"select\": { \"name\": \"Discovery\" } },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Extract Contact Info').item.json.notion_page_id }}\" }] },\n    \"BlueDot Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($('Claude: Extract Notes + Proposal Brief').item.json.content?.[0]?.text || '').substring(0, 2000)) }} } }] }\n  }\n}",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": \"{{ $('Extract BlueDot Data').item.json.meeting_title }}\" } }] },\n    \"Date\": { \"date\": { \"start\": \"{{ $('Extract BlueDot Data').item.json.meeting_date }}\" } },\n    \"Meeting Type\": { \"select\": { \"name\": \"Discovery\" } },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Extract Contact Info').item.json.notion_page_id }}\" }] },\n    \"BlueDot Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($('Claude: Extract Notes + Proposal Brief').item.json.content?.[0]?.text || $('Claude: Extract Notes + Proposal Brief').item.json.message?.content?.[0]?.text || $('Claude: Extract Notes + Proposal Brief').item.json.text || '').substring(0, 2000)) }} } }] }\n  }\n}",
         "options": {}
       },
       "id": "step6-node-11",
@@ -330,7 +337,7 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step6-v1-0",
+  "versionId": "step6-v2-0",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []

@@ -213,7 +213,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_CONTACTS_DB_ID\" },\n  \"properties\": {\n    \"Name\": { \"title\": [{ \"text\": { \"content\": \"{{ $('Parse Prosp.ai Event').item.json.full_name }}\" } }] },\n    \"Email\": { \"email\": \"{{ $('Parse Prosp.ai Event').item.json.email }}\" },\n    \"LinkedIn Profile\": { \"url\": \"{{ $('Parse Prosp.ai Event').item.json.linkedin_url }}\" },\n    \"Company\": { \"rich_text\": [{ \"text\": { \"content\": \"{{ $('Parse Prosp.ai Event').item.json.company }}\" } }] },\n    \"Title\": { \"rich_text\": [{ \"text\": { \"content\": \"{{ $('Parse Prosp.ai Event').item.json.title }}\" } }] },\n    \"LI Connection Sent\": { \"checkbox\": true },\n    \"Source\": { \"select\": { \"name\": \"LI Loom Outreach\" } },\n    \"Status\": { \"select\": { \"name\": \"Connection Sent\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } },\n    \"Notes\": { \"rich_text\": [{ \"text\": { \"content\": \"Campaign: {{ $('Parse Prosp.ai Event').item.json.campaign_name }}\" } }] }\n  }\n}",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_CONTACTS_DB_ID\" },\n  \"properties\": {\n    \"Name\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.full_name || '') }} } }] },\n    \"Email\": { \"email\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.email || '') }} },\n    \"LinkedIn Profile\": { \"url\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.linkedin_url || '') }} },\n    \"Company\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.company || '') }} } }] },\n    \"Title\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.title || '') }} } }] },\n    \"LI Connection Sent\": { \"checkbox\": true },\n    \"Source\": { \"select\": { \"name\": \"LI Loom Outreach\" } },\n    \"Status\": { \"select\": { \"name\": \"Connection Sent\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } },\n    \"Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify('Campaign: ' + ($('Parse Prosp.ai Event').item.json.campaign_name || '')) }} } }] }\n  }\n}",
         "options": {}
       },
       "id": "step1-node-6a",
@@ -550,7 +550,7 @@
     "errorWorkflow": "",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step1-v1-0",
+  "versionId": "step1-v2-0",
   "meta": {
     "templateCredsSetupCompleted": false
   },

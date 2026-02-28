@@ -162,56 +162,101 @@
     },
     {
       "parameters": {
-        "resource": "databasePage",
-        "databaseId": {
-          "__rl": true,
-          "value": "YOUR_NOTION_CONTACTS_DB_ID",
-          "mode": "id"
-        },
-        "propertiesUi": {
-          "propertyValues": [
-            { "key": "Name", "title": "={{ $json.name }}" },
-            { "key": "Email", "emailValue": "={{ $json.email }}" },
-            { "key": "Status", "selectValue": "Pending Approval" },
-            { "key": "Call Booked", "checkboxValue": true },
-            { "key": "Last Contact Date" }
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": { \"equals\": {{ JSON.stringify($json.email || '') }} }\n  }\n}",
         "options": {}
       },
       "id": "step5c-node-5b",
-      "name": "Update Notion (Pending Approval)",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
-      "position": [1350, 200],
-      "notes": "Updates Notion to 'Pending Approval' while waiting for Anthony's decision."
+      "name": "Find Contact (Pending)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 200]
     },
     {
       "parameters": {
-        "resource": "databasePage",
-        "databaseId": {
-          "__rl": true,
-          "value": "YOUR_NOTION_CONTACTS_DB_ID",
-          "mode": "id"
-        },
-        "propertiesUi": {
-          "propertyValues": [
-            { "key": "Name", "title": "={{ $json.name }}" },
-            { "key": "Email", "emailValue": "={{ $json.email }}" },
-            { "key": "Status", "selectValue": "Meeting Booked" },
-            { "key": "Call Booked", "checkboxValue": true },
-            { "key": "Responded", "checkboxValue": true },
-            { "key": "Last Contact Date" }
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.results[0]?.id || '' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Pending Approval\" } },\n    \"Call Booked\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-5c",
+      "name": "Update Notion (Pending Approval)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 200],
+      "notes": "Updates existing Notion contact to 'Pending Approval'. Uses HTTP PATCH to prevent duplicate contact creation (fixes DI-06)."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": { \"equals\": {{ JSON.stringify($json.email || '') }} }\n  }\n}",
         "options": {}
       },
       "id": "step5c-node-6",
+      "name": "Find Contact (Auto-Qualify)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 440]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.results[0]?.id || '' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Meeting Booked\" } },\n    \"Call Booked\": { \"checkbox\": true },\n    \"Responded\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-6b",
       "name": "Update Notion (Meeting Booked - Auto)",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
-      "position": [1130, 440],
-      "notes": "Auto-qualifies contacts with revenue above $5K. Updates Notion: Status = 'Meeting Booked', Call Booked = true."
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 440],
+      "notes": "Auto-qualifies contacts with revenue above $5K. Updates existing Notion contact via PATCH to prevent duplicates (fixes DI-06)."
     },
     {
       "parameters": {
@@ -453,11 +498,25 @@
           { "node": "Send Approval Email", "type": "main", "index": 0 }
         ],
         [
+          { "node": "Find Contact (Auto-Qualify)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Contact (Auto-Qualify)": {
+      "main": [
+        [
           { "node": "Update Notion (Meeting Booked - Auto)", "type": "main", "index": 0 }
         ]
       ]
     },
     "Send Approval Email": {
+      "main": [
+        [
+          { "node": "Find Contact (Pending)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Contact (Pending)": {
       "main": [
         [
           { "node": "Update Notion (Pending Approval)", "type": "main", "index": 0 }
@@ -519,7 +578,7 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step5c-v1-0",
+  "versionId": "step5c-v2-0",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []
