@@ -457,7 +457,7 @@
           "name": "VV Google Sheets account"
         }
       },
-      "notes": "Writes scores AND Loom script back to the Loom Videos sheet. Matches rows by LI Profile (unique per lead). Add these columns to your sheet header: Score, Tier, Outreach Type, Employee Count, Company, Title, Score Breakdown, Flags."
+      "notes": "Writes scores AND Loom script back to the Loom Videos sheet. Matches rows by LI Profile (unique per lead). Add these columns to your sheet header: Score, Tier, Outreach Type, Employee Count, Revenue Est, Company, Title, Score Breakdown, Flags."
     },
     {
       "parameters": {
