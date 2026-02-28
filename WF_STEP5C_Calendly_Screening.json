@@ -1,0 +1,585 @@
+{
+  "name": "WF STEP5C - Calendly Discovery Call Screening + Approval",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "events": ["invitee.created"]
+      },
+      "id": "step5c-node-1",
+      "name": "Calendly Trigger",
+      "type": "n8n-nodes-base.calendlyTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "step5c-calendly-trigger",
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "Htykkb3r14siqEFc",
+          "name": "VV - Calendly account"
+        }
+      },
+      "notes": "Triggers when a new invitee books a discovery call via Calendly."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extract-name",
+              "name": "name",
+              "value": "={{ $json.payload.name || $json.payload.invitee?.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-email",
+              "name": "email",
+              "value": "={{ $json.payload.email || $json.payload.invitee?.email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-first-name",
+              "name": "first_name",
+              "value": "={{ ($json.payload.name || $json.payload.invitee?.name || '').split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-event-uuid",
+              "name": "event_uuid",
+              "value": "={{ $json.payload.event.split('/').pop() }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-revenue",
+              "name": "monthly_revenue",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('revenue'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-employees",
+              "name": "employees",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('employee') || q.question.toLowerCase().includes('team size'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-company",
+              "name": "company",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('company'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-budget",
+              "name": "budget",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('budget'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-decision-maker",
+              "name": "decision_maker",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('decision maker'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-pain-points",
+              "name": "pain_points",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('pain') || q.question.toLowerCase().includes('challenge'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-event-url",
+              "name": "event_url",
+              "value": "={{ $json.payload.uri || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "extract-scheduled-time",
+              "name": "scheduled_time",
+              "value": "={{ $json.payload.scheduled_event?.start_time || $json.payload.event_start_time || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step5c-node-2",
+      "name": "Extract Booking Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300],
+      "notes": "Extracts all relevant data from Calendly booking: name, email, revenue, employees, company, budget, decision maker status, pain points."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse monthly revenue and check if between $0-$5,000\nconst revenueStr = $json.monthly_revenue || '';\n\n// Extract numeric value from revenue answer\nconst numericMatch = revenueStr.replace(/[^0-9.,kKmM]/g, '');\nlet revenueValue = 0;\n\nif (revenueStr.toLowerCase().includes('under') || revenueStr.includes('<')) {\n  // Answers like 'Under $5,000' or '<$5K'\n  const num = revenueStr.replace(/[^0-9.,]/g, '');\n  revenueValue = parseFloat(num) || 0;\n} else if (revenueStr.toLowerCase().includes('k')) {\n  revenueValue = parseFloat(revenueStr.replace(/[^0-9.,]/g, '')) * 1000;\n} else if (revenueStr.toLowerCase().includes('m')) {\n  revenueValue = parseFloat(revenueStr.replace(/[^0-9.,]/g, '')) * 1000000;\n} else {\n  revenueValue = parseFloat(revenueStr.replace(/[^0-9.,]/g, '')) || 0;\n}\n\n// Check if revenue is between $0 and $5,000\nconst isLowRevenue = revenueValue >= 0 && revenueValue <= 5000;\n\n// Also flag if answer directly indicates low revenue\nconst lowRevenueKeywords = ['0-5', '0 - 5', 'under 5', 'less than 5', '<5', '$0', 'none', 'pre-revenue', 'startup'];\nconst containsLowKeyword = lowRevenueKeywords.some(kw => revenueStr.toLowerCase().includes(kw));\n\nreturn [{\n  json: {\n    ...$json,\n    revenue_parsed: revenueValue,\n    needs_approval: isLowRevenue || containsLowKeyword,\n    revenue_flag: isLowRevenue || containsLowKeyword ? 'LOW ($0-$5K)' : 'QUALIFIED'\n  }\n}];"
+      },
+      "id": "step5c-node-3",
+      "name": "Parse Revenue & Check Threshold",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300],
+      "notes": "Parses monthly revenue from Calendly answer. Checks if between $0-$5,000/month. Handles various answer formats (Under $5K, <$5,000, etc.)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needs_approval }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step5c-node-4",
+      "name": "Revenue $0-$5K?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [910, 300],
+      "notes": "Routes to approval email if revenue is $0-$5K/month. Otherwise, auto-qualifies and updates Notion."
+    },
+    {
+      "parameters": {
+        "sendTo": "anthony@veteranvectors.io",
+        "subject": "=Approval Needed: Discovery Call - {{ $json.name }} ({{ $json.company }})",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;\">\n  <div style=\"background-color:#1a1a2e;padding:24px 40px;text-align:center;border-radius:8px 8px 0 0;\">\n    <span style=\"color:#4dd0e1;font-size:22px;font-weight:bold;\">DISCOVERY CALL APPROVAL</span>\n  </div>\n  <div style=\"padding:40px;background:#fff;\">\n    <p style=\"font-size:16px;\">A discovery call has been booked that <strong>needs your approval</strong>.</p>\n    <p style=\"color:#e74c3c;font-weight:bold;\">Revenue Flag: {{ $json.revenue_flag }} ({{ $json.monthly_revenue }})</p>\n    \n    <table style=\"width:100%;border-collapse:collapse;margin:20px 0;\">\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Name</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.name }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Email</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.email }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Company</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.company }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Monthly Revenue</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.monthly_revenue }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Employees</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.employees }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Budget</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.budget }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Decision Maker?</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.decision_maker }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Pain Points</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.pain_points }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Scheduled</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.scheduled_time }}</td></tr>\n    </table>\n    \n    <div style=\"text-align:center;margin:30px 0;\">\n      <a href=\"YOUR_N8N_WEBHOOK_BASE_URL/webhook/calendly-approval?action=approve&event_uuid={{ $json.event_uuid }}&email={{ encodeURIComponent($json.email) }}&name={{ encodeURIComponent($json.name) }}\" style=\"display:inline-block;background:#27ae60;color:#fff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;margin:0 10px;\">APPROVE</a>\n      <a href=\"YOUR_N8N_WEBHOOK_BASE_URL/webhook/calendly-approval?action=disapprove&event_uuid={{ $json.event_uuid }}&email={{ encodeURIComponent($json.email) }}&name={{ encodeURIComponent($json.name) }}\" style=\"display:inline-block;background:#e74c3c;color:#fff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;margin:0 10px;\">DISAPPROVE</a>\n    </div>\n  </div>\n  <div style=\"background:#1a1a2e;padding:20px;text-align:center;border-radius:0 0 8px 8px;\">\n    <p style=\"margin:0;color:#888;font-size:12px;\">Veteran Vectors Onboarding Pipeline</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "id": "step5c-node-5",
+      "name": "Send Approval Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1130, 200],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      },
+      "notes": "Sends approval email to Anthony with all lead details and Approve/Disapprove buttons. Replace YOUR_N8N_WEBHOOK_BASE_URL with your n8n instance URL."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": { \"equals\": {{ JSON.stringify($json.email || '') }} }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-5b",
+      "name": "Find Contact (Pending)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.results[0]?.id || '' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Pending Approval\" } },\n    \"Call Booked\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-5c",
+      "name": "Update Notion (Pending Approval)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 200],
+      "notes": "Updates existing Notion contact to 'Pending Approval'. Uses HTTP PATCH to prevent duplicate contact creation (fixes DI-06)."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": { \"equals\": {{ JSON.stringify($json.email || '') }} }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-6",
+      "name": "Find Contact (Auto-Qualify)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 440]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.results[0]?.id || '' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Meeting Booked\" } },\n    \"Call Booked\": { \"checkbox\": true },\n    \"Responded\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-6b",
+      "name": "Update Notion (Meeting Booked - Auto)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 440],
+      "notes": "Auto-qualifies contacts with revenue above $5K. Updates existing Notion contact via PATCH to prevent duplicates (fixes DI-06)."
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "calendly-approval",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "step5c-node-7",
+      "name": "Approval Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 600],
+      "webhookId": "calendly-approval",
+      "notes": "Receives Anthony's approve/disapprove click from the email. Query params: action, event_uuid, email, name."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "approve",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step5c-node-8",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [470, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": {\n      \"equals\": \"{{ decodeURIComponent($json.query.email) }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-9a",
+      "name": "Find Contact (Approve)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 520]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Meeting Booked\" } },\n    \"Call Booked\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-10a",
+      "name": "Update Notion (Approved - Meeting Booked)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 520],
+      "notes": "Updates Notion to 'Meeting Booked' when Anthony approves."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<html><body style='font-family:Arial;text-align:center;padding:60px;'><h1 style='color:#27ae60;'>Approved!</h1><p>The discovery call with {{ $('Approval Webhook').item.json.query.name }} will proceed as scheduled.</p><p>Notion CRM has been updated.</p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [{ "name": "Content-Type", "value": "text/html" }]
+          }
+        }
+      },
+      "id": "step5c-node-11a",
+      "name": "Respond Approved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1130, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": {\n      \"equals\": \"{{ decodeURIComponent($json.query.email) }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-9b",
+      "name": "Find Contact (Disapprove)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 720]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ decodeURIComponent($('Approval Webhook').item.json.query.email) }}",
+        "subject": "=Thanks for your interest, {{ decodeURIComponent($('Approval Webhook').item.json.query.name).split(' ')[0] }}",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;font-size:16px;line-height:1.7;\">\n  <div style=\"background-color:#1a1a2e;padding:24px 40px;text-align:center;border-radius:8px 8px 0 0;\">\n    <span style=\"color:#4dd0e1;font-size:22px;font-weight:bold;letter-spacing:1px;\">VETERAN VECTORS</span>\n  </div>\n  <div style=\"padding:40px;background:#fff;\">\n    <p>Hey <strong>{{ decodeURIComponent($('Approval Webhook').item.json.query.name).split(' ')[0] }}</strong>,</p>\n    <p>It's Anthony from Veteran Vectors.</p>\n    <p>I took a look at your application and at this point, our services aren't quite the right fit for where your business is currently. We typically work with companies at a different stage of growth.</p>\n    <p>Out of respect for your time, I've gone ahead and cancelled our upcoming call so you don't have to worry about it.</p>\n    <p>That said, I still want to make sure you get something valuable out of this. I put together a complete guide on implementing automations in your business — it's free and packed with stuff you can use right away:</p>\n    <p style=\"text-align:center;padding:16px 0;\">\n      <a href=\"https://drive.google.com/file/d/1Rghj0-doawvR9jCAPts0oLncSMB4Du5N/view?usp=sharing\" style=\"display:inline-block;background-color:#4dd0e1;color:#1a1a2e;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;\">Download the Free Guide</a>\n    </p>\n    <p>If things change down the road, my door is always open.</p>\n    <p>Have a great rest of your day.</p>\n    <p style=\"margin:0 0 4px;\">Cheers,</p>\n    <p style=\"margin:0;font-weight:bold;color:#1a1a2e;\">Anthony</p>\n    <p style=\"margin:0;color:#4dd0e1;font-weight:600;\">Veteran Vectors</p>\n  </div>\n  <div style=\"background:#1a1a2e;padding:20px;text-align:center;border-radius:0 0 8px 8px;\">\n    <p style=\"margin:0;color:#888;font-size:12px;\">© 2026 Veteran Vectors. All rights reserved.</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "id": "step5c-node-10b",
+      "name": "Send Cancellation Email + Lead Magnet",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [910, 660],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      },
+      "notes": "Sends cancellation email with free automation guide (lead magnet) when disapproved."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.calendly.com/scheduled_events/{{ $('Approval Webhook').item.json.query.event_uuid }}/cancellation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"reason\": \"Based on your responses, we're not the right fit at this time. We've sent you a free guide with valuable automation resources.\" }",
+        "options": {}
+      },
+      "id": "step5c-node-11b",
+      "name": "Cancel Calendly Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 820],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "notes": "Cancels the Calendly event when Anthony disapproves the lead."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Find Contact (Disapprove)').item.json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Declined\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step5c-node-12b",
+      "name": "Update Notion (Declined)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 740]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<html><body style='font-family:Arial;text-align:center;padding:60px;'><h1 style='color:#e74c3c;'>Disapproved</h1><p>The discovery call with {{ $('Approval Webhook').item.json.query.name }} has been cancelled.</p><p>A cancellation email with the free guide has been sent.</p><p>Notion CRM updated to 'Declined'.</p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [{ "name": "Content-Type", "value": "text/html" }]
+          }
+        }
+      },
+      "id": "step5c-node-13b",
+      "name": "Respond Disapproved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1350, 740]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Calendly Trigger": {
+      "main": [
+        [
+          { "node": "Extract Booking Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract Booking Data": {
+      "main": [
+        [
+          { "node": "Parse Revenue & Check Threshold", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Revenue & Check Threshold": {
+      "main": [
+        [
+          { "node": "Revenue $0-$5K?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Revenue $0-$5K?": {
+      "main": [
+        [
+          { "node": "Send Approval Email", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Find Contact (Auto-Qualify)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Contact (Auto-Qualify)": {
+      "main": [
+        [
+          { "node": "Update Notion (Meeting Booked - Auto)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Send Approval Email": {
+      "main": [
+        [
+          { "node": "Find Contact (Pending)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Contact (Pending)": {
+      "main": [
+        [
+          { "node": "Update Notion (Pending Approval)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Approval Webhook": {
+      "main": [
+        [
+          { "node": "Approved?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          { "node": "Find Contact (Approve)", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Find Contact (Disapprove)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Contact (Approve)": {
+      "main": [
+        [
+          { "node": "Update Notion (Approved - Meeting Booked)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Notion (Approved - Meeting Booked)": {
+      "main": [
+        [
+          { "node": "Respond Approved", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Contact (Disapprove)": {
+      "main": [
+        [
+          { "node": "Send Cancellation Email + Lead Magnet", "type": "main", "index": 0 },
+          { "node": "Cancel Calendly Event", "type": "main", "index": 0 },
+          { "node": "Update Notion (Declined)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Notion (Declined)": {
+      "main": [
+        [
+          { "node": "Respond Disapproved", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "step5c-v2-0",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": []
+}
