@@ -454,7 +454,11 @@
     },
     "Calculate Amounts": {
       "main": [[
-        { "node": "Create/Find Client Folder", "type": "main", "index": 0 },
+        { "node": "Create/Find Client Folder", "type": "main", "index": 0 }
+      ]]
+    },
+    "Create/Find Client Folder": {
+      "main": [[
         { "node": "PDFco: Fill SOW Template", "type": "main", "index": 0 }
       ]]
     },
@@ -481,8 +485,7 @@
     },
     "Has Fixed Cost?": {
       "main": [
-        [ { "node": "Stripe: Create Customer", "type": "main", "index": 0 } ],
-        [ { "node": "Update Notion (Contract Sent)", "type": "main", "index": 0 } ]
+        [ { "node": "Stripe: Create Customer", "type": "main", "index": 0 } ]
       ]
     },
     "Stripe: Create Customer": {

@@ -86,7 +86,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": \"{{ $json.linkedin_url }}\"\n    }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json.linkedin_url || '') }}\n    }\n  }\n}",
         "options": {}
       },
       "id": "step4-node-4",

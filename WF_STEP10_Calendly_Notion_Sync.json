@@ -98,7 +98,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": \"{{ $json.invitee_email }}\" }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": \"{{ $json.invitee_name }}\" }\n      }\n    ]\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": {{ JSON.stringify($json.invitee_email || '') }} }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": {{ JSON.stringify($json.invitee_name || '') }} }\n      }\n    ]\n  }\n}",
         "options": {}
       },
       "id": "step10-node-3",
@@ -143,7 +143,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify($('Parse Calendly Event').item.json.event_name + ' - ' + $('Parse Calendly Event').item.json.invitee_name) }} } }] },\n    \"Date\": { \"date\": { \"start\": \"{{ $('Parse Calendly Event').item.json.start_time }}\" } },\n    \"Meeting Category\": { \"select\": { \"name\": \"{{ $('Parse Calendly Event').item.json.meeting_category }}\" } },\n    \"Meeting Type\": { \"select\": { \"name\": \"{{ $('Parse Calendly Event').item.json.event_action === 'invitee.created' ? 'Scheduled' : 'Cancelled' }}\" } },\n    \"Attendee Email\": { \"email\": \"{{ $('Parse Calendly Event').item.json.invitee_email }}\" },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Find Notion Contact').item.json.results[0].id }}\" }] }\n  }\n}",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify(($('Parse Calendly Event').item.json.event_name || 'Meeting') + ' - ' + ($('Parse Calendly Event').item.json.invitee_name || '')) }} } }] },\n    \"Date\": { \"date\": { \"start\": {{ JSON.stringify($('Parse Calendly Event').item.json.start_time || '') }} } },\n    \"Meeting Category\": { \"select\": { \"name\": {{ JSON.stringify($('Parse Calendly Event').item.json.meeting_category || 'Other') }} } },\n    \"Meeting Type\": { \"select\": { \"name\": {{ JSON.stringify($('Parse Calendly Event').item.json.event_action === 'invitee.created' ? 'Scheduled' : 'Cancelled') }} } },\n    \"Attendee Email\": { \"email\": {{ JSON.stringify($('Parse Calendly Event').item.json.invitee_email || '') }} },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Find Notion Contact').item.json.results[0].id }}\" }] }\n  }\n}",
         "options": {}
       },
       "id": "step10-node-5",

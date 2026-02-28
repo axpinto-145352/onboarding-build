@@ -166,7 +166,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": \"{{ $json.linkedin_url }}\"\n    }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json.linkedin_url || '') }}\n    }\n  }\n}",
         "options": {}
       },
       "id": "step1-node-4a",
@@ -263,7 +263,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": \"{{ $json.linkedin_url }}\"\n    }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json.linkedin_url || '') }}\n    }\n  }\n}",
         "options": {}
       },
       "id": "step1-node-4b",
@@ -325,7 +325,7 @@
         "url": "YOUR_N8N_WEBHOOK_BASE_URL/webhook/loom-research-trigger",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"notion_page_id\": \"{{ $('Find Contact (Accepted)').item.json.results[0].id }}\",\n  \"full_name\": \"{{ $('Parse Prosp.ai Event').item.json.full_name }}\",\n  \"linkedin_url\": \"{{ $('Parse Prosp.ai Event').item.json.linkedin_url }}\",\n  \"company\": \"{{ $('Parse Prosp.ai Event').item.json.company }}\",\n  \"title\": \"{{ $('Parse Prosp.ai Event').item.json.title }}\"\n}",
+        "jsonBody": "={\n  \"notion_page_id\": {{ JSON.stringify($('Find Contact (Accepted)').item.json.results[0].id || '') }},\n  \"full_name\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.full_name || '') }},\n  \"linkedin_url\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.linkedin_url || '') }},\n  \"company\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.company || '') }},\n  \"title\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.title || '') }}\n}",
         "options": { "timeout": 5000 }
       },
       "id": "step1-node-7b",
@@ -351,7 +351,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": \"{{ $json.linkedin_url }}\"\n    }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json.linkedin_url || '') }}\n    }\n  }\n}",
         "options": {}
       },
       "id": "step1-node-4c",

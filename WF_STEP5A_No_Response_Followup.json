@@ -100,7 +100,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"linkedin_url\": \"{{ $json.linkedin_url }}\",\n  \"name\": \"{{ $json.name }}\",\n  \"email\": \"{{ $json.email }}\",\n  \"tags\": [\"follow-up-loom\", \"3-day-no-response\"]\n}",
+        "jsonBody": "={\n  \"linkedin_url\": {{ JSON.stringify($json.linkedin_url || '') }},\n  \"name\": {{ JSON.stringify($json.name || '') }},\n  \"email\": {{ JSON.stringify($json.email || '') }},\n  \"tags\": [\"follow-up-loom\", \"3-day-no-response\"]\n}",
         "options": { "timeout": 10000 }
       },
       "id": "step5a-node-6",

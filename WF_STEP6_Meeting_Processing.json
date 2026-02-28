@@ -86,7 +86,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": \"{{ $json.attendee_email }}\" }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": \"{{ $json.attendee_name }}\" }\n      }\n    ]\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": {{ JSON.stringify($json.attendee_email || '') }} }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": {{ JSON.stringify($json.attendee_name || '') }} }\n      }\n    ]\n  }\n}",
         "options": {}
       },
       "id": "step6-node-3",
@@ -255,7 +255,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": \"{{ $('Extract BlueDot Data').item.json.meeting_title }}\" } }] },\n    \"Date\": { \"date\": { \"start\": \"{{ $('Extract BlueDot Data').item.json.meeting_date }}\" } },\n    \"Meeting Type\": { \"select\": { \"name\": \"Discovery\" } },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Extract Contact Info').item.json.notion_page_id }}\" }] },\n    \"BlueDot Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($('Claude: Extract Notes + Proposal Brief').item.json.content?.[0]?.text || $('Claude: Extract Notes + Proposal Brief').item.json.message?.content?.[0]?.text || $('Claude: Extract Notes + Proposal Brief').item.json.text || '').substring(0, 2000)) }} } }] }\n  }\n}",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify($('Extract BlueDot Data').item.json.meeting_title || '') }} } }] },\n    \"Date\": { \"date\": { \"start\": {{ JSON.stringify($('Extract BlueDot Data').item.json.meeting_date || $now.toISO()) }} } },\n    \"Meeting Type\": { \"select\": { \"name\": \"Discovery\" } },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Extract Contact Info').item.json.notion_page_id }}\" }] },\n    \"BlueDot Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($('Claude: Extract Notes + Proposal Brief').item.json.content?.[0]?.text || $('Claude: Extract Notes + Proposal Brief').item.json.message?.content?.[0]?.text || $('Claude: Extract Notes + Proposal Brief').item.json.text || '').substring(0, 2000)) }} } }] }\n  }\n}",
         "options": {}
       },
       "id": "step6-node-11",
