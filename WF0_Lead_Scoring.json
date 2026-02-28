@@ -321,7 +321,7 @@
         "messages": {
           "values": [
             {
-              "content": "=Estimate the annual revenue for this company. Use your knowledge of the industry, company size, and comparable companies.\n\nCompany: {{ $json.experiences[0].companyName }}\nEmployee Count (from LinkedIn): {{ $json.experiences[0].companyEmployees || $json.experiences[0].companySize || 'Unknown' }}\nTitle of Contact: {{ $json.experiences[0].title }}\nCompany Description: {{ $json.experiences[0].jobDescription }}\nHeadline: {{ $json.headline }}\n\nRespond with ONLY a JSON object, no other text:\n{\n  \"revenue_estimate\": <number in USD, integer, no commas>,\n  \"confidence\": \"<low|medium|high>\",\n  \"reasoning\": \"<one sentence>\"\n}"
+              "content": "=Estimate the annual revenue for this company. Use your knowledge of the industry, company size, and comparable companies.\n\nCompany: {{ $json.experiences?.[0]?.companyName ?? 'Unknown' }}\nEmployee Count (from LinkedIn): {{ $json.experiences?.[0]?.companyEmployees ?? $json.experiences?.[0]?.companySize ?? $json.experiences?.[0]?.companyStaffCountRange ?? $json.experiences?.[0]?.companyEmployeeCount ?? $json.companySize ?? $json.employeesCount ?? 'Unknown' }}\nTitle of Contact: {{ $json.experiences?.[0]?.title ?? 'Unknown' }}\nCompany Description: {{ $json.experiences?.[0]?.jobDescription ?? 'No description available' }}\nHeadline: {{ $json.headline }}\n\nRespond with ONLY a JSON object, no other text:\n{\n  \"revenue_estimate\": <number in USD, integer, no commas>,\n  \"confidence\": \"<low|medium|high>\",\n  \"reasoning\": \"<one sentence>\"\n}"
             }
           ]
         },
@@ -366,7 +366,7 @@
         "messages": {
           "values": [
             {
-              "content": "=INPUTS:\n\nName: {{ $json.fullName }}\nCompany: {{ $json.experiences[0].companyName }}\nCompany Title: {{ $json.experiences[0].title }}\nCompany Description: {{ $json.experiences[0].jobDescription }}\nLI Profile Headline: {{ $json.headline }}\n\n{{ $('Loop Over Items').item.json['Loom Video Research Prompt'] }}"
+              "content": "=INPUTS:\n\nName: {{ $json.fullName }}\nCompany: {{ $json.experiences?.[0]?.companyName ?? 'Unknown' }}\nCompany Title: {{ $json.experiences?.[0]?.title ?? 'Unknown' }}\nCompany Description: {{ $json.experiences?.[0]?.jobDescription ?? 'No description available' }}\nLI Profile Headline: {{ $json.headline }}\n\n{{ $('Loop Over Items').item.json['Loom Video Research Prompt'] }}"
             }
           ]
         },
