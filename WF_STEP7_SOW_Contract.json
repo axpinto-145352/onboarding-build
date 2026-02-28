@@ -214,7 +214,7 @@
       "name": "Has Fixed Cost?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [690, 600]
+      "position": [910, 600]
     },
     {
       "parameters": {
@@ -235,7 +235,7 @@
       "name": "Stripe: Create Customer",
       "type": "n8n-nodes-base.stripe",
       "typeVersion": 1,
-      "position": [910, 600]
+      "position": [690, 600]
     },
     {
       "parameters": {
@@ -449,7 +449,7 @@
     "SOW Contract Form": {
       "main": [[
         { "node": "Calculate Amounts", "type": "main", "index": 0 },
-        { "node": "Has Fixed Cost?", "type": "main", "index": 0 }
+        { "node": "Stripe: Create Customer", "type": "main", "index": 0 }
       ]]
     },
     "Calculate Amounts": {
@@ -483,13 +483,14 @@
     "Update Notion (Contract Sent)": {
       "main": [[ { "node": "Create Notion Project", "type": "main", "index": 0 } ]]
     },
+    "Stripe: Create Customer": {
+      "main": [[ { "node": "Has Fixed Cost?", "type": "main", "index": 0 } ]]
+    },
     "Has Fixed Cost?": {
       "main": [
-        [ { "node": "Stripe: Create Customer", "type": "main", "index": 0 } ]
+        [ { "node": "Stripe: Invoice Item", "type": "main", "index": 0 } ],
+        [ { "node": "Has Retainer?", "type": "main", "index": 0 } ]
       ]
-    },
-    "Stripe: Create Customer": {
-      "main": [[ { "node": "Stripe: Invoice Item", "type": "main", "index": 0 } ]]
     },
     "Stripe: Invoice Item": {
       "main": [[ { "node": "Stripe: Create Invoice (Draft)", "type": "main", "index": 0 } ]]
@@ -520,7 +521,7 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step7-v2-0",
+  "versionId": "step7-v3-0",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []

@@ -144,7 +144,7 @@
       "parameters": {
         "sendTo": "anthony@veteranvectors.io",
         "subject": "=Approval Needed: Discovery Call - {{ $json.name }} ({{ $json.company }})",
-        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;\">\n  <div style=\"background-color:#1a1a2e;padding:24px 40px;text-align:center;border-radius:8px 8px 0 0;\">\n    <span style=\"color:#4dd0e1;font-size:22px;font-weight:bold;\">DISCOVERY CALL APPROVAL</span>\n  </div>\n  <div style=\"padding:40px;background:#fff;\">\n    <p style=\"font-size:16px;\">A discovery call has been booked that <strong>needs your approval</strong>.</p>\n    <p style=\"color:#e74c3c;font-weight:bold;\">Revenue Flag: {{ $json.revenue_flag }} ({{ $json.monthly_revenue }})</p>\n    \n    <table style=\"width:100%;border-collapse:collapse;margin:20px 0;\">\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Name</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.name }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Email</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.email }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Company</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.company }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Monthly Revenue</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.monthly_revenue }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Employees</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.employees }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Budget</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.budget }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Decision Maker?</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.decision_maker }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Pain Points</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.pain_points }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Scheduled</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.scheduled_time }}</td></tr>\n    </table>\n    \n    <div style=\"text-align:center;margin:30px 0;\">\n      <a href=\"YOUR_N8N_WEBHOOK_BASE_URL/webhook/calendly-approval?action=approve&event_uuid={{ $json.event_uuid }}&email={{ encodeURIComponent($json.email) }}&name={{ encodeURIComponent($json.name) }}\" style=\"display:inline-block;background:#27ae60;color:#fff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;margin:0 10px;\">APPROVE</a>\n      <a href=\"YOUR_N8N_WEBHOOK_BASE_URL/webhook/calendly-approval?action=disapprove&event_uuid={{ $json.event_uuid }}&email={{ encodeURIComponent($json.email) }}&name={{ encodeURIComponent($json.name) }}\" style=\"display:inline-block;background:#e74c3c;color:#fff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;margin:0 10px;\">DISAPPROVE</a>\n    </div>\n  </div>\n  <div style=\"background:#1a1a2e;padding:20px;text-align:center;border-radius:0 0 8px 8px;\">\n    <p style=\"margin:0;color:#888;font-size:12px;\">Veteran Vectors Onboarding Pipeline</p>\n  </div>\n</div>",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;\">\n  <div style=\"background-color:#1a1a2e;padding:24px 40px;text-align:center;border-radius:8px 8px 0 0;\">\n    <span style=\"color:#4dd0e1;font-size:22px;font-weight:bold;\">DISCOVERY CALL APPROVAL</span>\n  </div>\n  <div style=\"padding:40px;background:#fff;\">\n    <p style=\"font-size:16px;\">A discovery call has been booked that <strong>needs your approval</strong>.</p>\n    <p style=\"color:#e74c3c;font-weight:bold;\">Revenue Flag: {{ $json.revenue_flag }} ({{ $json.monthly_revenue }})</p>\n    \n    <table style=\"width:100%;border-collapse:collapse;margin:20px 0;\">\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Name</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.name }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Email</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.email }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Company</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.company }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Monthly Revenue</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.monthly_revenue }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Employees</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.employees }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Budget</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.budget }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Decision Maker?</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.decision_maker }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Pain Points</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.pain_points }}</td></tr>\n      <tr><td style=\"padding:8px;border-bottom:1px solid #eee;font-weight:bold;\">Scheduled</td><td style=\"padding:8px;border-bottom:1px solid #eee;\">{{ $json.scheduled_time }}</td></tr>\n    </table>\n    \n    <div style=\"text-align:center;margin:30px 0;\">\n      <a href=\"YOUR_N8N_WEBHOOK_BASE_URL/webhook/calendly-approval?action=approve&event_uuid={{ $json.event_uuid }}&email={{ encodeURIComponent($json.email) }}&name={{ encodeURIComponent($json.name) }}&token={{ $json.approve_token }}\" style=\"display:inline-block;background:#27ae60;color:#fff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;margin:0 10px;\">APPROVE</a>\n      <a href=\"YOUR_N8N_WEBHOOK_BASE_URL/webhook/calendly-approval?action=disapprove&event_uuid={{ $json.event_uuid }}&email={{ encodeURIComponent($json.email) }}&name={{ encodeURIComponent($json.name) }}&token={{ $json.disapprove_token }}\" style=\"display:inline-block;background:#e74c3c;color:#fff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;margin:0 10px;\">DISAPPROVE</a>\n    </div>\n  </div>\n  <div style=\"background:#1a1a2e;padding:20px;text-align:center;border-radius:0 0 8px 8px;\">\n    <p style=\"margin:0;color:#888;font-size:12px;\">Veteran Vectors Onboarding Pipeline</p>\n  </div>\n</div>",
         "options": {}
       },
       "id": "step5c-node-5",
@@ -211,6 +211,17 @@
     },
     {
       "parameters": {
+        "jsCode": "// Generate HMAC-SHA256 tokens for approve/disapprove links\nconst crypto = require('crypto');\nconst secret = process.env.APPROVAL_WEBHOOK_SECRET || 'YOUR_APPROVAL_WEBHOOK_SECRET';\nconst email = $json.email || '';\nconst eventUuid = $json.event_uuid || '';\nconst approveToken = crypto.createHmac('sha256', secret)\n  .update(`approve:${eventUuid}:${email}`).digest('hex');\nconst disapproveToken = crypto.createHmac('sha256', secret)\n  .update(`disapprove:${eventUuid}:${email}`).digest('hex');\nreturn [{ json: { ...$json, approve_token: approveToken, disapprove_token: disapproveToken } }];"
+      },
+      "id": "step5c-node-4b",
+      "name": "Generate HMAC Tokens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1020, 200],
+      "notes": "Generates HMAC-SHA256 tokens for approval links to prevent unauthorized access. Set APPROVAL_WEBHOOK_SECRET env var in n8n."
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
         "authentication": "genericCredentialType",
@@ -271,7 +282,58 @@
       "typeVersion": 2,
       "position": [250, 600],
       "webhookId": "calendly-approval",
-      "notes": "Receives Anthony's approve/disapprove click from the email. Query params: action, event_uuid, email, name."
+      "notes": "Receives Anthony's approve/disapprove click from the email. Query params: action, event_uuid, email, name, token."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate HMAC token from approval link\nconst crypto = require('crypto');\nconst secret = process.env.APPROVAL_WEBHOOK_SECRET || 'YOUR_APPROVAL_WEBHOOK_SECRET';\nconst q = $json.query || {};\nconst payload = `${q.action || ''}:${q.event_uuid || ''}:${q.email || ''}`;\nconst expectedToken = crypto.createHmac('sha256', secret).update(payload).digest('hex');\nconst isValid = q.token && q.token === expectedToken;\nreturn [{ json: { ...q, token_valid: isValid } }];"
+      },
+      "id": "step5c-node-7b",
+      "name": "Validate HMAC Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 600],
+      "notes": "Validates the HMAC-SHA256 token from the approval link. Prevents unauthorized approve/disapprove. Set APPROVAL_WEBHOOK_SECRET env var in n8n."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.token_valid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step5c-node-7c",
+      "name": "Token Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [690, 600],
+      "notes": "Rejects requests with invalid or missing HMAC tokens."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html><body style='font-family:Arial;text-align:center;padding:60px;'><h1 style='color:#e74c3c;'>Invalid or Expired Link</h1><p>This approval link is invalid or has already been used.</p><p>Please contact Anthony directly if you need to approve or disapprove this lead.</p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [{ "name": "Content-Type", "value": "text/html" }]
+          },
+          "responseCode": 403
+        }
+      },
+      "id": "step5c-node-7d",
+      "name": "Respond Invalid Token",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [910, 700],
+      "notes": "Returns 403 for invalid/missing HMAC tokens."
     },
     {
       "parameters": {
@@ -279,7 +341,7 @@
           "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
             {
-              "leftValue": "={{ $json.query.action }}",
+              "leftValue": "={{ $json.action }}",
               "rightValue": "approve",
               "operator": { "type": "string", "operation": "equals" }
             }
@@ -292,7 +354,7 @@
       "name": "Approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [470, 600]
+      "position": [910, 600]
     },
     {
       "parameters": {
@@ -309,14 +371,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": {\n      \"equals\": \"{{ decodeURIComponent($json.query.email) }}\"\n    }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": {\n      \"equals\": {{ JSON.stringify(decodeURIComponent($json.email || '')) }}\n    }\n  }\n}",
         "options": {}
       },
       "id": "step5c-node-9a",
       "name": "Find Contact (Approve)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [690, 520]
+      "position": [1130, 520]
     },
     {
       "parameters": {
@@ -340,7 +402,7 @@
       "name": "Update Notion (Approved - Meeting Booked)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [910, 520],
+      "position": [1350, 520],
       "notes": "Updates Notion to 'Meeting Booked' when Anthony approves."
     },
     {
@@ -357,7 +419,7 @@
       "name": "Respond Approved",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1130, 520]
+      "position": [1570, 520]
     },
     {
       "parameters": {
@@ -374,14 +436,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": {\n      \"equals\": \"{{ decodeURIComponent($json.query.email) }}\"\n    }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": {\n      \"equals\": {{ JSON.stringify(decodeURIComponent($json.email || '')) }}\n    }\n  }\n}",
         "options": {}
       },
       "id": "step5c-node-9b",
       "name": "Find Contact (Disapprove)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [690, 720]
+      "position": [1130, 720]
     },
     {
       "parameters": {
@@ -394,7 +456,7 @@
       "name": "Send Cancellation Email + Lead Magnet",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [910, 660],
+      "position": [1350, 660],
       "credentials": {
         "gmailOAuth2": {
           "id": "r13jnGsjwNOqcBvt",
@@ -418,7 +480,7 @@
       "name": "Cancel Calendly Event",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [910, 820],
+      "position": [1350, 820],
       "credentials": {
         "oAuth2Api": {
           "id": "uFXaP32GB3oPzqwu",
@@ -450,7 +512,7 @@
       "name": "Update Notion (Declined)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1130, 740]
+      "position": [1570, 740]
     },
     {
       "parameters": {
@@ -466,7 +528,7 @@
       "name": "Respond Disapproved",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1350, 740]
+      "position": [1790, 740]
     }
   ],
   "pinData": {},
@@ -495,24 +557,18 @@
     "Revenue $0-$5K?": {
       "main": [
         [
-          { "node": "Send Approval Email", "type": "main", "index": 0 }
+          { "node": "Generate HMAC Tokens", "type": "main", "index": 0 },
+          { "node": "Find Contact (Pending)", "type": "main", "index": 0 }
         ],
         [
           { "node": "Find Contact (Auto-Qualify)", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Find Contact (Auto-Qualify)": {
+    "Generate HMAC Tokens": {
       "main": [
         [
-          { "node": "Update Notion (Meeting Booked - Auto)", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "Send Approval Email": {
-      "main": [
-        [
-          { "node": "Find Contact (Pending)", "type": "main", "index": 0 }
+          { "node": "Send Approval Email", "type": "main", "index": 0 }
         ]
       ]
     },
@@ -523,10 +579,34 @@
         ]
       ]
     },
+    "Find Contact (Auto-Qualify)": {
+      "main": [
+        [
+          { "node": "Update Notion (Meeting Booked - Auto)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
     "Approval Webhook": {
       "main": [
         [
+          { "node": "Validate HMAC Token", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Validate HMAC Token": {
+      "main": [
+        [
+          { "node": "Token Valid?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Token Valid?": {
+      "main": [
+        [
           { "node": "Approved?", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Respond Invalid Token", "type": "main", "index": 0 }
         ]
       ]
     },
@@ -578,7 +658,7 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step5c-v2-0",
+  "versionId": "step5c-v3-0",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []
