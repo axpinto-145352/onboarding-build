@@ -96,7 +96,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": { \"equals\": \"{{ $json.client_email }}\" }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": { \"equals\": {{ JSON.stringify($json.client_email || '') }} }\n  }\n}",
         "options": {}
       },
       "id": "step9-node-4",

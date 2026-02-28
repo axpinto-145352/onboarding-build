@@ -485,8 +485,7 @@
     },
     "Has Fixed Cost?": {
       "main": [
-        [ { "node": "Stripe: Create Customer", "type": "main", "index": 0 } ],
-        [ { "node": "Update Notion (Contract Sent)", "type": "main", "index": 0 } ]
+        [ { "node": "Stripe: Create Customer", "type": "main", "index": 0 } ]
       ]
     },
     "Stripe: Create Customer": {

@@ -103,7 +103,7 @@
         "url": "https://api.apollo.io/v1/people/match",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"first_name\": \"{{ $('Loop Over Contacts').item.json.full_name.split(' ')[0] }}\",\n  \"last_name\": \"{{ $('Loop Over Contacts').item.json.full_name.split(' ').slice(1).join(' ') }}\",\n  \"linkedin_url\": \"{{ $('Loop Over Contacts').item.json.linkedin_url }}\",\n  \"reveal_personal_emails\": false,\n  \"reveal_phone_number\": false\n}",
+        "jsonBody": "={\n  \"first_name\": {{ JSON.stringify(($('Loop Over Contacts').item.json.full_name || '').split(' ')[0] || '') }},\n  \"last_name\": {{ JSON.stringify(($('Loop Over Contacts').item.json.full_name || '').split(' ').slice(1).join(' ') || '') }},\n  \"linkedin_url\": {{ JSON.stringify($('Loop Over Contacts').item.json.linkedin_url || '') }},\n  \"reveal_personal_emails\": false,\n  \"reveal_phone_number\": false\n}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
