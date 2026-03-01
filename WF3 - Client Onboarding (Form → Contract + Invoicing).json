@@ -1,0 +1,760 @@
+{
+  "name": "WF3 - Client Onboarding (Form → Contract + Invoicing)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "SOW Contract Submission",
+        "formDescription": "Fill out form to generate and send contract for new client.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "First_Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Last_Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Full_Client_Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Client_Email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Client_Title"
+            },
+            {
+              "fieldLabel": "Company_Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Project_Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Project_Scope",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company_Address"
+            },
+            {
+              "fieldLabel": "Company_State",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Project_Start_Date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Project_End_Date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Milestones",
+              "placeholder": "Phase 1: Discovery, Phase 2: Design, Phase 3: Build, Phase 4: Test, Phase 5: Deploy",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Project_Cost",
+              "placeholder": "$5,000",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Initial_Payment",
+              "placeholder": "$2,500",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Final_Payment",
+              "placeholder": "$2,500",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Monthly_Retainer",
+              "placeholder": "$500/month",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Compliances",
+              "placeholder": "SOC2, ITAR, CMMC, etc."
+            },
+            {
+              "fieldLabel": "Cost?",
+              "placeholder": "Yes or No",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Retainer?",
+              "placeholder": "Yes or No",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Retainer_description"
+            },
+            {
+              "fieldLabel": "Retainer_for_invoice",
+              "placeholder": "$500"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-1",
+      "name": "Onboarding Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        256,
+        304
+      ],
+      "webhookId": "261b7ce2-9e24-448c-9bf6-8c80c27e0037"
+    },
+    {
+      "parameters": {
+        "jsCode": "// FIX: Validate financial fields before proceeding\nconst form = $input.first().json;\n\nfunction parseAmount(val) {\n  if (!val) return 0;\n  const cleaned = String(val).replace(/[^0-9.]/g, '');\n  return parseFloat(cleaned) || 0;\n}\n\nconst projectCost = parseAmount(form.Project_Cost);\nconst initialPayment = parseAmount(form.Initial_Payment);\nconst finalPayment = parseAmount(form.Final_Payment);\nconst retainerAmount = parseAmount(form.Retainer_for_invoice);\n\nconst errors = [];\n\nif (projectCost <= 0) errors.push('Project_Cost must be a positive number');\nif (initialPayment <= 0) errors.push('Initial_Payment must be a positive number');\nif (finalPayment <= 0) errors.push('Final_Payment must be a positive number');\n\nconst isRetainer = (form['Retainer?'] || '').toLowerCase().trim();\nif (isRetainer === 'yes' && retainerAmount <= 0) {\n  errors.push('Retainer_for_invoice must be a positive number when Retainer = Yes');\n}\n\nif (errors.length > 0) {\n  throw new Error('Form validation failed: ' + errors.join('; '));\n}\n\n// Normalize the Yes/No fields\nconst isCost = (form['Cost?'] || '').toLowerCase().trim();\n\nreturn [{\n  json: {\n    ...form,\n    _validated: true,\n    _project_cost_cents: Math.round(projectCost * 100),\n    _initial_payment_cents: Math.round(initialPayment * 100),\n    _final_payment_cents: Math.round(finalPayment * 100),\n    _retainer_cents: Math.round(retainerAmount * 100),\n    _is_retainer: isRetainer === 'yes',\n    _is_cost: isCost === 'yes'\n  }\n}];"
+      },
+      "id": "wf3-node-1a",
+      "name": "Validate Form Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        304
+      ],
+      "notes": "FIX: Validates all financial fields parse to positive numbers before proceeding. Normalizes Yes/No fields."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Prospects"
+        },
+        "options": {}
+      },
+      "id": "wf3-node-1b",
+      "name": "Read Prospects Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        704,
+        304
+      ],
+      "notes": "Looks up the client's existing Drive folder ID that WF2 created."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find the matching prospect row to get the Drive folder ID\nconst form = $('Validate Form Data').first().json;\nconst prospects = $('Read Prospects Sheet').all();\n\nlet driveFolderId = '';\n\nfor (const prospect of prospects) {\n  const row = prospect.json;\n  if ((row.Email && row.Email.toLowerCase() === form.Client_Email.toLowerCase()) ||\n      (row.Company_Name && row.Company_Name.toLowerCase() === form.Company_Name.toLowerCase())) {\n    driveFolderId = row.Drive_Folder_ID || '';\n    break;\n  }\n}\n\nif (!driveFolderId) {\n  return [{ json: { ...form, drive_folder_id: '', needs_folder: true } }];\n}\n\nreturn [{ json: { ...form, drive_folder_id: driveFolderId, needs_folder: false } }];"
+      },
+      "id": "wf3-node-1c",
+      "name": "Lookup Drive Folder ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needs_folder }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-1d",
+      "name": "IF Needs Folder",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create"
+      },
+      "id": "wf3-node-1e",
+      "name": "Fallback Create Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1360,
+        208
+      ],
+      "notes": "Only runs if WF2 did not create a folder. Replace YOUR_CLIENTS_FOLDER_ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge the folder ID (from lookup or fallback creation) with form data\nconst form = $('Validate Form Data').first().json;\nconst lookupResult = $('Lookup Drive Folder ID').first().json;\n\nlet folderId = lookupResult.drive_folder_id;\n\nif (!folderId) {\n  try {\n    folderId = $('Fallback Create Folder').first().json.id;\n  } catch (e) {\n    folderId = '';\n  }\n}\n\nreturn [{ json: { ...form, drive_folder_id: folderId } }];"
+      },
+      "id": "wf3-node-1f",
+      "name": "Merge Folder ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the SignWell fields array with all repeated field instances\nconst form = $json;\n\nconst fields = [];\n\nfor (let i = 1; i <= 2; i++) {\n  fields.push({ api_id: `Full_Client_Name${i}`, value: form.Full_Client_Name });\n}\n\nfor (let i = 1; i <= 25; i++) {\n  fields.push({ api_id: `Company_Name${i}`, value: form.Company_Name });\n}\n\nfor (let i = 1; i <= 24; i++) {\n  fields.push({ api_id: `Project_Name${i}`, value: form.Project_Name });\n}\n\nfor (let i = 1; i <= 3; i++) {\n  fields.push({ api_id: `Project_Start_Date${i}`, value: form.Project_Start_Date });\n}\n\nfor (let i = 1; i <= 3; i++) {\n  fields.push({ api_id: `Project_End_Date${i}`, value: form.Project_End_Date });\n}\n\nfields.push({ api_id: 'Company_State1', value: form.Company_State || '' });\nfields.push({ api_id: 'Company_Address1', value: form.Company_Address || '' });\nfields.push({ api_id: 'Client_Title1', value: form.Client_Title || '' });\nfields.push({ api_id: 'Milestones1', value: form.Milestones || '' });\nfields.push({ api_id: 'Project_Cost1', value: form.Project_Cost || '' });\nfields.push({ api_id: 'Monthly_Retainer1', value: form.Monthly_Retainer || '' });\nfields.push({ api_id: 'Initial_Payment1', value: form.Initial_Payment || '' });\nfields.push({ api_id: 'Final_Payment1', value: form.Final_Payment || '' });\nfields.push({ api_id: 'Compliances1', value: form.Compliances || '' });\n\nreturn [{\n  json: {\n    template_id: 'YOUR_SIGNWELL_TEMPLATE_ID',\n    doc_name: `SOW - ${form.Company_Name} - ${form.Project_Name}`,\n    client_name: form.Full_Client_Name,\n    client_email: form.Client_Email,\n    fields: fields,\n    drive_folder_id: form.drive_folder_id\n  }\n}];"
+      },
+      "id": "wf3-node-2b",
+      "name": "Build SignWell Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        304
+      ],
+      "notes": "Replace YOUR_SIGNWELL_TEMPLATE_ID."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.signwell.com/api/v1/document_templates/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"template_id\": \"{{ $json.template_id }}\",\n  \"name\": \"{{ $json.doc_name }}\",\n  \"recipients\": [\n    {\n      \"id\": \"1\",\n      \"name\": \"{{ $json.client_name }}\",\n      \"email\": \"{{ $json.client_email }}\",\n      \"role\": \"Client\"\n    },\n    {\n      \"id\": \"2\",\n      \"name\": \"Anthony Pinto\",\n      \"email\": \"anthony@veteranvectors.com\",\n      \"role\": \"Contractor\"\n    }\n  ],\n  \"fields\": {{ JSON.stringify($json.fields) }},\n  \"test_mode\": false\n}",
+        "options": {}
+      },
+      "id": "wf3-node-3",
+      "name": "SignWell Send Contract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        304
+      ],
+      "notes": "Set up HTTP Header Auth: Name=X-Api-Key, Value=YOUR_SIGNWELL_API_KEY."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/customers",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Validate Form Data').first().json.Full_Client_Name }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $('Validate Form Data').first().json.Client_Email }}"
+            },
+            {
+              "name": "metadata[company]",
+              "value": "={{ $('Validate Form Data').first().json.Company_Name }}"
+            },
+            {
+              "name": "metadata[project]",
+              "value": "={{ $('Validate Form Data').first().json.Project_Name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-4",
+      "name": "Stripe Create Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        304
+      ],
+      "notes": "Set up HTTP Header Auth: Name=Authorization, Value=Bearer sk_live_YOUR_STRIPE_SECRET_KEY"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/invoiceitems",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "customer",
+              "value": "={{ $('Stripe Create Customer').first().json.id }}"
+            },
+            {
+              "name": "amount",
+              "value": "={{ $('Validate Form Data').first().json._initial_payment_cents }}"
+            },
+            {
+              "name": "currency",
+              "value": "usd"
+            },
+            {
+              "name": "description",
+              "value": "={{ $('Validate Form Data').first().json.Project_Name }} - Initial Payment (50%)"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-5",
+      "name": "Stripe Create Invoice Item",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2464,
+        304
+      ],
+      "notes": "FIX: Uses pre-validated cents amount from Validate Form Data instead of inline parsing."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/invoices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "customer",
+              "value": "={{ $('Stripe Create Customer').first().json.id }}"
+            },
+            {
+              "name": "collection_method",
+              "value": "send_invoice"
+            },
+            {
+              "name": "days_until_due",
+              "value": "30"
+            },
+            {
+              "name": "auto_advance",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-6",
+      "name": "Stripe Create Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2672,
+        304
+      ],
+      "notes": "FIX: auto_advance set to false. Invoice is created but NOT sent — it will be sent by WF5 after contract signing."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('Validate Form Data').first().json._is_retainer }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-8",
+      "name": "IF Retainer = Yes",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2896,
+        304
+      ],
+      "notes": "FIX: Uses pre-validated boolean from Validate Form Data instead of string comparison."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "unit_amount",
+              "value": "={{ $('Validate Form Data').first().json._retainer_cents }}"
+            },
+            {
+              "name": "currency",
+              "value": "usd"
+            },
+            {
+              "name": "recurring[interval]",
+              "value": "month"
+            },
+            {
+              "name": "product_data[name]",
+              "value": "={{ $('Validate Form Data').first().json.Company_Name }} - Monthly Retainer"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-9",
+      "name": "Stripe Create Retainer Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        208
+      ],
+      "notes": "FIX: Uses pre-validated cents amount."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/subscriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "customer",
+              "value": "={{ $('Stripe Create Customer').first().json.id }}"
+            },
+            {
+              "name": "items[0][price]",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "collection_method",
+              "value": "send_invoice"
+            },
+            {
+              "name": "days_until_due",
+              "value": "30"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf3-node-10",
+      "name": "Stripe Create Subscription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3344,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Client Tracker"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Client_Name": "={{ $('Validate Form Data').first().json.Full_Client_Name }}",
+            "Email": "={{ $('Validate Form Data').first().json.Client_Email }}",
+            "Company": "={{ $('Validate Form Data').first().json.Company_Name }}",
+            "Project": "={{ $('Validate Form Data').first().json.Project_Name }}",
+            "Project_Cost": "={{ $('Validate Form Data').first().json.Project_Cost }}",
+            "Monthly_Retainer": "={{ $('Validate Form Data').first().json.Monthly_Retainer }}",
+            "SignWell_Doc_ID": "={{ $('SignWell Send Contract').first().json.id }}",
+            "Stripe_Customer_ID": "={{ $('Stripe Create Customer').first().json.id }}",
+            "Invoice_ID": "={{ $('Stripe Create Invoice').first().json.id }}",
+            "Drive_Folder_ID": "={{ $('Build SignWell Fields').first().json.drive_folder_id }}",
+            "Status": "Contract Sent",
+            "Contract_Sent_Date": "={{ new Date().toISOString() }}",
+            "Signed_Date": "",
+            "Slack_Channel": "",
+            "Last_Reminder_Sent": "",
+            "Project_End_Date": "={{ $('Validate Form Data').first().json.Project_End_Date }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "wf3-node-11",
+      "name": "Log to Client Tracker",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3552,
+        400
+      ],
+      "notes": "FIX: Contract_Sent_Date now stores full ISO timestamp for accurate reminder timing. Added Last_Reminder_Sent and Project_End_Date columns."
+    },
+    {
+      "parameters": {
+        "text": "=:page_facing_up: *Contract Sent: {{ $('Validate Form Data').first().json.Company_Name }}*\n\nProject: {{ $('Validate Form Data').first().json.Project_Name }}\nTotal: {{ $('Validate Form Data').first().json.Project_Cost }}\n\n_Contract sent via SignWell. Invoice created (will be sent after signing). Reminders will fire at 48hrs and 7 days._",
+        "otherOptions": {}
+      },
+      "id": "wf3-node-12",
+      "name": "Slack Notify Contract Sent",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        3776,
+        400
+      ],
+      "webhookId": "f2378b73-30aa-4bb5-9ebe-9838f2ecce19"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Onboarding Form": {
+      "main": [
+        [
+          {
+            "node": "Validate Form Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Form Data": {
+      "main": [
+        [
+          {
+            "node": "Read Prospects Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Prospects Sheet": {
+      "main": [
+        [
+          {
+            "node": "Lookup Drive Folder ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Drive Folder ID": {
+      "main": [
+        [
+          {
+            "node": "IF Needs Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Needs Folder": {
+      "main": [
+        [
+          {
+            "node": "Fallback Create Folder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Folder ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback Create Folder": {
+      "main": [
+        [
+          {
+            "node": "Merge Folder ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Folder ID": {
+      "main": [
+        [
+          {
+            "node": "Build SignWell Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SignWell Fields": {
+      "main": [
+        [
+          {
+            "node": "SignWell Send Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SignWell Send Contract": {
+      "main": [
+        [
+          {
+            "node": "Stripe Create Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Create Customer": {
+      "main": [
+        [
+          {
+            "node": "Stripe Create Invoice Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Create Invoice Item": {
+      "main": [
+        [
+          {
+            "node": "Stripe Create Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Create Invoice": {
+      "main": [
+        [
+          {
+            "node": "IF Retainer = Yes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Retainer = Yes": {
+      "main": [
+        [
+          {
+            "node": "Stripe Create Retainer Price",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log to Client Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Create Retainer Price": {
+      "main": [
+        [
+          {
+            "node": "Stripe Create Subscription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Create Subscription": {
+      "main": [
+        [
+          {
+            "node": "Log to Client Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Client Tracker": {
+      "main": [
+        [
+          {
+            "node": "Slack Notify Contract Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "eadc2fb9-da04-4828-aa43-cf008c4a4f7d",
+  "meta": {
+    "instanceId": "ea0340db5b8064116e794e0185a0bdec41ba3c48ebfd47c8bd55e58fde2a2625"
+  },
+  "id": "ncXOM2fTCk629OIA",
+  "tags": []
+}

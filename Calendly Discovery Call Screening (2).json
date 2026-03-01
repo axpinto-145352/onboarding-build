@@ -1,0 +1,569 @@
+{
+  "name": "Calendly Discovery Call Screening",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "events": [
+          "invitee.created"
+        ]
+      },
+      "id": "9ed3e206-344f-4e57-954c-07c3a7fdbd44",
+      "name": "Calendly Trigger",
+      "type": "n8n-nodes-base.calendlyTrigger",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        288
+      ],
+      "webhookId": "4edc718f-3611-4482-ac45-1a55ed25d250",
+      "credentials": {
+        "calendlyOAuth2Api": {
+          "id": "Htykkb3r14siqEFc",
+          "name": "VV - Calendly account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-name",
+              "name": "name",
+              "value": "={{ $json.payload.name }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-email",
+              "name": "email",
+              "value": "={{ $json.payload.email }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-event-uuid",
+              "name": "event_uuid",
+              "value": "={{ $json.payload.event.split('/').pop() }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-decision-maker",
+              "name": "decision_maker",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('decision maker'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-revenue",
+              "name": "revenue",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('revenue'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-budget",
+              "name": "budget",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('budget'))?.answer || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-employees",
+              "name": "employees",
+              "value": "={{ $json.payload.questions_and_answers.find(q => q.question.toLowerCase().includes('employee') || q.question.toLowerCase().includes('team size'))?.answer || 'Unknown' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "af8388e7-3d3c-409b-be85-0465581643c3",
+      "name": "Extract Booking Answers",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -720,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-reason",
+              "name": "disqualification_reason",
+              "value": "={{ (() => { const reasons = []; if ($json.decision_maker === 'No') reasons.push('Not the decision maker'); if ($json.revenue === 'Under $100k') reasons.push('Revenue below minimum threshold'); if ($json.budget === 'No budget') reasons.push('No allocated budget'); return reasons.join(', '); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ae890a0-354a-4e45-887b-67ff3a0a6395",
+      "name": "Build Disqualification Reason",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -304,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.calendly.com/scheduled_events/{{ $json.event_uuid }}/cancellation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"reason\": \"Based on your responses, we're not the right fit at this time.\" }",
+        "options": {}
+      },
+      "id": "931e66a4-c9da-4d70-8ec9-fa8bdc1bf72b",
+      "name": "Cancel Calendly Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        32,
+        -48
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Hey [First Name], following up on your booking",
+        "message": "=<div style=\"font-family:Arial, sans-serif; max-width:600px; margin:0 auto; color:#333333; font-size:16px; line-height:1.7;\">\n  <div style=\"background-color:#1a1a2e; padding:24px 40px; text-align:center; border-radius:8px 8px 0 0;\">\n    <span style=\"color:#4dd0e1; font-size:22px; font-weight:bold; letter-spacing:1px;\">VETERAN VECTORS</span>\n  </div>\n\n  <div style=\"padding:40px 40px 16px 40px; background-color:#ffffff;\">\n    <p>Hey <strong>{{ $('Calendly Trigger').item.json.payload.invitee.name.split(' ')[0] }}</strong>,</p>\n\n    <p>It's Anthony here from Veteran Vectors.</p>\n\n    <p>I read through your application and at this time, we might not be the best fit for you. We're currently looking to work with companies that are a bit bigger in size and revenue.</p>\n\n    <p>Out of respect for your time, I've gone ahead and canceled our upcoming call so you don't have to worry about it.</p>\n\n    <p>That said, I still want to make sure you walk away with something valuable. I actually put together a full guide giving you everything you need to start implementing automations in your business — I'd definitely check it out:</p>\n\n    <p style=\"text-align:center; padding:16px 0;\">\n      <a href=\"https://drive.google.com/file/d/1Rghj0-doawvR9jCAPts0oLncSMB4Du5N/view?usp=sharing\" style=\"display:inline-block; background-color:#4dd0e1; color:#1a1a2e; text-decoration:none; font-weight:bold; font-size:16px; padding:14px 36px; border-radius:6px;\">Download the Free Guide</a>\n    </p>\n\n    <p>If things change down the road, my door is always open.</p>\n\n    <p>Have a great rest of your day.</p>\n\n    <p style=\"margin:0 0 4px 0;\">Cheers,</p>\n    <p style=\"margin:0; font-weight:bold; color:#1a1a2e;\">Anthony</p>\n    <p style=\"margin:0; color:#4dd0e1; font-weight:600;\">Veteran Vectors</p>\n  </div>\n\n  <div style=\"background-color:#1a1a2e; padding:20px 40px; text-align:center; border-radius:0 0 8px 8px;\">\n    <p style=\"margin:0; color:#888888; font-size:12px;\">© 2026 Veteran Vectors. All rights reserved.</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "id": "2c127cbe-cb0a-4fc1-b6f7-d2a0c5871549",
+      "name": "Send Disqualification Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        32,
+        -240
+      ],
+      "webhookId": "3e5db9ae-5b57-480a-a5f9-7dae4249d43b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-error-node",
+              "name": "failed_node",
+              "value": "={{ $json.error?.node || 'Unknown node' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-error-message",
+              "name": "error_message",
+              "value": "={{ $json.error?.message || $json.errorMessage || 'Unknown error' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-error-timestamp",
+              "name": "error_timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-error-lead",
+              "name": "lead_name",
+              "value": "={{ $('Extract Booking Answers').item.json.name || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-error-lead-email",
+              "name": "lead_email",
+              "value": "={{ $('Extract Booking Answers').item.json.email || 'Unknown' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1149574-6f47-4c30-9700-9c40ee64611c",
+      "name": "Collect Error Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        512,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "anthony@veteranvectors.io",
+        "subject": "=Calendly Workflow Error: {{ $json.failed_node }}",
+        "message": "<p><strong>Calendly Screening Workflow Error</strong></p>\n<p><strong>Failed Node:</strong> {{ $json.failed_node }}</p>\n<p><strong>Error:</strong> {{ $json.error_message }}</p>\n<p><strong>Lead:</strong> {{ $json.lead_name }} ({{ $json.lead_email }})</p>\n<p><strong>Time:</strong> {{ $json.error_timestamp }}</p>\n<p>Check the n8n execution log for full details.</p>",
+        "options": {}
+      },
+      "id": "916906e7-62aa-43d6-a81b-934c2fc03c03",
+      "name": "Email Error Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        752,
+        144
+      ],
+      "webhookId": "ea6c1cfa-68ec-4f9a-93e0-8075df283479",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -144,
+        -48
+      ],
+      "id": "6f0f4799-f593-41c1-a10a-ec5bc4917490",
+      "name": "Wait",
+      "webhookId": "fe48eae1-9994-4f52-ab56-67dd460690f6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7c063bd2-9088-4a8c-a819-db168d55fafd",
+              "leftValue": "={{ $json.revenue }}",
+              "rightValue": "<$150,000",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "6a265e62-e94e-49e2-93e6-40c8e9fe9985",
+              "leftValue": "={{ $json.budget }}",
+              "rightValue": "<$500",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -496,
+        288
+      ],
+      "id": "df02a55b-35e3-41a2-a404-e52a1cf740ad",
+      "name": "Check Disqualifiers"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name",
+              "title": "={{ $json.name }}"
+            },
+            {
+              "key": "Email",
+              "emailValue": "={{ $json.email }}"
+            },
+            {
+              "key": "Source",
+              "selectValue": "Networking/Podcast"
+            },
+            {
+              "key": "Status",
+              "selectValue": "Declined"
+            },
+            {
+              "key": "LI Connection Sent"
+            },
+            {
+              "key": "LI Connection Accepted"
+            },
+            {
+              "key": "Loom Sent"
+            },
+            {
+              "key": "Responded",
+              "checkboxValue": true
+            },
+            {
+              "key": "Call Booked"
+            },
+            {
+              "key": "Audit Call"
+            },
+            {
+              "key": "Last Contact Date"
+            },
+            {
+              "key": "Notes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "073345aa-156f-429f-86b2-c33a155bcb62",
+      "name": "Add Disqualified to Notion1",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        48,
+        128
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name",
+              "title": "={{ $json.name }}"
+            },
+            {
+              "key": "Email",
+              "emailValue": "={{ $json.email }}"
+            },
+            {
+              "key": "Source",
+              "selectValue": "Networking/Podcast"
+            },
+            {
+              "key": "Status",
+              "selectValue": "Meeting Scheduled"
+            },
+            {
+              "key": "LI Connection Sent"
+            },
+            {
+              "key": "LI Connection Accepted"
+            },
+            {
+              "key": "Loom Sent"
+            },
+            {
+              "key": "Responded",
+              "checkboxValue": true
+            },
+            {
+              "key": "Call Booked",
+              "checkboxValue": true
+            },
+            {
+              "key": "Audit Call"
+            },
+            {
+              "key": "Last Contact Date"
+            },
+            {
+              "key": "Notes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "78b2d0ac-68c3-46a7-8e3e-4a151ddd323d",
+      "name": "Add Qualified to Notion1",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        -16,
+        368
+      ],
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Calendly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Booking Answers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Booking Answers": {
+      "main": [
+        [
+          {
+            "node": "Check Disqualifiers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Disqualification Reason": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add Qualified to Notion1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel Calendly Event": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Collect Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Disqualification Email": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Collect Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Error Details": {
+      "main": [
+        [
+          {
+            "node": "Email Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Send Disqualification Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Cancel Calendly Event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add Disqualified to Notion1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Disqualifiers": {
+      "main": [
+        [
+          {
+            "node": "Build Disqualification Reason",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Qualified to Notion1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Disqualified to Notion1": {
+      "main": [
+        [],
+        []
+      ]
+    },
+    "Add Qualified to Notion1": {
+      "main": [
+        [
+          {
+            "node": "Collect Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6dbc5d88-fcd7-44ba-99b0-c25506deb8ac",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ea0340db5b8064116e794e0185a0bdec41ba3c48ebfd47c8bd55e58fde2a2625"
+  },
+  "id": "Cl4Upu-JaN7W7YHbFo1Mx",
+  "tags": []
+}

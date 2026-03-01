@@ -1,0 +1,439 @@
+{
+  "name": "WF STEP9 - Post-Signing Onboarding (Welcome Email + Full Setup)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "signwell-document-completed",
+        "options": { "rawBody": true }
+      },
+      "id": "step9-node-1",
+      "name": "SignWell Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "signwell-document-completed",
+      "notes": "Receives SignWell webhook when a document is fully signed (document.completed event). Configure this URL in your SignWell webhook settings."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.status || $json.body.event_type || '' }}",
+              "rightValue": "completed",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step9-node-2",
+      "name": "Is Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [470, 300],
+      "notes": "Filters to only process fully completed/signed documents."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "sw-doc-id",
+              "name": "signwell_doc_id",
+              "value": "={{ $json.body.id || $json.body.document_id || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "sw-client-email",
+              "name": "client_email",
+              "value": "={{ $json.body.recipients?.find(r => r.email !== 'anthony@veteranvectors.io')?.email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "sw-client-name",
+              "name": "client_name",
+              "value": "={{ $json.body.recipients?.find(r => r.email !== 'anthony@veteranvectors.io')?.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "sw-doc-name",
+              "name": "document_name",
+              "value": "={{ $json.body.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "sw-pdf-url",
+              "name": "completed_pdf_url",
+              "value": "={{ $json.body.completed_pdf_url || $json.body.file_url || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step9-node-3",
+      "name": "Extract SignWell Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Email\",\n    \"email\": { \"equals\": {{ JSON.stringify($json.client_email || '') }} }\n  }\n}",
+        "options": {}
+      },
+      "id": "step9-node-4",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step9-node-5",
+      "name": "Contact Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Find Notion Contact').first().json.results[0];\nconst props = contact.properties;\nreturn [{\n  json: {\n    notion_page_id: contact.id,\n    contact_name: props['Name']?.title?.[0]?.text?.content || '',\n    first_name: (props['Name']?.title?.[0]?.text?.content || '').split(' ')[0],\n    email: props['Email']?.email || '',\n    company: props['Company']?.rich_text?.[0]?.text?.content || '',\n    drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n    current_status: props['Status']?.select?.name || '',\n    stripe_customer_id: props['Stripe Customer ID']?.rich_text?.[0]?.text?.content || '',\n    stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n    stripe_subscription_id: props['Stripe Subscription ID']?.rich_text?.[0]?.text?.content || ''\n  }\n}];"
+      },
+      "id": "step9-node-6",
+      "name": "Extract Contact Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1350, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.current_status }}",
+              "rightValue": "Project Started",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step9-node-7",
+      "name": "Not Already Onboarded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1570, 240],
+      "notes": "Idempotency check: skip if already 'Project Started' (prevents duplicate processing from webhook retries)."
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Extract SignWell Data').item.json.completed_pdf_url }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "step9-node-8",
+      "name": "Download Signed Contract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1790, 160]
+    },
+    {
+      "parameters": {
+        "name": "=SoW-{{ $('Extract Contact Info').item.json.company }}-{{ $('Extract Contact Info').item.json.contact_name }}-Signed",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "value": "={{ $('Extract Contact Info').item.json.drive_folder_id || 'YOUR_CLIENTS_FOLDER_ID' }}", "mode": "id" },
+        "options": {}
+      },
+      "id": "step9-node-9",
+      "name": "Upload Signed Contract to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2010, 160]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extract Contact Info').item.json.email }}",
+        "subject": "=Let's Get Started - Your Project with Veteran Vectors Kicks Off Soon!",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;font-size:16px;line-height:1.7;\">\n  <div style=\"background-color:#1a1a2e;padding:24px 40px;text-align:center;border-radius:8px 8px 0 0;\">\n    <span style=\"color:#4dd0e1;font-size:22px;font-weight:bold;letter-spacing:1px;\">VETERAN VECTORS</span>\n  </div>\n  <div style=\"padding:40px;background:#fff;\">\n    <p>Hey <strong>{{ $('Extract Contact Info').item.json.first_name }}</strong>!</p>\n    <p>Thanks for completing the contract and invoice. We're locked in.</p>\n    <p>You'll get weekly updates from me on progress, blockers, and any questions I need answered. No surprises.</p>\n    <p><strong>Here are your Next Steps:</strong> Book your Onboarding Call ASAP so we can cover expectations, get your tech accounts set up, and establish how we'll communicate throughout the project.</p>\n    <p style=\"text-align:center;padding:16px 0;\">\n      <a href=\"https://calendly.com/anthony-veteranvectors/veteran-vectors-onboarding\" style=\"display:inline-block;background-color:#4dd0e1;color:#1a1a2e;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 36px;border-radius:6px;\">Schedule Onboarding Call</a>\n    </p>\n    <p>Looking forward to crushing it with {{ $('Extract Contact Info').item.json.company }} and you.</p>\n    <p>Questions? Hit reply.</p>\n    <p style=\"margin:0 0 4px;\">Cheers,</p>\n    <p style=\"margin:0;font-weight:bold;color:#1a1a2e;\">Anthony</p>\n    <p style=\"margin:0;color:#4dd0e1;font-weight:600;\">Veteran Vectors</p>\n  </div>\n  <div style=\"background:#1a1a2e;padding:20px;text-align:center;border-radius:0 0 8px 8px;\">\n    <p style=\"margin:0;color:#888;font-size:12px;\">© 2026 Veteran Vectors. All rights reserved.</p>\n  </div>\n</div>",
+        "options": { "ccList": "anthony@veteranvectors.io" }
+      },
+      "id": "step9-node-10",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1790, 340],
+      "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } },
+      "notes": "Sends the standardized welcome email with onboarding call Calendly link."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Extract Contact Info').item.json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Project Started\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step9-node-11",
+      "name": "Update Notion Contact (Project Started)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_PROJECTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Client\",\n    \"relation\": {\n      \"contains\": \"{{ $('Extract Contact Info').item.json.notion_page_id }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "step9-node-12",
+      "name": "Find Notion Project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2450, 240]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.results[0]?.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Project Status\": { \"select\": { \"name\": \"Active\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step9-node-13",
+      "name": "Update Project Status (Active)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2670, 240],
+      "notes": "Updates the Notion Project record to 'Active' status. Fixes DATA-01/G-02 from audit — ensures WF7 weekly check-ins find active projects."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Extract Contact Info').item.json.stripe_invoice_id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step9-node-14",
+      "name": "Has Stripe Invoice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2890, 240],
+      "notes": "Checks if Stripe billing was set up in STEP7. Skips billing finalization if no Stripe IDs present."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $('Extract Contact Info').item.json.stripe_invoice_id }}/finalize",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "options": {}
+      },
+      "id": "step9-node-15",
+      "name": "Stripe: Finalize Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [3110, 160],
+      "notes": "Finalizes the draft invoice created in STEP7, making it ready to send to the client."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $('Extract Contact Info').item.json.stripe_invoice_id }}/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "options": {}
+      },
+      "id": "step9-node-16",
+      "name": "Stripe: Send Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [3330, 160],
+      "notes": "Sends the finalized invoice to the client via Stripe email."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Extract Contact Info').item.json.stripe_subscription_id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step9-node-17",
+      "name": "Has Subscription?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [3550, 160],
+      "notes": "Checks if a retainer subscription was created in STEP7."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/subscriptions/{{ $('Extract Contact Info').item.json.stripe_subscription_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "pause_collection", "value": "" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step9-node-18",
+      "name": "Stripe: Resume Subscription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [3770, 100],
+      "notes": "Resumes the paused retainer subscription. Removes pause_collection to activate monthly billing."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SignWell Webhook": {
+      "main": [[ { "node": "Is Completed?", "type": "main", "index": 0 } ]]
+    },
+    "Is Completed?": {
+      "main": [[ { "node": "Extract SignWell Data", "type": "main", "index": 0 } ]]
+    },
+    "Extract SignWell Data": {
+      "main": [[ { "node": "Find Notion Contact", "type": "main", "index": 0 } ]]
+    },
+    "Find Notion Contact": {
+      "main": [[ { "node": "Contact Found?", "type": "main", "index": 0 } ]]
+    },
+    "Contact Found?": {
+      "main": [[ { "node": "Extract Contact Info", "type": "main", "index": 0 } ]]
+    },
+    "Extract Contact Info": {
+      "main": [[ { "node": "Not Already Onboarded?", "type": "main", "index": 0 } ]]
+    },
+    "Not Already Onboarded?": {
+      "main": [[
+        { "node": "Download Signed Contract", "type": "main", "index": 0 },
+        { "node": "Send Welcome Email", "type": "main", "index": 0 }
+      ]]
+    },
+    "Download Signed Contract": {
+      "main": [[ { "node": "Upload Signed Contract to Drive", "type": "main", "index": 0 } ]]
+    },
+    "Upload Signed Contract to Drive": {
+      "main": [[ { "node": "Update Notion Contact (Project Started)", "type": "main", "index": 0 } ]]
+    },
+    "Update Notion Contact (Project Started)": {
+      "main": [[ { "node": "Find Notion Project", "type": "main", "index": 0 } ]]
+    },
+    "Find Notion Project": {
+      "main": [[ { "node": "Update Project Status (Active)", "type": "main", "index": 0 } ]]
+    },
+    "Update Project Status (Active)": {
+      "main": [[ { "node": "Has Stripe Invoice?", "type": "main", "index": 0 } ]]
+    },
+    "Has Stripe Invoice?": {
+      "main": [
+        [ { "node": "Stripe: Finalize Invoice", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Stripe: Finalize Invoice": {
+      "main": [[ { "node": "Stripe: Send Invoice", "type": "main", "index": 0 } ]]
+    },
+    "Stripe: Send Invoice": {
+      "main": [[ { "node": "Has Subscription?", "type": "main", "index": 0 } ]]
+    },
+    "Has Subscription?": {
+      "main": [
+        [ { "node": "Stripe: Resume Subscription", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "step9-v2-0",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": []
+}

@@ -322,6 +322,23 @@
     {
       "parameters": {
         "method": "POST",
+        "url": "YOUR_N8N_WEBHOOK_BASE_URL/webhook/loom-research-trigger",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"notion_page_id\": {{ JSON.stringify($('Find Contact (Accepted)').item.json.results[0].id || '') }},\n  \"full_name\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.full_name || '') }},\n  \"linkedin_url\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.linkedin_url || '') }},\n  \"company\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.company || '') }},\n  \"title\": {{ JSON.stringify($('Parse Prosp.ai Event').item.json.title || '') }}\n}",
+        "options": { "timeout": 5000 }
+      },
+      "id": "step1-node-7b",
+      "name": "Trigger Loom Research (WF_STEP3)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 340],
+      "notes": "Triggers the Loom Research Script workflow (WF_STEP3) asynchronously. Replace YOUR_N8N_WEBHOOK_BASE_URL with your n8n instance URL.",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
         "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
@@ -485,6 +502,17 @@
         [
           {
             "node": "Update Notion (Connection Accepted)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion (Connection Accepted)": {
+      "main": [
+        [
+          {
+            "node": "Trigger Loom Research (WF_STEP3)",
             "type": "main",
             "index": 0
           }
