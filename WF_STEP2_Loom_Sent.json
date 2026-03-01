@@ -1,0 +1,194 @@
+{
+  "name": "WF STEP2 - Prosp.ai Loom Sent Tracking",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prosp-loom-sent",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "step4-node-1",
+      "name": "Prosp.ai Webhook (Message Sent)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "prosp-loom-sent",
+      "notes": "Receives Prosp.ai message_sent events. Filters for messages containing Loom links to track Loom video outreach."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "parse-linkedin",
+              "name": "linkedin_url",
+              "value": "={{ $json.body.prospect?.linkedin_url || $json.body.prospect?.linkedinUrl || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-name",
+              "name": "full_name",
+              "value": "={{ $json.body.prospect?.name || $json.body.prospect?.first_name + ' ' + ($json.body.prospect?.last_name || '') || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "parse-message",
+              "name": "message_content",
+              "value": "={{ $json.body.message?.content || $json.body.message?.text || $json.body.message || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step4-node-2",
+      "name": "Parse Event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message_content }}",
+              "rightValue": "loom.com",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step4-node-3",
+      "name": "Contains Loom Link?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [690, 300],
+      "notes": "Filters to only process messages that contain a loom.com link, indicating a Loom video was sent."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json.linkedin_url || '') }}\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "step4-node-4",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step4-node-5",
+      "name": "Contact Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1130, 240]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Find Notion Contact').item.json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Loom Sent\": { \"checkbox\": true },\n    \"Status\": { \"select\": { \"name\": \"Loom Sent\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step4-node-6",
+      "name": "Update Notion (Loom Sent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 240],
+      "notes": "Updates Notion contact: Loom Sent checkbox = true, Status = 'Loom Sent', Last Contact Date = now."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Prosp.ai Webhook (Message Sent)": {
+      "main": [
+        [
+          { "node": "Parse Event", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Event": {
+      "main": [
+        [
+          { "node": "Contains Loom Link?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Contains Loom Link?": {
+      "main": [
+        [
+          { "node": "Find Notion Contact", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Notion Contact": {
+      "main": [
+        [
+          { "node": "Contact Found?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Contact Found?": {
+      "main": [
+        [
+          { "node": "Update Notion (Loom Sent)", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "step4-v1-0",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": []
+}

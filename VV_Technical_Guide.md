@@ -2,7 +2,7 @@
 
 ## System Architecture Overview
 
-This document describes the technical architecture of the 10-step LinkedIn-to-Client onboarding pipeline. It covers every service, how they connect, data flow between systems, and the technical decisions behind each choice.
+This document describes the technical architecture of the 8-step LinkedIn-to-Client onboarding pipeline. It covers every service, how they connect, data flow between systems, and the technical decisions behind each choice.
 
 ---
 
@@ -13,8 +13,7 @@ This document describes the technical architecture of the 10-step LinkedIn-to-Cl
 | **Outreach Automation** | Prosp.ai | LinkedIn connection requests, messages, follow-up campaigns | Paid plan with webhook support |
 | **CRM / Source of Truth** | Notion | Contacts, Projects, Meetings databases | Team or Business plan |
 | **LinkedIn Scraping** | Apify | Mass LinkedIn Profile Scraper actor (`2SyF0bVxmgGr8IVCZ`) | Free tier (5 USD/month) or paid |
-| **Data Enrichment** | Apollo.io | Company employee count, revenue, industry, seniority | Free tier (10K records/month) |
-| **AI Processing** | Anthropic Claude | Loom scripts, meeting notes, proposal drafts | API access (Sonnet 4.5) |
+| **AI Processing** | Anthropic Claude | Loom scripts, meeting notes, proposal drafts, revenue estimation | API access (Sonnet 4.5) |
 | **Scheduling** | Calendly | Discovery calls, audit calls, onboarding calls, check-ins | Professional plan (custom questions + webhooks) |
 | **Meeting Transcription** | BlueDot AI | Auto-transcription with webhook delivery | Business plan with API webhooks |
 | **E-Signatures** | SignWell | SOW/contract signing with completion webhooks | Business plan |
@@ -23,7 +22,7 @@ This document describes the technical architecture of the 10-step LinkedIn-to-Cl
 | **Document Generation** | PDFco | PDF form filling for SOW template | API access |
 | **Email** | Gmail (OAuth2) | Approval emails, cancellation emails, reminders, welcome emails | Google Workspace |
 | **Notifications** | Slack | #onboarding-alerts channel for pipeline events | Workspace with Bot token |
-| **Workflow Engine** | n8n | Orchestrates all 10 steps | Self-hosted or Cloud |
+| **Workflow Engine** | n8n | Orchestrates all 8 steps | Self-hosted or Cloud |
 | **Prompt Storage** | Google Sheets | Loom Video Research Prompt (column N, "Prompts" tab) | Existing sheet: `1fe-WP...` |
 
 ---
@@ -35,58 +34,58 @@ This document describes the technical architecture of the 10-step LinkedIn-to-Cl
 | Property | Type | Set By | Description |
 |----------|------|--------|-------------|
 | Name | Title | STEP1 | Full name |
-| Email | Email | STEP1/5C | Contact email |
+| Email | Email | STEP1/3C | Contact email |
 | LinkedIn Profile | URL | STEP1 | LinkedIn profile URL (used for dedup) |
-| Company | Rich Text | STEP1/3 | Company name |
-| Title | Rich Text | STEP1/3 | Job title |
+| Company | Rich Text | STEP1/WF0 | Company name |
+| Title | Rich Text | STEP1/WF0 | Job title |
 | Source | Select | STEP1 | "LI Loom Outreach", "Networking/Podcast", "Warm Outreach/Text" |
 | Status | Select | All | Pipeline stage (see lifecycle below) |
 | LI Connection Sent | Checkbox | STEP1 | Connection request sent via Prosp.ai |
 | LI Connection Accepted | Checkbox | STEP1 | Connection accepted |
-| Loom Sent | Checkbox | STEP4 | Loom video sent |
-| Responded | Checkbox | STEP1/5C | Contact responded |
-| Call Booked | Checkbox | STEP5C | Discovery call booked |
-| Audit Call | Checkbox | STEP6 | Audit call completed |
+| Loom Sent | Checkbox | STEP2 | Loom video sent |
+| Responded | Checkbox | STEP1/3C | Contact responded |
+| Call Booked | Checkbox | STEP3C | Discovery call booked |
+| Audit Call | Checkbox | STEP4 | Audit call completed |
 | Last Contact Date | Date | All | Last interaction timestamp |
-| Need to Follow Up Date | Date | STEP5A | Follow-up date |
-| Notes | Rich Text | STEP3/6 | Research brief, meeting notes |
-| Drive Folder ID | Rich Text | STEP6 | Google Drive folder ID for this client |
-| Meetings | Relation | STEP6/10 | Links to Meetings database |
-| Projects | Relation | STEP7 | Links to Projects database |
+| Need to Follow Up Date | Date | STEP3A | Follow-up date |
+| Notes | Rich Text | WF0/4 | Research brief, meeting notes |
+| Drive Folder ID | Rich Text | STEP4 | Google Drive folder ID for this client |
+| Meetings | Relation | STEP4/8 | Links to Meetings database |
+| Projects | Relation | STEP5 | Links to Projects database |
 | Free or Paid | Select | Manual | "Free" or "Paid" |
 
 ### Status Lifecycle (Select Values)
 
 ```
 "Connection Sent" → "Connection Accepted" → "Research Complete" → "Loom Sent"
-     STEP 1              STEP 1                  STEP 3              STEP 4
+     STEP 1              STEP 1                  WF0                STEP 2
                                                                        │
                                                           ┌────────────┤
                                                           ▼            ▼
                                                   "Follow-Up      "Responded"
                                                    Sequence"        STEP 1
-                                                   STEP 5A            │
-                                                                      ├── "Pending Approval" (5C, low revenue)
+                                                   STEP 3A            │
+                                                                      ├── "Pending Approval" (3C, low revenue)
                                                                       ▼
                                                               "Meeting Booked"
-                                                                  STEP 5C
+                                                                  STEP 3C
                                                                       │
 "Project Started" ← "Contract Sent" ← "Proposal Sent" ← "Meeting Held"
-     STEP 9              STEP 7           STEP 8            STEP 6
+     STEP 7              STEP 5           STEP 5            STEP 4
 
-Side exits: "Declined" (5C disapprove, STEP8 30-day expire)
+Side exits: "Declined" (3C disapprove, STEP6 30-day expire)
 ```
 
 ### Projects Database
 
 | Property | Type | Set By |
 |----------|------|--------|
-| Project Name | Title | STEP7 |
-| Client | Relation | STEP7 |
-| Project Status | Select | STEP7→STEP9 ("Contract Sent" → "Active") |
-| Project Cost | Number | STEP7 |
-| Start Date | Date | STEP7 |
-| Retainer | Number | STEP7 |
+| Project Name | Title | STEP5 |
+| Client | Relation | STEP5 |
+| Project Status | Select | STEP5→STEP7 ("Contract Sent" → "Active") |
+| Project Cost | Number | STEP5 |
+| Start Date | Date | STEP5 |
+| Retainer | Number | STEP5 |
 | Opportunity | Select | Manual |
 | Dollars Received | Number | Manual |
 
@@ -94,13 +93,13 @@ Side exits: "Declined" (5C disapprove, STEP8 30-day expire)
 
 | Property | Type | Set By |
 |----------|------|--------|
-| Meeting Title | Title | STEP6/10 |
-| Date | Date | STEP6/10 |
-| Contact | Relation | STEP6/10 |
-| Meeting Category | Select | STEP10 ("Discovery", "Audit", "Onboarding", "Check-In") |
-| Meeting Type | Select | STEP10 ("Scheduled", "Cancelled") |
-| Attendee Email | Email | STEP10 |
-| BlueDot Notes | Rich Text | STEP6 |
+| Meeting Title | Title | STEP4/8 |
+| Date | Date | STEP4/8 |
+| Contact | Relation | STEP4/8 |
+| Meeting Category | Select | STEP8 ("Discovery", "Audit", "Onboarding", "Check-In") |
+| Meeting Type | Select | STEP8 ("Scheduled", "Cancelled") |
+| Attendee Email | Email | STEP8 |
+| BlueDot Notes | Rich Text | STEP4 |
 | Call Platform | Select | Manual |
 
 ---
@@ -152,30 +151,7 @@ Actor `2SyF0bVxmgGr8IVCZ` returns:
 }
 ```
 
-### Apollo.io People Match Response
-
-```json
-{
-  "person": {
-    "title": "Chief Executive Officer",
-    "seniority": "founder",
-    "city": "San Diego",
-    "state": "California",
-    "country": "United States",
-    "organization": {
-      "name": "Acme Corp",
-      "estimated_num_employees": 85,
-      "annual_revenue": 12000000,
-      "annual_revenue_printed": "$12M",
-      "industry": "Logistics",
-      "website_url": "https://acmecorp.com",
-      "founded_year": 2015
-    }
-  }
-}
-```
-
-### Priority Scoring Algorithm (max 20 points)
+### Priority Scoring Algorithm
 
 | Factor | Points | Criteria |
 |--------|--------|----------|
@@ -202,15 +178,14 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 |----------------|------|-------------------|---------|
 | VV Google Sheets account | Google Sheets OAuth2 | `wi6bAEK3LwBuXnNr` | Loom Research, WF0 |
 | VV Google Sheets Trigger account | Google Sheets Trigger OAuth2 | `uIBJOZhW3WjUilpV` | Loom Research (trigger) |
-| Apify account | Apify API | `8HrOAzWZHeGNrHbZ` | Loom Research, STEP3 |
-| VV Claude | Anthropic API | `au1c518sMzUt89ul` | Loom Research, STEP3, STEP6 |
-| VV - Calendly account | Calendly OAuth2 | `Htykkb3r14siqEFc` | STEP5C, STEP10 |
-| VV - Calendly (OAuth2) | OAuth2 Generic | `uFXaP32GB3oPzqwu` | STEP5C (cancellation) |
-| VV Gmail account | Gmail OAuth2 | `r13jnGsjwNOqcBvt` | STEP5C, STEP8, STEP9 |
+| Apify account | Apify API | `8HrOAzWZHeGNrHbZ` | Loom Research, WF0 |
+| VV Claude | Anthropic API | `au1c518sMzUt89ul` | Loom Research, WF0, STEP4 |
+| VV - Calendly account | Calendly OAuth2 | `Htykkb3r14siqEFc` | STEP3C, STEP8 |
+| VV - Calendly (OAuth2) | OAuth2 Generic | `uFXaP32GB3oPzqwu` | STEP3C (cancellation) |
+| VV Gmail account | Gmail OAuth2 | `r13jnGsjwNOqcBvt` | STEP3C, STEP6, STEP7 |
 | Notion Integration | HTTP Header Auth | (configure) | All STEP workflows |
-| Apollo.io | HTTP Header Auth | (configure) | STEP3, WF0 |
-| Stripe | Stripe API | (configure) | STEP7, STEP9 |
-| SignWell | HTTP Header Auth | (configure) | STEP7, STEP9 |
+| Stripe | Stripe API | (configure) | STEP5, STEP7 |
+| SignWell | HTTP Header Auth | (configure) | STEP5, STEP7 |
 | Slack Bot | Slack OAuth2 | (configure) | Notifications |
 
 ---
@@ -220,13 +195,12 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 | Webhook Path | Workflow | HTTP Method | Source |
 |-------------|----------|-------------|--------|
 | `/webhook/prosp-linkedin-events` | STEP1 | POST | Prosp.ai |
-| `/webhook/loom-research-trigger` | STEP3 | POST | STEP1 (internal) |
-| `/webhook/prosp-loom-sent` | STEP4 | POST | Prosp.ai |
-| `/webhook/calendly-approval` | STEP5C | GET | Email button clicks |
-| `/webhook/bluedot-meeting-processed` | STEP6 | POST | BlueDot |
-| `/webhook/signwell-document-completed` | STEP9 | POST | SignWell |
-| Calendly native webhook | STEP5C | POST | Calendly |
-| Calendly native webhook | STEP10 | POST | Calendly |
+| `/webhook/prosp-loom-sent` | STEP2 | POST | Prosp.ai |
+| `/webhook/calendly-approval` | STEP3C | GET | Email button clicks |
+| `/webhook/bluedot-meeting-processed` | STEP4 | POST | BlueDot |
+| `/webhook/signwell-document-completed` | STEP7 | POST | SignWell |
+| Calendly native webhook | STEP3C | POST | Calendly |
+| Calendly native webhook | STEP8 | POST | Calendly |
 
 **n8n Webhook Base URL format:** `https://your-n8n-instance.com` (or `http://localhost:5678` for local)
 
@@ -238,8 +212,7 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 |-----------|----------|-------------|
 | Webhook delivery failure | Prosp.ai/Calendly/SignWell retry automatically | n8n execution log |
 | Notion API error | `onError: continueErrorOutput` → error collector node | Email to anthony@veteranvectors.io |
-| Apify scraper timeout | `retryOnFail: true, maxTries: 3` | Fallback to Apollo-only data |
-| Apollo API rate limit | `onError: continueErrorOutput` → Fallback Score node | Flagged as "Unscored" |
+| Apify scraper timeout | `retryOnFail: true, maxTries: 3` | Retry with backoff |
 | Claude API error | Retry 3x with 5s delay | Slack alert |
 | Stripe API error | `onError: continueErrorOutput` | Email alert + Slack |
 | SignWell PDF download failure | Check for empty URL before download | Slack alert |
@@ -252,7 +225,6 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 |---------|-----------|-------------|
 | Prosp.ai API | 100 requests/minute | Webhook-driven (no polling) |
 | Notion API | 3 requests/second | Sequential processing with natural delays |
-| Apollo.io | 200 requests/hour (free) | 1.5s inline delay between calls |
 | Apify | Concurrent actor runs limited by plan | 2s wait between items |
 | Claude API | Based on plan tier | Single sequential calls per workflow |
 | Calendly | 120 requests/minute | Webhook-driven |
@@ -266,11 +238,11 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 | Scenario | Guard | Implementation |
 |----------|-------|---------------|
 | Duplicate Prosp.ai webhooks | LinkedIn URL uniqueness check | STEP1 queries Notion by LinkedIn URL before creating |
-| Duplicate BlueDot transcripts | Status check | STEP6 skips if contact already "Meeting Held" |
-| Duplicate SignWell completions | Status check | STEP9 skips if already "Project Started" |
-| Duplicate Calendly bookings | Meeting dedup by email + date | STEP10 creates meeting record (acceptable duplicates) |
-| Duplicate contract reminders | Last Contact Date check | STEP8 only sends if not already reminded today |
-| Duplicate Google Drive folders | Drive Folder ID persistence | STEP6 checks if folder ID exists in Notion first |
+| Duplicate BlueDot transcripts | Status check | STEP4 skips if contact already "Meeting Held" |
+| Duplicate SignWell completions | Status check | STEP7 skips if already "Project Started" |
+| Duplicate Calendly bookings | Meeting dedup by email + date | STEP8 creates meeting record (acceptable duplicates) |
+| Duplicate contract reminders | Last Contact Date check | STEP6 only sends if not already reminded today |
+| Duplicate Google Drive folders | Drive Folder ID persistence | STEP4 checks if folder ID exists in Notion first |
 
 ---
 
@@ -285,7 +257,7 @@ The existing Loom Research Script and WF0 Lead Scoring use Google Sheets as thei
 | Loom Videos | Lead list for Loom outreach | Name, LI Profile, Script, Done?, Run |
 | Prompts | AI prompt templates | Column N: "Loom Video Research Prompt" |
 
-**Data Flow:** Google Sheets is the input source for the existing Loom Research Script. The new STEP3 workflow adds a parallel Notion-based path while maintaining backward compatibility with the Google Sheets workflow.
+**Data Flow:** Google Sheets is the input source for the existing Loom Research Script. WF0 handles lead scoring and research via a Notion-based path while maintaining backward compatibility with the Google Sheets workflow.
 
 ---
 
@@ -297,7 +269,6 @@ The existing Loom Research Script and WF0 Lead Scoring use Google Sheets as thei
 │  ┌────────────────────────────────────────────────────┐  │
 │  │ Webhook Server (port 5678)                         │  │
 │  │  /webhook/prosp-linkedin-events    ← Prosp.ai     │  │
-│  │  /webhook/loom-research-trigger    ← Internal      │  │
 │  │  /webhook/prosp-loom-sent          ← Prosp.ai     │  │
 │  │  /webhook/calendly-approval        ← Email clicks  │  │
 │  │  /webhook/bluedot-meeting-processed ← BlueDot     │  │
@@ -305,9 +276,9 @@ The existing Loom Research Script and WF0 Lead Scoring use Google Sheets as thei
 │  └────────────────────────────────────────────────────┘  │
 │                                                          │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐      │
-│  │ STEP1   │ │ STEP3   │ │ STEP4   │ │ STEP5A   │      │
-│  │ STEP5C  │ │ STEP6   │ │ STEP7   │ │ STEP8    │      │
-│  │ STEP9   │ │ STEP10  │ │ Loom RS │ │ WF0 Lead │      │
+│  │ STEP1   │ │ STEP2   │ │ STEP3A  │ │ STEP3C   │      │
+│  │ STEP4   │ │ STEP5   │ │ STEP6   │ │ STEP7    │      │
+│  │ STEP8   │ │ WF0 Lead│ │         │ │          │      │
 │  └─────────┘ └─────────┘ └─────────┘ └──────────┘      │
 │                                                          │
 │  Credential Store: Notion, Google, Stripe, SignWell...   │
@@ -319,7 +290,7 @@ The existing Loom Research Script and WF0 Lead Scoring use Google Sheets as thei
     │ CRM     │   │ Drive    │  │ APIs     │
     │         │   │          │  │ (Stripe, │
     │ Contacts│   │ Client   │  │ SignWell,│
-    │ Projects│   │ Folders  │  │ Apollo,  │
-    │ Meetings│   │          │  │ Apify)   │
+    │ Projects│   │ Folders  │  │ Apify,   │
+    │ Meetings│   │          │  │ Claude)  │
     └─────────┘   └──────────┘  └──────────┘
 ```
