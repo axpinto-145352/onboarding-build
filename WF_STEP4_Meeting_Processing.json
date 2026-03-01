@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP6 - Post-Discovery Call Processing (BlueDot → Notion + Drive + Proposal)",
+  "name": "WF STEP4 - Post-Discovery Call Processing (BlueDot → Notion + Drive + Proposal)",
   "nodes": [
     {
       "parameters": {

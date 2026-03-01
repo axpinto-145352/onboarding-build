@@ -1,6 +1,6 @@
 # Veteran Vectors — Step-by-Step Implementation Guide
 
-## How to Set Up the Complete 10-Step Pipeline
+## How to Set Up the Complete 8-Step Pipeline
 
 This guide walks you through setting up every workflow, from creating accounts to testing the full pipeline end-to-end.
 
@@ -243,31 +243,18 @@ done
 - A new contact appears in Notion with Status = "Connection Sent"
 - LI Connection Sent checkbox is checked
 
-### Step 4.2: Import STEP3 — Loom Research Script
+### Step 4.2: Import STEP2 — Loom Sent Tracking
 
-1. Import `WF_STEP3_Loom_Research.json`
-2. Assign credentials:
-   - Notion HTTP nodes → "Notion Integration"
-   - Apify node → "Apify account" (ID: `8HrOAzWZHeGNrHbZ`)
-   - Apollo HTTP node → "Apollo API"
-   - Claude node → "VV Claude" (ID: `au1c518sMzUt89ul`)
-3. Save and Activate
-4. Copy the webhook URL and paste it into STEP1's "Trigger Loom Research" node URL
-
-**Test it:** Click "Execute Workflow" with the manual trigger. If you have contacts with "Connection Accepted" status in Notion, they'll be processed.
-
-### Step 4.3: Import STEP4 — Loom Sent Tracking
-
-1. Import `WF_STEP4_Loom_Sent.json`
+1. Import `WF_STEP2_Loom_Sent.json`
 2. Assign Notion credentials to HTTP Request nodes
 3. Save and Activate
 4. Copy webhook URL → Add to Prosp.ai webhook settings (message_sent events)
 
 **Test it:** Send a message containing a loom.com link via Prosp.ai. Check Notion updates.
 
-### Step 4.4: Import STEP5A — No-Response Follow-Up
+### Step 4.3: Import STEP3A — No-Response Follow-Up
 
-1. Import `WF_STEP5A_No_Response_Followup.json`
+1. Import `WF_STEP3A_No_Response_Followup.json`
 2. Assign credentials:
    - Notion HTTP nodes → "Notion Integration"
    - Prosp.ai HTTP node → "Prosp.ai API"
@@ -277,9 +264,9 @@ done
 
 **Test it:** Manually create a Notion contact with Status = "Loom Sent" and Last Contact Date = 4 days ago. Wait for the 9 AM trigger or test manually.
 
-### Step 4.5: Import STEP5C — Calendly Screening
+### Step 4.4: Import STEP3C — Calendly Screening
 
-1. Import `WF_STEP5C_Calendly_Screening.json`
+1. Import `WF_STEP3C_Calendly_Screening.json`
 2. Assign credentials:
    - Calendly Trigger → "VV - Calendly account"
    - Gmail nodes → "VV Gmail account"
@@ -296,32 +283,24 @@ done
 
 **Test it:** Book a test discovery call with revenue "Under $5K". Check that you receive an approval email.
 
-### Step 4.6: Import STEP10 — Calendly-Notion Sync
+### Step 4.5: Import STEP4 — Meeting Processing
 
-1. Import `WF_STEP10_Calendly_Notion_Sync.json`
-2. Assign Calendly and Notion credentials
-3. Save and Activate
-
-**Test it:** Book any Calendly call. Check that a Meeting record appears in Notion linked to the contact.
-
-### Step 4.7: Import STEP6 — Meeting Processing
-
-1. Import `WF_STEP6_Meeting_Processing.json`
+1. Import `WF_STEP4_Meeting_Processing.json`
 2. Assign credentials:
    - Notion HTTP nodes → "Notion Integration"
    - Google Drive nodes → Google Drive OAuth2
    - Claude HTTP node → Use existing "VV Claude" or set up HTTP Header Auth with `x-api-key`
 3. Save and Activate
-4. **In BlueDot:** Go to Settings → Webhooks → Add webhook URL from STEP6
+4. **In BlueDot:** Go to Settings → Webhooks → Add webhook URL from STEP4
 
 **Test it:** Hold a short test call with BlueDot recording. When transcript is ready, check:
 - Google Drive folder created
 - Notion contact updated to "Meeting Held"
 - Meeting record created in Notion
 
-### Step 4.8: Import STEP7 — SOW/Contract Creation
+### Step 4.6: Import STEP5 — SOW/Contract Creation
 
-1. Import `WF_STEP7_SOW_Contract.json`
+1. Import `WF_STEP5_SOW_Contract.json`
 2. Assign credentials:
    - Google Drive → OAuth2
    - PDFco → PDFco API credential
@@ -339,30 +318,38 @@ done
 
 **Test it:** Access the form URL (shown in n8n after activation). Fill out test data and submit.
 
-### Step 4.9: Import STEP8 — Contract Reminders
+### Step 4.7: Import STEP6 — Contract Reminders
 
-1. Import `WF_STEP8_Contract_Reminders.json`
+1. Import `WF_STEP6_Contract_Reminders.json`
 2. Assign Notion and Gmail credentials
 3. Save and Activate
 
 **Test it:** Create a test contact with Status = "Contract Sent" and Last Contact Date = yesterday. Wait for the schedule trigger or test manually.
 
-### Step 4.10: Import STEP9 — Post-Signing Onboarding
+### Step 4.8: Import STEP7 — Post-Signing Onboarding
 
-1. Import `WF_STEP9_Post_Signing.json`
+1. Import `WF_STEP7_Post_Signing.json`
 2. Assign credentials:
    - Notion → "Notion Integration"
    - Google Drive → OAuth2
    - Gmail → "VV Gmail account"
    - Stripe → Stripe API
 3. Save and Activate
-4. **In SignWell:** Go to Settings → Webhooks → Add webhook URL from STEP9
+4. **In SignWell:** Go to Settings → Webhooks → Add webhook URL from STEP7
 
 **Test it:** Sign a test contract in SignWell. Check:
 - Signed PDF uploaded to Google Drive
 - Welcome email sent
 - Notion contact updated to "Project Started"
 - Notion project updated to "Active"
+
+### Step 4.9: Import STEP8 — Calendly-Notion Sync
+
+1. Import `WF_STEP8_Calendly_Notion_Sync.json`
+2. Assign Calendly and Notion credentials
+3. Save and Activate
+
+**Test it:** Book any Calendly call. Check that a Meeting record appears in Notion linked to the contact.
 
 ---
 
@@ -398,7 +385,7 @@ Hey {first_name}, just wanted to check — did you get a chance to watch that qu
 Last one from me, {first_name}. I put together a free guide on automation best practices that I think would be valuable regardless — here's the link: [guide URL]. If you ever want to explore what's possible, I'm always around.
 ```
 
-Copy the campaign ID and use it in STEP5A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placeholder.
+Copy the campaign ID and use it in STEP3A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placeholder.
 
 ---
 
@@ -409,15 +396,15 @@ Copy the campaign ID and use it in STEP5A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 1. Go to Calendly → Event Types → Create New
 2. Name: "Veteran Vectors Discovery Call"
 3. Duration: 30 minutes
-4. Add custom questions (see Step 4.5 above)
-5. Under **Notifications**, add the webhook URL from STEP5C
+4. Add custom questions (see Step 4.4 above)
+5. Under **Notifications**, add the webhook URL from STEP3C
 6. Under **Integrations**, connect your Calendly to the n8n Calendly trigger
 
 ### Onboarding Call Event Type
 
 1. Create another event type: "Veteran Vectors Onboarding"
 2. Duration: 45 minutes
-3. This URL goes in the welcome email template in STEP9
+3. This URL goes in the welcome email template in STEP7
 
 ---
 
@@ -426,17 +413,16 @@ Copy the campaign ID and use it in STEP5A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 ### Test the Full Pipeline
 
 1. **STEP 1:** Add a test prospect in Prosp.ai → verify Notion contact created
-2. **STEP 1→3:** Simulate connection accepted → verify research runs, Notion updated with priority score
-3. **STEP 4:** Send a Loom message via Prosp.ai → verify "Loom Sent" in Notion
-4. **STEP 5A:** Wait 3 days (or manually backdate) → verify follow-up triggers
-5. **STEP 5C:** Book a discovery call on Calendly:
+2. **STEP 2:** Send a Loom message via Prosp.ai → verify "Loom Sent" in Notion
+3. **STEP 3A:** Wait 3 days (or manually backdate) → verify follow-up triggers
+4. **STEP 3C:** Book a discovery call on Calendly:
    - With revenue < $5K → verify approval email received → test approve and disapprove
    - With revenue > $5K → verify auto-qualified in Notion
-6. **STEP 6:** Hold a discovery call with BlueDot → verify transcript processed, Drive folder created
-7. **STEP 7:** Submit the SOW form → verify contract sent via SignWell
-8. **STEP 8:** Wait for reminder schedule → verify emails sent
-9. **STEP 9:** Sign the test contract → verify welcome email and Notion updates
-10. **STEP 10:** Book any call → verify Notion meeting record created
+5. **STEP 4:** Hold a discovery call with BlueDot → verify transcript processed, Drive folder created
+6. **STEP 5:** Submit the SOW form → verify contract sent via SignWell
+7. **STEP 6:** Wait for reminder schedule → verify emails sent
+8. **STEP 7:** Sign the test contract → verify welcome email and Notion updates
+9. **STEP 8:** Book any call → verify Notion meeting record created
 
 ### Monitoring
 
@@ -459,7 +445,7 @@ Copy the campaign ID and use it in STEP5A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 - [ ] Stripe product created for retainer
 - [ ] Google Drive "Clients" root folder created
 - [ ] Slack #onboarding-alerts channel exists
-- [ ] All 10 workflows activated in n8n
+- [ ] All 8 workflows activated in n8n
 - [ ] End-to-end test completed successfully
 - [ ] Error notification email (anthony@veteranvectors.io) receiving test alerts
 

@@ -1,4 +1,4 @@
-# Veteran Vectors — 10-Step LinkedIn-to-Client Onboarding Pipeline
+# Veteran Vectors — 8-Step LinkedIn-to-Client Onboarding Pipeline
 
 ## Architecture Document v4.0
 
@@ -11,34 +11,34 @@
 ## Pipeline at a Glance
 
 ```
-STEP 1          STEP 2           STEP 3           STEP 4          STEP 5A/B/C
-LI Connection   Connection       Loom Research    Loom Video      Response
-Sent via        Accepted →       Script →         Sent via        Handling
-Prosp.ai        Notion Update    Company Intel    Prosp.ai        (3 paths)
-                                 + Priority Score
+STEP 1          STEP 2           STEP 3A/B/C      STEP 4          STEP 5
+LI Connection   Loom Video       Response          Discovery       SOW/Contract
+Sent/Accepted   Sent via         Handling           Call Held →     Creation →
+via Prosp.ai    Prosp.ai         (3 paths)          Notes + AI      Invoicing +
+                                                    Proposal        Onboarding Doc
 
-WF_STEP1        WF_STEP1         WF_STEP3         WF_STEP4        WF_STEP5A/5C
-Prosp.ai        Prosp.ai         Apify + Claude   Prosp.ai        Schedule/Calendly
-webhook         webhook          + Notion         webhook         webhook
+WF_STEP1        WF_STEP2         WF_STEP3A/3C     WF_STEP4        WF_STEP5
+Prosp.ai        Prosp.ai         Schedule/Calendly BlueDot         Form/Webhook
+webhook         webhook          webhook           webhook         trigger
 
 ────────────────────────────────────────────────────────────────────────────────
 
-STEP 6          STEP 7           STEP 8           STEP 9          STEP 10
-Discovery       SOW/Contract     Contract         Contract        All Calendly
-Call Held →     Creation →       Reminders        Signed →        Calls →
-Notes + AI      Invoicing +      Every Other      Welcome         Notion
-Proposal        Onboarding Doc   Day              Email           CRM Sync
+STEP 6          STEP 7           STEP 8
+Contract        Contract         All Calendly
+Reminders       Signed →         Calls →
+Every Other     Welcome          Notion
+Day             Email            CRM Sync
 
-WF_STEP6        WF_STEP7         WF_STEP8         WF_STEP9        WF_STEP10
-BlueDot         Form/Webhook     Schedule         SignWell        Calendly
-webhook         trigger          trigger          webhook         webhook
+WF_STEP6        WF_STEP7         WF_STEP8
+Schedule        SignWell         Calendly
+trigger         webhook         webhook
 ```
 
 ---
 
 ## Detailed Step Breakdown
 
-### STEP 1-2: LinkedIn Connection (Prosp.ai → Notion)
+### STEP 1: LinkedIn Connection (Prosp.ai → Notion)
 
 **Workflow:** `WF_STEP1_Prosp_LinkedIn_Connection.json`
 **Trigger:** Prosp.ai webhook (connection_sent, connection_accepted events)
@@ -61,10 +61,6 @@ webhook         trigger          trigger          webhook         webhook
                 [Update Notion Contact]
                 - LI Connection Accepted: ✓
                 - Status: "Connection Accepted"
-                          │
-                      ▼
-                [Trigger WF_STEP3 (Loom Research)]
-                - Pass: Name, LinkedIn URL, Notion Page ID
 ```
 
 **Notion Fields Updated:**
@@ -77,52 +73,9 @@ webhook         trigger          trigger          webhook         webhook
 
 ---
 
-### STEP 3: Loom Research Script (Research + Priority Score)
+### STEP 2: Loom Video Sent (Prosp.ai → Notion)
 
-**Workflow:** `WF_STEP3_Loom_Research.json`
-**Trigger:** Webhook from WF_STEP1 (connection accepted) OR manual trigger
-
-```
-[Webhook/Manual Trigger] → [Get Contact from Notion]
-                                │
-                          [Apify LinkedIn Scraper]
-                          - Pull: Full name, headline, experience
-                          - Pull: Company name, description
-                                │
-                          [Apollo.io Enrichment]
-                          - Employee count
-                          - Annual revenue
-                          - Industry
-                          - Company website
-                          - Founded year
-                                │
-                          [Claude AI: Generate Research Brief]
-                          - Priority Score (1-20)
-                          - Loom video script/talking points
-                          - Key pain points to address
-                          - Personalization hooks
-                                │
-                          [Update Notion Contact]
-                          - Employee Count, Revenue, Title
-                          - Industry, Company Website
-                          - Priority Score (number property)
-                          - Loom Script (rich text)
-                          - Status: "Research Complete"
-```
-
-**Priority Scoring (max 20 pts):**
-- Employee Count (0-5 pts): 50-200 = 5, 20-49 = 4, 10-19 = 3
-- Revenue (0-5 pts): $10M+ = 5, $5-10M = 4, $1-5M = 3
-- Title/Seniority (0-3 pts): CEO/Founder = 3, VP = 2, Director = 1
-- Industry Fit (0-3 pts): Services/ops-heavy = 3, manufacturing/retail = 2
-- Company Maturity (0-2 pts): 2-25 years = 2
-- Loom Script Quality (0-2 pts): Based on research completeness
-
----
-
-### STEP 4: Loom Video Sent (Prosp.ai → Notion)
-
-**Workflow:** `WF_STEP4_Loom_Sent.json`
+**Workflow:** `WF_STEP2_Loom_Sent.json`
 **Trigger:** Prosp.ai webhook (message_sent event with Loom link detection)
 
 ```
@@ -138,9 +91,9 @@ webhook         trigger          trigger          webhook         webhook
 
 ---
 
-### STEP 5A: No Response Follow-Up (3-Day Timer)
+### STEP 3A: No Response Follow-Up (3-Day Timer)
 
-**Workflow:** `WF_STEP5A_No_Response_Followup.json`
+**Workflow:** `WF_STEP3A_No_Response_Followup.json`
 **Trigger:** Daily schedule (9 AM)
 
 ```
@@ -156,7 +109,7 @@ webhook         trigger          trigger          webhook         webhook
         │
         └──► [Update Notion Contact]
              - Status: "Follow-Up Sequence"
-             - Moved to group: "5 Bravo"
+             - Moved to group: "3 Bravo"
              - Need to Follow Up Date: today
 ```
 
@@ -167,7 +120,7 @@ webhook         trigger          trigger          webhook         webhook
 
 ---
 
-### STEP 5B: Response Received
+### STEP 3B: Response Received
 
 **Handled within:** `WF_STEP1_Prosp_LinkedIn_Connection.json` (reply_received event)
 
@@ -184,9 +137,9 @@ webhook         trigger          trigger          webhook         webhook
 
 ---
 
-### STEP 5C: Calendly Discovery Call Screening
+### STEP 3C: Calendly Discovery Call Screening
 
-**Workflow:** `WF_STEP5C_Calendly_Screening.json`
+**Workflow:** `WF_STEP3C_Calendly_Screening.json`
 **Trigger:** Calendly webhook (invitee.created for Discovery Call)
 
 ```
@@ -235,9 +188,9 @@ APPROVE    DISAPPROVE
 
 ---
 
-### STEP 6: Post-Discovery Call Processing
+### STEP 4: Post-Discovery Call Processing
 
-**Workflow:** `WF_STEP6_Meeting_Processing.json`
+**Workflow:** `WF_STEP4_Meeting_Processing.json`
 **Trigger:** BlueDot webhook (call transcript ready)
 
 ```
@@ -281,9 +234,9 @@ APPROVE    DISAPPROVE
 
 ---
 
-### STEP 7: SOW/Contract Creation
+### STEP 5: SOW/Contract Creation
 
-**Workflow:** `WF_STEP7_SOW_Contract.json`
+**Workflow:** `WF_STEP5_SOW_Contract.json`
 **Trigger:** Form submission (Anthony submits after proposal approval)
 
 ```
@@ -321,9 +274,9 @@ APPROVE    DISAPPROVE
 
 ---
 
-### STEP 8: Contract Reminders
+### STEP 6: Contract Reminders
 
-**Workflow:** `WF_STEP8_Contract_Reminders.json`
+**Workflow:** `WF_STEP6_Contract_Reminders.json`
 **Trigger:** Schedule (every other day, 9 AM)
 
 ```
@@ -349,9 +302,9 @@ email    Slack alert
 
 ---
 
-### STEP 9: Post-Signing Onboarding
+### STEP 7: Post-Signing Onboarding
 
-**Workflow:** `WF_STEP9_Post_Signing.json`
+**Workflow:** `WF_STEP7_Post_Signing.json`
 **Trigger:** SignWell webhook (document.completed)
 
 ```
@@ -382,9 +335,9 @@ email    Slack alert
 
 ---
 
-### STEP 10: Calendly → Notion Sync (All Calls)
+### STEP 8: Calendly → Notion Sync (All Calls)
 
-**Workflow:** `WF_STEP10_Calendly_Notion_Sync.json`
+**Workflow:** `WF_STEP8_Calendly_Notion_Sync.json`
 **Trigger:** Calendly webhook (all event types)
 
 ```
@@ -409,23 +362,23 @@ email    Slack alert
 ## Notion CRM Status Lifecycle (Complete)
 
 ```
-"Connection Sent" → "Connection Accepted" → "Research Complete" → "Loom Sent"
-     STEP 1              STEP 2                  STEP 3              STEP 4
-                                                                       │
-                                                            ┌──────────┤
-                                                            ▼          ▼
-                                                    "Follow-Up    "Responded"
-                                                     Sequence"      STEP 5B
-                                                     STEP 5A          │
-                                                                      ▼
-                                                              "Meeting Booked"
-                                                                  STEP 5C
-                                                                      │
+"Connection Sent" → "Connection Accepted" → "Loom Sent"
+     STEP 1              STEP 1                STEP 2
+                                                  │
+                                       ┌──────────┤
+                                       ▼          ▼
+                               "Follow-Up    "Responded"
+                                Sequence"      STEP 3B
+                                STEP 3A          │
+                                                  ▼
+                                          "Meeting Booked"
+                                              STEP 3C
+                                                  │
 "Project Started" ← "Contract Sent" ← "Proposal Sent" ← "Meeting Held"
-     STEP 9              STEP 7           STEP 8            STEP 6
+     STEP 7              STEP 5           STEP 6            STEP 4
                                                                 │
                                                           "Proposal Draft"
-                                                              STEP 6
+                                                              STEP 4
 
 Side exits: "Declined" (at any qualification/approval gate)
 ```
@@ -437,8 +390,8 @@ Side exits: "Declined" (at any qualification/approval gate)
 | Event | Workflow | Action |
 |-------|----------|--------|
 | `connection_sent` | WF_STEP1 | Create Notion contact, Status: "Connection Sent" |
-| `connection_accepted` | WF_STEP1 | Update Notion, trigger WF_STEP3 research |
-| `message_sent` (with Loom) | WF_STEP4 | Update Notion, Loom Sent: true |
+| `connection_accepted` | WF_STEP1 | Update Notion, Status: "Connection Accepted" |
+| `message_sent` (with Loom) | WF_STEP2 | Update Notion, Loom Sent: true |
 | `reply_received` | WF_STEP1 | Update Notion, Status: "Responded" |
 
 ---
@@ -447,19 +400,17 @@ Side exits: "Declined" (at any qualification/approval gate)
 
 | Service | Credential Type | Used In Steps |
 |---------|----------------|---------------|
-| Prosp.ai API | API Key (webhook + REST) | 1, 2, 4, 5A, 5B |
+| Prosp.ai API | API Key (webhook + REST) | 1, 2, 3A, 3B |
 | Notion | Integration Token | All steps |
-| Apify | API Token | 3 |
-| Apollo.io | API Key | 3 |
-| Anthropic Claude | API Key | 3, 6 |
-| Calendly | OAuth2 | 5C, 10 |
-| Gmail | OAuth2 | 5C, 8, 9 |
-| Google Drive | OAuth2 | 6, 7, 9 |
-| Google Docs | OAuth2 | 7 |
-| BlueDot | Webhook Secret | 6 |
-| SignWell | API Key | 7, 9 |
-| Stripe | Secret Key | 7, 9 |
-| Slack | Bot Token | 6, 7, 9 |
+| Anthropic Claude | API Key | 4 |
+| Calendly | OAuth2 | 3C, 8 |
+| Gmail | OAuth2 | 3C, 6, 7 |
+| Google Drive | OAuth2 | 4, 5, 7 |
+| Google Docs | OAuth2 | 5 |
+| BlueDot | Webhook Secret | 4 |
+| SignWell | API Key | 5, 7 |
+| Stripe | Secret Key | 5, 7 |
+| Slack | Bot Token | 4, 5, 7 |
 
 ---
 
@@ -467,16 +418,15 @@ Side exits: "Declined" (at any qualification/approval gate)
 
 | File | Step | Trigger |
 |------|------|---------|
-| `WF_STEP1_Prosp_LinkedIn_Connection.json` | 1, 2, 5B | Prosp.ai webhook |
-| `WF_STEP3_Loom_Research.json` | 3 | Webhook (from STEP1) + Manual |
-| `WF_STEP4_Loom_Sent.json` | 4 | Prosp.ai webhook |
-| `WF_STEP5A_No_Response_Followup.json` | 5A | Daily schedule |
-| `WF_STEP5C_Calendly_Screening.json` | 5C | Calendly webhook |
-| `WF_STEP6_Meeting_Processing.json` | 6 | BlueDot webhook |
-| `WF_STEP7_SOW_Contract.json` | 7 | n8n Form |
-| `WF_STEP8_Contract_Reminders.json` | 8 | Every-other-day schedule |
-| `WF_STEP9_Post_Signing.json` | 9 | SignWell webhook |
-| `WF_STEP10_Calendly_Notion_Sync.json` | 10 | Calendly webhook |
+| `WF_STEP1_Prosp_LinkedIn_Connection.json` | 1, 3B | Prosp.ai webhook |
+| `WF_STEP2_Loom_Sent.json` | 2 | Prosp.ai webhook |
+| `WF_STEP3A_No_Response_Followup.json` | 3A | Daily schedule |
+| `WF_STEP3C_Calendly_Screening.json` | 3C | Calendly webhook |
+| `WF_STEP4_Meeting_Processing.json` | 4 | BlueDot webhook |
+| `WF_STEP5_SOW_Contract.json` | 5 | n8n Form |
+| `WF_STEP6_Contract_Reminders.json` | 6 | Every-other-day schedule |
+| `WF_STEP7_Post_Signing.json` | 7 | SignWell webhook |
+| `WF_STEP8_Calendly_Notion_Sync.json` | 8 | Calendly webhook |
 
 ---
 
@@ -485,12 +435,11 @@ Side exits: "Declined" (at any qualification/approval gate)
 | Order | File | Reason |
 |-------|------|--------|
 | 1 | WF_STEP1_Prosp_LinkedIn_Connection | Entry point, creates contacts |
-| 2 | WF_STEP3_Loom_Research | Triggered by Step 1 |
-| 3 | WF_STEP4_Loom_Sent | Tracks Loom delivery |
-| 4 | WF_STEP5A_No_Response_Followup | Depends on Loom Sent status |
-| 5 | WF_STEP5C_Calendly_Screening | Qualification gate |
-| 6 | WF_STEP10_Calendly_Notion_Sync | Universal Calendly sync |
-| 7 | WF_STEP6_Meeting_Processing | Post-call processing |
-| 8 | WF_STEP7_SOW_Contract | Contract creation |
-| 9 | WF_STEP8_Contract_Reminders | Reminder engine |
-| 10 | WF_STEP9_Post_Signing | Final onboarding |
+| 2 | WF_STEP2_Loom_Sent | Tracks Loom delivery |
+| 3 | WF_STEP3A_No_Response_Followup | Depends on Loom Sent status |
+| 4 | WF_STEP3C_Calendly_Screening | Qualification gate |
+| 5 | WF_STEP8_Calendly_Notion_Sync | Universal Calendly sync |
+| 6 | WF_STEP4_Meeting_Processing | Post-call processing |
+| 7 | WF_STEP5_SOW_Contract | Contract creation |
+| 8 | WF_STEP6_Contract_Reminders | Reminder engine |
+| 9 | WF_STEP7_Post_Signing | Final onboarding |

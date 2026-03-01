@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP5A - No Response Follow-Up (3-Day Timer)",
+  "name": "WF STEP3A - No Response Follow-Up (3-Day Timer)",
   "nodes": [
     {
       "parameters": {

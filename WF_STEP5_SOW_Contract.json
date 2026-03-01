@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP7 - SOW/Contract Creation + Invoicing + Onboarding Doc",
+  "name": "WF STEP5 - SOW/Contract Creation + Invoicing + Onboarding Doc",
   "nodes": [
     {
       "parameters": {
@@ -285,7 +285,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [1350, 600],
-      "notes": "Creates invoice as DRAFT (auto_advance=false). Invoice is NOT sent until contract is signed (WF_STEP9)."
+      "notes": "Creates invoice as DRAFT (auto_advance=false). Invoice is NOT sent until contract is signed (WF_STEP7)."
     },
     {
       "parameters": {
@@ -356,7 +356,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [2010, 540],
-      "notes": "Creates the retainer subscription PAUSED (pause_collection=void). It will be resumed in WF_STEP9 after contract signing."
+      "notes": "Creates the retainer subscription PAUSED (pause_collection=void). It will be resumed in WF_STEP7 after contract signing."
     },
     {
       "parameters": {
@@ -441,7 +441,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2450, 600],
-      "notes": "Persists Stripe customer, invoice, and subscription IDs to the Notion contact. These are used by WF_STEP9 to finalize billing after contract signing."
+      "notes": "Persists Stripe customer, invoice, and subscription IDs to the Notion contact. These are used by WF_STEP7 to finalize billing after contract signing."
     }
   ],
   "pinData": {},

@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP9 - Post-Signing Onboarding (Welcome Email + Full Setup)",
+  "name": "WF STEP7 - Post-Signing Onboarding (Welcome Email + Full Setup)",
   "nodes": [
     {
       "parameters": {
@@ -290,7 +290,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [2890, 240],
-      "notes": "Checks if Stripe billing was set up in STEP7. Skips billing finalization if no Stripe IDs present."
+      "notes": "Checks if Stripe billing was set up in STEP5. Skips billing finalization if no Stripe IDs present."
     },
     {
       "parameters": {
@@ -305,7 +305,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [3110, 160],
-      "notes": "Finalizes the draft invoice created in STEP7, making it ready to send to the client."
+      "notes": "Finalizes the draft invoice created in STEP5, making it ready to send to the client."
     },
     {
       "parameters": {
@@ -342,7 +342,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [3550, 160],
-      "notes": "Checks if a retainer subscription was created in STEP7."
+      "notes": "Checks if a retainer subscription was created in STEP5."
     },
     {
       "parameters": {

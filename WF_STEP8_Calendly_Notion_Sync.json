@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP10 - Calendly → Notion CRM Sync (All Calls)",
+  "name": "WF STEP8 - Calendly → Notion CRM Sync (All Calls)",
   "nodes": [
     {
       "parameters": {
