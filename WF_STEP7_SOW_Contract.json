@@ -1,0 +1,528 @@
+{
+  "name": "WF STEP7 - SOW/Contract Creation + Invoicing + Onboarding Doc",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "New Client SOW / Contract Submission",
+        "formDescription": "Fill out to generate Statement of Work, contract, invoicing, and onboarding doc for a new client.",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "First_Name", "requiredField": true },
+            { "fieldLabel": "Last_Name", "requiredField": true },
+            { "fieldLabel": "Full_Client_Name", "requiredField": true },
+            { "fieldLabel": "Client_Email", "requiredField": true },
+            { "fieldLabel": "Client_Title", "requiredField": true },
+            { "fieldLabel": "Company_Name", "requiredField": true },
+            { "fieldLabel": "Project_Name", "requiredField": true },
+            { "fieldLabel": "Project_Scope", "requiredField": true },
+            { "fieldLabel": "Company_Address" },
+            { "fieldLabel": "Company_City" },
+            { "fieldLabel": "Company_State", "requiredField": true },
+            { "fieldLabel": "Company_Zipcode" },
+            { "fieldLabel": "Project_Start_Date", "requiredField": true },
+            { "fieldLabel": "Project_End_Date", "requiredField": true },
+            { "fieldLabel": "Total_Project_Cost", "requiredField": true },
+            { "fieldLabel": "Initial_Payment", "requiredField": true },
+            { "fieldLabel": "Final_Payment", "requiredField": true },
+            { "fieldLabel": "Retainer_Cost", "placeholder": "$100/month", "requiredField": true },
+            { "fieldLabel": "Has_Fixed_Cost", "placeholder": "Yes/No", "requiredField": true },
+            { "fieldLabel": "Has_Retainer", "placeholder": "Yes/No", "requiredField": true },
+            { "fieldLabel": "Retainer_Description" },
+            { "fieldLabel": "Retainer_For_Invoice", "placeholder": "$200" },
+            { "fieldLabel": "Compliance_Terms", "placeholder": "HIPAA, SOC2, etc." },
+            { "fieldLabel": "Contract_Length", "placeholder": "6 months" },
+            { "fieldLabel": "Notion_Contact_ID", "requiredField": true }
+          ]
+        },
+        "options": { "buttonLabel": "Generate Contract" }
+      },
+      "id": "step7-node-1",
+      "name": "SOW Contract Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [250, 300],
+      "webhookId": "sow-contract-form",
+      "notes": "Form for Anthony to submit new client contract details. Includes all project scope, financial terms, compliance requirements, and Notion contact ID for CRM linking."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "calc-retainer-cents",
+              "name": "retainer_cents",
+              "value": "={{ Math.round(Number(String($json.Retainer_Cost || '0').replace(/[^0-9.]/g, '')) * 100) }}",
+              "type": "string"
+            },
+            {
+              "id": "calc-fixed-cents",
+              "name": "fixed_cents",
+              "value": "={{ Math.round(Number(String($json.Initial_Payment || '0').replace(/[^0-9.]/g, '')) * 100) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step7-node-2",
+      "name": "Calculate Amounts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('SOW Contract Form').item.json.Company_Name }}-{{ $('SOW Contract Form').item.json.Full_Client_Name }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "value": "YOUR_CLIENTS_FOLDER_ID", "mode": "id" },
+        "options": {}
+      },
+      "id": "step7-node-3",
+      "name": "Create/Find Client Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [690, 200],
+      "notes": "Creates client folder in Google Drive (or uses existing one if already created in Step 6)."
+    },
+    {
+      "parameters": {
+        "operation": "Fill a PDF Form",
+        "url": "https://drive.google.com/file/d/YOUR_SOW_TEMPLATE_FILE_ID/view?usp=sharing",
+        "fields": {
+          "metadataValues": [
+            { "fieldName": "Full_Client_Name", "text": "={{ $('SOW Contract Form').item.json.Full_Client_Name }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Client_Title", "text": "={{ $('SOW Contract Form').item.json.Client_Title }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "{Company_Name}", "text": "={{ $('SOW Contract Form').item.json.Company_Name }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Project_Name", "text": "={{ $('SOW Contract Form').item.json.Project_Name }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Company_Address", "text": "={{ $('SOW Contract Form').item.json.Company_Address }}", "size": "12", "fontName": "Times New Roman" },
+            { "fieldName": "Company_State", "text": "={{ $('SOW Contract Form').item.json.Company_State }}", "size": "12", "fontName": "Times New Roman" },
+            { "fieldName": "Project_Start_Date", "text": "={{ $('SOW Contract Form').item.json.Project_Start_Date }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Project_End_Date", "text": "={{ $('SOW Contract Form').item.json.Project_End_Date }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Total_Project_Cost", "text": "={{ $('SOW Contract Form').item.json.Total_Project_Cost }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Initial_Payment", "text": "={{ $('SOW Contract Form').item.json.Initial_Payment }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Final_Payment", "text": "={{ $('SOW Contract Form').item.json.Final_Payment }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Retainer_Cost", "text": "={{ $('SOW Contract Form').item.json.Retainer_Cost }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Project_Scope", "text": "={{ $('SOW Contract Form').item.json.Project_Scope }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
+            { "fieldName": "Compliance_Terms", "text": "={{ $('SOW Contract Form').item.json.Compliance_Terms || 'N/A' }}", "size": "12", "fontName": "Times New Roman" },
+            { "fieldName": "Contract_Length", "text": "={{ $('SOW Contract Form').item.json.Contract_Length || 'As specified' }}", "size": "12", "fontName": "Times New Roman" }
+          ]
+        },
+        "advancedOptions": {}
+      },
+      "id": "step7-node-4",
+      "name": "PDFco: Fill SOW Template",
+      "type": "n8n-nodes-pdfco.PDFco Api",
+      "typeVersion": 1,
+      "position": [690, 400],
+      "notes": "Fills the SOW PDF template with all client and project details including compliance terms and contract length."
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "step7-node-5",
+      "name": "Download Filled PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [910, 400]
+    },
+    {
+      "parameters": {
+        "name": "=SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}-Unsigned",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "value": "={{ $('Create/Find Client Folder').item.json.id }}", "mode": "id" },
+        "options": {}
+      },
+      "id": "step7-node-6",
+      "name": "Upload Contract to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1130, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.signwell.com/api/v1/documents/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"test_mode\": false,\n  \"draft\": true,\n  \"text_tags\": true,\n  \"name\": \"Veteran Vectors SoW - {{ $('SOW Contract Form').item.json.Project_Name }} - {{ $('SOW Contract Form').item.json.Company_Name }}\",\n  \"files\": [{\n    \"name\": \"SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}.pdf\",\n    \"file_url\": {{ JSON.stringify($('Download Filled PDF').item.json.url || '') }}\n  }],\n  \"recipients\": [\n    { \"id\": 1, \"email\": \"anthony@veteranvectors.io\", \"name\": \"Anthony Pinto\" },\n    { \"id\": 2, \"email\": {{ JSON.stringify($('SOW Contract Form').item.json.Client_Email) }}, \"name\": {{ JSON.stringify($('SOW Contract Form').item.json.Full_Client_Name) }} }\n  ]\n}",
+        "options": {}
+      },
+      "id": "step7-node-7",
+      "name": "Create SignWell Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1350, 400],
+      "notes": "Creates a SignWell document for e-signatures. Uses JSON.stringify for proper escaping (fixes SEC-16)."
+    },
+    {
+      "parameters": { "amount": 15 },
+      "id": "step7-node-8",
+      "name": "Wait for SignWell Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1570, 400],
+      "webhookId": "step7-signwell-wait"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.signwell.com/api/v1/documents/{{ $('Create SignWell Document').item.json.id }}/send/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"test_mode\": false,\n  \"email_subject\": \"SoW - {{ $('SOW Contract Form').item.json.Project_Name }} - {{ $('SOW Contract Form').item.json.Company_Name }}\",\n  \"email_message\": \"Hi {{ $('SOW Contract Form').item.json.First_Name }},\\n\\nPlease review and sign this Statement of Work for \\\"{{ $('SOW Contract Form').item.json.Project_Name }}\\\".\\n\\nThanks,\\nAnthony\"\n}",
+        "options": {}
+      },
+      "id": "step7-node-9",
+      "name": "Send Contract for Signing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1790, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $('SOW Contract Form').item.json.Has_Fixed_Cost }}",
+              "rightValue": "Yes",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step7-node-10",
+      "name": "Has Fixed Cost?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [910, 600]
+    },
+    {
+      "parameters": {
+        "resource": "customer",
+        "operation": "create",
+        "name": "={{ $('SOW Contract Form').item.json.Full_Client_Name }}",
+        "additionalFields": {
+          "email": "={{ $('SOW Contract Form').item.json.Client_Email }}",
+          "description": "=Veteran Vectors - {{ $('SOW Contract Form').item.json.Project_Name }}",
+          "metadata": {
+            "metadataProperties": [
+              { "key": "Company", "value": "={{ $('SOW Contract Form').item.json.Company_Name }}" }
+            ]
+          }
+        }
+      },
+      "id": "step7-node-11",
+      "name": "Stripe: Create Customer",
+      "type": "n8n-nodes-base.stripe",
+      "typeVersion": 1,
+      "position": [690, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/invoiceitems",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customer", "value": "={{ $json.id }}" },
+            { "name": "amount", "value": "={{ $('Calculate Amounts').item.json.fixed_cents }}" },
+            { "name": "currency", "value": "usd" },
+            { "name": "description", "value": "={{ $('SOW Contract Form').item.json.Project_Name }} - Initial Payment" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step7-node-12",
+      "name": "Stripe: Invoice Item",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1130, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/invoices",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customer", "value": "={{ $json.customer }}" },
+            { "name": "collection_method", "value": "send_invoice" },
+            { "name": "days_until_due", "value": "7" },
+            { "name": "auto_advance", "value": "false" },
+            { "name": "pending_invoice_items_behavior", "value": "include" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step7-node-13",
+      "name": "Stripe: Create Invoice (Draft)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1350, 600],
+      "notes": "Creates invoice as DRAFT (auto_advance=false). Invoice is NOT sent until contract is signed (WF_STEP9)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ Number($('Calculate Amounts').item.json.retainer_cents) }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step7-node-14",
+      "name": "Has Retainer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1570, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "product", "value": "prod_YOUR_RETAINER_PRODUCT_ID" },
+            { "name": "unit_amount", "value": "={{ $('Calculate Amounts').item.json.retainer_cents }}" },
+            { "name": "currency", "value": "usd" },
+            { "name": "recurring[interval]", "value": "month" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step7-node-15",
+      "name": "Stripe: Create Retainer Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1790, 540]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/subscriptions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "customer", "value": "={{ $('Stripe: Create Customer').item.json.id }}" },
+            { "name": "items[0][price]", "value": "={{ $json.id }}" },
+            { "name": "collection_method", "value": "send_invoice" },
+            { "name": "days_until_due", "value": "3" },
+            { "name": "pause_collection[behavior]", "value": "void" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step7-node-16",
+      "name": "Stripe: Create Subscription (Paused)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2010, 540],
+      "notes": "Creates the retainer subscription PAUSED (pause_collection=void). It will be resumed in WF_STEP9 after contract signing."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('SOW Contract Form').item.json.Notion_Contact_ID }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Contract Sent\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "step7-node-17",
+      "name": "Update Notion (Contract Sent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2010, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_PROJECTS_DB_ID\" },\n  \"properties\": {\n    \"Project Name\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify($('SOW Contract Form').item.json.Project_Name) }} } }] },\n    \"Client\": { \"relation\": [{ \"id\": \"{{ $('SOW Contract Form').item.json.Notion_Contact_ID }}\" }] },\n    \"Project Status\": { \"select\": { \"name\": \"Contract Sent\" } },\n    \"Project Cost\": { \"number\": {{ Number(String($('SOW Contract Form').item.json.Total_Project_Cost || '0').replace(/[^0-9.]/g, '')) || 0 }} },\n    \"Start Date\": { \"date\": { \"start\": \"{{ $('SOW Contract Form').item.json.Project_Start_Date }}\" } },\n    \"Retainer\": { \"number\": {{ Number(String($('SOW Contract Form').item.json.Retainer_Cost || '0').replace(/[^0-9.]/g, '')) || 0 }} }\n  }\n}",
+        "options": {}
+      },
+      "id": "step7-node-18",
+      "name": "Create Notion Project",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 300],
+      "notes": "Creates a Notion Project record linked to the Client contact (fixes DATA-05 from audit)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect Stripe IDs from previous nodes — handles cases where subscription may not exist\nconst customerId = $('Stripe: Create Customer').first()?.json?.id || '';\nlet invoiceId = '';\nlet subscriptionId = '';\ntry { invoiceId = $('Stripe: Create Invoice (Draft)').first()?.json?.id || ''; } catch(e) {}\ntry { subscriptionId = $('Stripe: Create Subscription (Paused)').first()?.json?.id || ''; } catch(e) {}\nreturn [{ json: { stripe_customer_id: customerId, stripe_invoice_id: invoiceId, stripe_subscription_id: subscriptionId } }];"
+      },
+      "id": "step7-node-19",
+      "name": "Collect Stripe IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2230, 600],
+      "notes": "Collects all Stripe IDs (customer, invoice, subscription) for persistence to Notion."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('SOW Contract Form').item.json.Notion_Contact_ID }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Stripe Customer ID\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.stripe_customer_id || '') }} } }] },\n    \"Stripe Invoice ID\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.stripe_invoice_id || '') }} } }] },\n    \"Stripe Subscription ID\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.stripe_subscription_id || '') }} } }] }\n  }\n}",
+        "options": {}
+      },
+      "id": "step7-node-20",
+      "name": "Save Stripe IDs to Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2450, 600],
+      "notes": "Persists Stripe customer, invoice, and subscription IDs to the Notion contact. These are used by WF_STEP9 to finalize billing after contract signing."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SOW Contract Form": {
+      "main": [[
+        { "node": "Calculate Amounts", "type": "main", "index": 0 },
+        { "node": "Stripe: Create Customer", "type": "main", "index": 0 }
+      ]]
+    },
+    "Calculate Amounts": {
+      "main": [[
+        { "node": "Create/Find Client Folder", "type": "main", "index": 0 }
+      ]]
+    },
+    "Create/Find Client Folder": {
+      "main": [[
+        { "node": "PDFco: Fill SOW Template", "type": "main", "index": 0 }
+      ]]
+    },
+    "PDFco: Fill SOW Template": {
+      "main": [[ { "node": "Download Filled PDF", "type": "main", "index": 0 } ]]
+    },
+    "Download Filled PDF": {
+      "main": [[ { "node": "Upload Contract to Drive", "type": "main", "index": 0 } ]]
+    },
+    "Upload Contract to Drive": {
+      "main": [[ { "node": "Create SignWell Document", "type": "main", "index": 0 } ]]
+    },
+    "Create SignWell Document": {
+      "main": [[ { "node": "Wait for SignWell Processing", "type": "main", "index": 0 } ]]
+    },
+    "Wait for SignWell Processing": {
+      "main": [[ { "node": "Send Contract for Signing", "type": "main", "index": 0 } ]]
+    },
+    "Send Contract for Signing": {
+      "main": [[ { "node": "Update Notion (Contract Sent)", "type": "main", "index": 0 } ]]
+    },
+    "Update Notion (Contract Sent)": {
+      "main": [[ { "node": "Create Notion Project", "type": "main", "index": 0 } ]]
+    },
+    "Stripe: Create Customer": {
+      "main": [[ { "node": "Has Fixed Cost?", "type": "main", "index": 0 } ]]
+    },
+    "Has Fixed Cost?": {
+      "main": [
+        [ { "node": "Stripe: Invoice Item", "type": "main", "index": 0 } ],
+        [ { "node": "Has Retainer?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Stripe: Invoice Item": {
+      "main": [[ { "node": "Stripe: Create Invoice (Draft)", "type": "main", "index": 0 } ]]
+    },
+    "Stripe: Create Invoice (Draft)": {
+      "main": [[ { "node": "Has Retainer?", "type": "main", "index": 0 } ]]
+    },
+    "Has Retainer?": {
+      "main": [
+        [ { "node": "Stripe: Create Retainer Price", "type": "main", "index": 0 } ],
+        [ { "node": "Collect Stripe IDs", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Stripe: Create Retainer Price": {
+      "main": [[ { "node": "Stripe: Create Subscription (Paused)", "type": "main", "index": 0 } ]]
+    },
+    "Stripe: Create Subscription (Paused)": {
+      "main": [[ { "node": "Collect Stripe IDs", "type": "main", "index": 0 } ]]
+    },
+    "Collect Stripe IDs": {
+      "main": [[ { "node": "Save Stripe IDs to Notion", "type": "main", "index": 0 } ]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "step7-v3-0",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": []
+}
