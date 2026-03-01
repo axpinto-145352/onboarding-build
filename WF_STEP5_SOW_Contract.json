@@ -83,7 +83,7 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [690, 200],
-      "notes": "Creates client folder in Google Drive (or uses existing one if already created in Step 6)."
+      "notes": "Creates client folder in Google Drive (or uses existing one if already created in Step 4)."
     },
     {
       "parameters": {

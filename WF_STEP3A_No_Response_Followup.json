@@ -134,7 +134,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1570, 240],
-      "notes": "Updates Notion contact: Status = 'Follow-Up Sequence' (5 Bravo group), sets Need to Follow Up Date."
+      "notes": "Updates Notion contact: Status = 'Follow-Up Sequence', sets Need to Follow Up Date."
     },
     {
       "parameters": {

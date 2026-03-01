@@ -15,7 +15,6 @@ Before you start, make sure you have accounts and access to:
 - [ ] **Prosp.ai** — Account with webhook support and API access
 - [ ] **Calendly** — Professional plan (custom questions + webhook support)
 - [ ] **Google Workspace** — Gmail, Drive, Sheets (with OAuth2 app configured)
-- [ ] **Apollo.io** — Free or paid account for lead enrichment
 - [ ] **Apify** — Account with LinkedIn scraper actor access
 - [ ] **Anthropic** — Claude API key
 - [ ] **Stripe** — Account for invoicing and subscriptions
@@ -125,32 +124,23 @@ If you need new ones:
 3. Add n8n redirect URL: `https://your-n8n-instance.com/rest/oauth2-credential/callback`
 4. Enable APIs: Google Sheets, Gmail, Google Drive, Google Docs
 
-### Step 2.3: Apollo.io Credentials
-
-1. Go to [app.apollo.io](https://app.apollo.io/) → Settings → API Keys
-2. Copy your API key
-3. In n8n: New Credential → Header Auth
-4. Name: `Apollo API`
-5. Header Name: `x-api-key`
-6. Header Value: `YOUR_APOLLO_API_KEY`
-
-### Step 2.4: Apify Credentials
+### Step 2.3: Apify Credentials
 
 Already configured:
 - **Apify account** (ID: `8HrOAzWZHeGNrHbZ`)
 
-### Step 2.5: Anthropic Claude Credentials
+### Step 2.4: Anthropic Claude Credentials
 
 Already configured:
 - **VV Claude** (ID: `au1c518sMzUt89ul`)
 
-### Step 2.6: Calendly Credentials
+### Step 2.5: Calendly Credentials
 
 Already configured:
 - **VV - Calendly account** (ID: `Htykkb3r14siqEFc`) — OAuth2 trigger
 - **VV - Calendly** (ID: `uFXaP32GB3oPzqwu`) — OAuth2 for API calls (cancellation)
 
-### Step 2.7: Prosp.ai Credentials
+### Step 2.6: Prosp.ai Credentials
 
 1. Log into Prosp.ai → Settings → API
 2. Copy your API key
@@ -159,14 +149,14 @@ Already configured:
 5. Header Name: `Authorization`
 6. Header Value: `Bearer YOUR_PROSP_API_KEY`
 
-### Step 2.8: Stripe Credentials
+### Step 2.7: Stripe Credentials
 
 1. Go to [Stripe Dashboard](https://dashboard.stripe.com/apikeys)
 2. Copy your Secret key (starts with `sk_live_`)
 3. In n8n: New Credential → Stripe API
 4. Secret Key: `sk_live_YOUR_KEY`
 
-### Step 2.9: SignWell Credentials
+### Step 2.8: SignWell Credentials
 
 1. Go to SignWell → Settings → API
 2. Copy your API key
@@ -175,7 +165,7 @@ Already configured:
 5. Header Name: `X-Api-Key`
 6. Header Value: `YOUR_SIGNWELL_API_KEY`
 
-### Step 2.10: Slack Bot Credentials
+### Step 2.9: Slack Bot Credentials
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps)
 2. Create or select your app
@@ -459,7 +449,6 @@ Copy the campaign ID and use it in STEP3A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 | Notion "property not found" | Property name mismatch | Check exact spelling + capitalization in Notion vs workflow |
 | "Cannot read property" in Code node | Upstream node failed silently | Check if previous node has `onError: continueErrorOutput` |
 | Duplicate contacts | No dedup check | STEP1 checks LinkedIn URL; ensure URL is consistent |
-| Apollo returns empty | Rate limited or no match | Check Apollo dashboard; add Wait node if needed |
 | SignWell PDF not downloading | URL expired or empty | Check for empty URL in webhook payload |
 | Calendly trigger not working | OAuth2 token expired | Re-authorize Calendly in n8n credentials |
 | Stripe subscription failed | Missing product ID | Verify `prod_` ID matches your Stripe product |

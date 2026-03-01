@@ -13,8 +13,7 @@ This document describes the technical architecture of the 8-step LinkedIn-to-Cli
 | **Outreach Automation** | Prosp.ai | LinkedIn connection requests, messages, follow-up campaigns | Paid plan with webhook support |
 | **CRM / Source of Truth** | Notion | Contacts, Projects, Meetings databases | Team or Business plan |
 | **LinkedIn Scraping** | Apify | Mass LinkedIn Profile Scraper actor (`2SyF0bVxmgGr8IVCZ`) | Free tier (5 USD/month) or paid |
-| **Data Enrichment** | Apollo.io | Company employee count, revenue, industry, seniority | Free tier (10K records/month) |
-| **AI Processing** | Anthropic Claude | Loom scripts, meeting notes, proposal drafts | API access (Sonnet 4.5) |
+| **AI Processing** | Anthropic Claude | Loom scripts, meeting notes, proposal drafts, revenue estimation | API access (Sonnet 4.5) |
 | **Scheduling** | Calendly | Discovery calls, audit calls, onboarding calls, check-ins | Professional plan (custom questions + webhooks) |
 | **Meeting Transcription** | BlueDot AI | Auto-transcription with webhook delivery | Business plan with API webhooks |
 | **E-Signatures** | SignWell | SOW/contract signing with completion webhooks | Business plan |
@@ -152,30 +151,7 @@ Actor `2SyF0bVxmgGr8IVCZ` returns:
 }
 ```
 
-### Apollo.io People Match Response
-
-```json
-{
-  "person": {
-    "title": "Chief Executive Officer",
-    "seniority": "founder",
-    "city": "San Diego",
-    "state": "California",
-    "country": "United States",
-    "organization": {
-      "name": "Acme Corp",
-      "estimated_num_employees": 85,
-      "annual_revenue": 12000000,
-      "annual_revenue_printed": "$12M",
-      "industry": "Logistics",
-      "website_url": "https://acmecorp.com",
-      "founded_year": 2015
-    }
-  }
-}
-```
-
-### Priority Scoring Algorithm (max 20 points)
+### Priority Scoring Algorithm
 
 | Factor | Points | Criteria |
 |--------|--------|----------|
@@ -208,7 +184,6 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 | VV - Calendly (OAuth2) | OAuth2 Generic | `uFXaP32GB3oPzqwu` | STEP3C (cancellation) |
 | VV Gmail account | Gmail OAuth2 | `r13jnGsjwNOqcBvt` | STEP3C, STEP6, STEP7 |
 | Notion Integration | HTTP Header Auth | (configure) | All STEP workflows |
-| Apollo.io | HTTP Header Auth | (configure) | WF0 |
 | Stripe | Stripe API | (configure) | STEP5, STEP7 |
 | SignWell | HTTP Header Auth | (configure) | STEP5, STEP7 |
 | Slack Bot | Slack OAuth2 | (configure) | Notifications |
@@ -237,8 +212,7 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 |-----------|----------|-------------|
 | Webhook delivery failure | Prosp.ai/Calendly/SignWell retry automatically | n8n execution log |
 | Notion API error | `onError: continueErrorOutput` → error collector node | Email to anthony@veteranvectors.io |
-| Apify scraper timeout | `retryOnFail: true, maxTries: 3` | Fallback to Apollo-only data |
-| Apollo API rate limit | `onError: continueErrorOutput` → Fallback Score node | Flagged as "Unscored" |
+| Apify scraper timeout | `retryOnFail: true, maxTries: 3` | Retry with backoff |
 | Claude API error | Retry 3x with 5s delay | Slack alert |
 | Stripe API error | `onError: continueErrorOutput` | Email alert + Slack |
 | SignWell PDF download failure | Check for empty URL before download | Slack alert |
@@ -251,7 +225,6 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 |---------|-----------|-------------|
 | Prosp.ai API | 100 requests/minute | Webhook-driven (no polling) |
 | Notion API | 3 requests/second | Sequential processing with natural delays |
-| Apollo.io | 200 requests/hour (free) | 1.5s inline delay between calls |
 | Apify | Concurrent actor runs limited by plan | 2s wait between items |
 | Claude API | Based on plan tier | Single sequential calls per workflow |
 | Calendly | 120 requests/minute | Webhook-driven |
@@ -317,7 +290,7 @@ The existing Loom Research Script and WF0 Lead Scoring use Google Sheets as thei
     │ CRM     │   │ Drive    │  │ APIs     │
     │         │   │          │  │ (Stripe, │
     │ Contacts│   │ Client   │  │ SignWell,│
-    │ Projects│   │ Folders  │  │ Apollo,  │
-    │ Meetings│   │          │  │ Apify)   │
+    │ Projects│   │ Folders  │  │ Apify,   │
+    │ Meetings│   │          │  │ Claude)  │
     └─────────┘   └──────────┘  └──────────┘
 ```
