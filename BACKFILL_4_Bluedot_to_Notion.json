@@ -1,0 +1,359 @@
+{
+  "name": "BACKFILL 4 - Bluedot Meeting Notes → Notion Contacts + Meetings (One-Time)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "bf4-node-1",
+      "name": "Run Backfill",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Click 'Execute Workflow' to backfill Bluedot meeting notes into Notion.\n\nPREREQUISITE: Export your Bluedot transcripts and paste into a Google Sheet tab called 'Bluedot Export'.\n\nRequired columns:\n- Attendee Name (the client name)\n- Attendee Email\n- Meeting Title\n- Meeting Date (YYYY-MM-DD or any parseable date)\n- Transcript (the full meeting transcript text)\n- Summary (optional - Bluedot's own summary)\n- Action Items (optional - Bluedot's extracted action items)\n\nTo export from Bluedot:\n1. Go to your Bluedot dashboard → Meetings\n2. For each meeting, copy the transcript text\n3. Paste into the Google Sheet row by row\n\nAlternatively, if Bluedot has an API export, you can use that to populate the sheet."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Bluedot Export",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "bf4-node-2",
+      "name": "Read Bluedot Export Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [470, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      },
+      "notes": "Reads all rows from the 'Bluedot Export' tab. Replace YOUR_GOOGLE_SHEET_ID with your actual sheet ID."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json['Transcript'] || $json['transcript'] || '' }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "bf4-node-3",
+      "name": "Has Transcript?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [690, 300],
+      "notes": "Only processes rows that have transcript data."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bf4-name",
+              "name": "attendee_name",
+              "value": "={{ $json['Attendee Name'] || $json['Name'] || $json['attendee_name'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf4-email",
+              "name": "attendee_email",
+              "value": "={{ $json['Attendee Email'] || $json['Email'] || $json['attendee_email'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf4-title",
+              "name": "meeting_title",
+              "value": "={{ $json['Meeting Title'] || $json['Title'] || $json['meeting_title'] || 'Discovery Call' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf4-date",
+              "name": "meeting_date",
+              "value": "={{ $json['Meeting Date'] || $json['Date'] || $json['meeting_date'] || new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "bf4-transcript",
+              "name": "transcript",
+              "value": "={{ ($json['Transcript'] || $json['transcript'] || '').substring(0, 15000) }}",
+              "type": "string"
+            },
+            {
+              "id": "bf4-summary",
+              "name": "bluedot_summary",
+              "value": "={{ $json['Summary'] || $json['summary'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf4-actions",
+              "name": "action_items",
+              "value": "={{ $json['Action Items'] || $json['action_items'] || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bf4-node-4",
+      "name": "Normalize Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [910, 300],
+      "notes": "Normalizes column names from the Bluedot export sheet."
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        },
+        "batchSize": 1
+      },
+      "id": "bf4-node-5",
+      "name": "Loop (1 at a time)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1130, 300],
+      "notes": "Processes one transcript at a time. Claude API calls take a few seconds each."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": {{ JSON.stringify($json.attendee_email || '') }} }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": {{ JSON.stringify($json.attendee_name || '') }} }\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "bf4-node-6",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300],
+      "notes": "Finds the contact in Notion by email or name."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "bf4-node-7",
+      "name": "Contact Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract contact info for downstream nodes\nconst contact = $('Find Notion Contact').first().json.results[0];\nconst props = contact.properties;\nconst companyName = props['Company']?.rich_text?.[0]?.text?.content || 'Unknown-Company';\nconst contactName = props['Name']?.title?.[0]?.text?.content || 'Unknown';\nconst existingFolderId = props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '';\nconst currentStatus = props['Status']?.select?.name || '';\n\n// Status priority check\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\nconst meetingHeldPriority = STATUS_PRIORITY['Meeting Held'];\nconst shouldUpdateStatus = meetingHeldPriority > currentPriority;\n\nreturn [{\n  json: {\n    notion_page_id: contact.id,\n    contact_name: contactName,\n    company_name: companyName,\n    existing_folder_id: existingFolderId,\n    current_status: currentStatus,\n    should_update_status: shouldUpdateStatus\n  }\n}];"
+      },
+      "id": "bf4-node-8",
+      "name": "Extract Contact Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1790, 240],
+      "notes": "Extracts contact info and checks if status should advance to 'Meeting Held'."
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-4-5-20250929"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a business consultant for Veteran Vectors, an automation consulting firm. Analyze this discovery call transcript and produce:\n\n1. MEETING SUMMARY (2-3 paragraphs)\n2. KEY PAIN POINTS (bulleted list)\n3. ACTION ITEMS (numbered list with owner: Anthony or Client)\n4. BUDGET/TIMELINE mentioned\n5. NEXT STEPS\n6. PRELIMINARY PROPOSAL OUTLINE - Based on the pain points and needs discussed, outline a preliminary proposal with:\n   - Recommended automations/solutions\n   - Estimated scope\n   - Suggested timeline\n   - Approximate value/ROI\n\nTRANSCRIPT:\n{{ $('Loop (1 at a time)').item.json.transcript.substring(0, 12000) }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 4000,
+          "temperature": 0.2
+        }
+      },
+      "id": "bf4-node-9",
+      "name": "Claude: Extract Notes + Proposal Brief",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [2010, 240],
+      "credentials": {
+        "anthropicApi": {
+          "id": "au1c518sMzUt89ul",
+          "name": "VV Claude"
+        }
+      },
+      "notes": "Uses the same Claude prompt as STEP4 to extract meeting notes, action items, and a proposal outline from the transcript."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Extract Contact Info').item.json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    {{ $('Extract Contact Info').item.json.should_update_status ? '\"Status\": { \"select\": { \"name\": \"Meeting Held\" } },' : '' }}\n    \"Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000)) }} } }] },\n    \"Last Contact Date\": { \"date\": { \"start\": {{ JSON.stringify($('Loop (1 at a time)').item.json.meeting_date || new Date().toISOString()) }} } }\n  }\n}",
+        "options": {}
+      },
+      "id": "bf4-node-10",
+      "name": "Update Notion (Meeting Held + Notes)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 160],
+      "notes": "Updates the contact's Notes field with Claude's extraction and optionally advances status to 'Meeting Held'. Uses the actual meeting date for Last Contact Date."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify($('Loop (1 at a time)').item.json.meeting_title || 'Discovery Call') }} } }] },\n    \"Date\": { \"date\": { \"start\": {{ JSON.stringify($('Loop (1 at a time)').item.json.meeting_date || new Date().toISOString()) }} } },\n    \"Meeting Type\": { \"select\": { \"name\": \"Completed\" } },\n    \"Meeting Category\": { \"select\": { \"name\": \"Discovery\" } },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Extract Contact Info').item.json.notion_page_id }}\" }] },\n    \"Attendee Email\": { \"email\": {{ JSON.stringify($('Loop (1 at a time)').item.json.attendee_email || '') }} },\n    \"BlueDot Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000)) }} } }] }\n  }\n}",
+        "options": {}
+      },
+      "id": "bf4-node-11",
+      "name": "Create Notion Meeting Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 340],
+      "notes": "Creates a meeting record in the Notion Meetings DB with Claude's extracted notes. Uses same schema as STEP4."
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "id": "bf4-node-12",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2450, 300],
+      "webhookId": "bf4-rate-limit",
+      "notes": "1 second delay between transcripts (Claude processing + 3 Notion API calls per transcript)."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run Backfill": {
+      "main": [
+        [{ "node": "Read Bluedot Export Sheet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Bluedot Export Sheet": {
+      "main": [
+        [{ "node": "Has Transcript?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Transcript?": {
+      "main": [
+        [{ "node": "Normalize Fields", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Fields": {
+      "main": [
+        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Loop (1 at a time)": {
+      "main": [
+        [],
+        [{ "node": "Find Notion Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Notion Contact": {
+      "main": [
+        [{ "node": "Contact Found?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Contact Found?": {
+      "main": [
+        [{ "node": "Extract Contact Info", "type": "main", "index": 0 }],
+        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Contact Info": {
+      "main": [
+        [{ "node": "Claude: Extract Notes + Proposal Brief", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude: Extract Notes + Proposal Brief": {
+      "main": [
+        [
+          { "node": "Update Notion (Meeting Held + Notes)", "type": "main", "index": 0 },
+          { "node": "Create Notion Meeting Record", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Notion (Meeting Held + Notes)": {
+      "main": [
+        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "bf4-v1-0",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": [{ "name": "Backfill" }]
+}
