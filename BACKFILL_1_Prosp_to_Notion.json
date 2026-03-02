@@ -1,0 +1,306 @@
+{
+  "name": "BACKFILL 1 - Prosp.ai Export → Notion Contacts (One-Time)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "bf1-node-1",
+      "name": "Run Backfill",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Click 'Execute Workflow' to start the one-time backfill. PREREQUISITE: Export your Prosp.ai campaigns as CSV, then paste into a new Google Sheet tab called 'Prosp Export'. Required columns: First Name, Last Name, Email, LinkedIn URL, Company, Title, Campaign Status (connected/pending/replied)."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Prosp Export",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "bf1-node-2",
+      "name": "Read Prosp Export Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [470, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      },
+      "notes": "Reads all rows from the 'Prosp Export' tab. Replace YOUR_GOOGLE_SHEET_ID with your sheet. Columns expected: First Name, Last Name, Email, LinkedIn URL, Company, Title, Campaign Status."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bf1-full-name",
+              "name": "full_name",
+              "value": "={{ (($json['First Name'] || '') + ' ' + ($json['Last Name'] || '')).trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "bf1-email",
+              "name": "email",
+              "value": "={{ $json['Email'] || $json['email'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf1-linkedin",
+              "name": "linkedin_url",
+              "value": "={{ $json['LinkedIn URL'] || $json['LinkedIn Profile'] || $json['linkedin_url'] || $json['LI Profile'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf1-company",
+              "name": "company",
+              "value": "={{ $json['Company'] || $json['company'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf1-title",
+              "name": "title",
+              "value": "={{ $json['Title'] || $json['title'] || $json['Job Title'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf1-campaign-status",
+              "name": "campaign_status",
+              "value": "={{ ($json['Campaign Status'] || $json['Status'] || $json['status'] || '').toLowerCase() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bf1-node-3",
+      "name": "Normalize Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [690, 300],
+      "notes": "Normalizes column names from Prosp export. Handles variations in column naming."
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        },
+        "batchSize": 1
+      },
+      "id": "bf1-node-4",
+      "name": "Loop (1 at a time)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [910, 300],
+      "notes": "Processes one contact at a time to respect Notion API rate limits (3 requests/sec)."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"LinkedIn Profile\",\n        \"url\": { \"equals\": {{ JSON.stringify($json.linkedin_url || '') }} }\n      },\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": {{ JSON.stringify($json.email || '') }} }\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "bf1-node-5",
+      "name": "Find Existing Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300],
+      "notes": "Deduplicates by LinkedIn Profile URL or Email. If found, updates. If not, creates."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "bf1-node-6",
+      "name": "Contact Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1350, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine the correct Notion status from Prosp campaign status\n// and ensure we never downgrade an existing contact's status\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\n\nconst existingContact = $('Find Existing Contact').first().json.results[0];\nconst currentStatus = existingContact?.properties?.Status?.select?.name || '';\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\n\nconst campaignStatus = $('Loop (1 at a time)').first().json.campaign_status || '';\n\n// Map Prosp status to Notion status\nlet newStatus = 'Connection Sent';\nlet setAccepted = false;\nlet setResponded = false;\n\nif (campaignStatus.includes('replied') || campaignStatus.includes('response') || campaignStatus.includes('responded')) {\n  newStatus = 'Responded';\n  setAccepted = true;\n  setResponded = true;\n} else if (campaignStatus.includes('accepted') || campaignStatus.includes('connected')) {\n  newStatus = 'Connection Accepted';\n  setAccepted = true;\n} else if (campaignStatus.includes('pending') || campaignStatus.includes('sent') || campaignStatus.includes('invited')) {\n  newStatus = 'Connection Sent';\n}\n\nconst newPriority = STATUS_PRIORITY[newStatus] || 0;\n\n// Only advance status forward, never downgrade\nconst shouldUpdateStatus = newPriority > currentPriority;\n\nreturn [{\n  json: {\n    notion_page_id: existingContact.id,\n    current_status: currentStatus,\n    new_status: shouldUpdateStatus ? newStatus : currentStatus,\n    should_update_status: shouldUpdateStatus,\n    set_accepted: setAccepted,\n    set_responded: setResponded,\n    full_name: $('Loop (1 at a time)').first().json.full_name,\n    email: $('Loop (1 at a time)').first().json.email,\n    company: $('Loop (1 at a time)').first().json.company,\n    title: $('Loop (1 at a time)').first().json.title,\n    linkedin_url: $('Loop (1 at a time)').first().json.linkedin_url\n  }\n}];"
+      },
+      "id": "bf1-node-7",
+      "name": "Status Priority Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 200],
+      "notes": "Compares existing Notion status against Prosp status. Only advances status forward (never downgrades). Maps Prosp statuses: pending→Connection Sent, connected→Connection Accepted, replied→Responded."
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    {{ $json.should_update_status ? '\"Status\": { \"select\": { \"name\": ' + JSON.stringify($json.new_status) + ' } },' : '' }}\n    {{ $json.set_accepted ? '\"LI Connection Accepted\": { \"checkbox\": true },' : '' }}\n    {{ $json.set_responded ? '\"Responded\": { \"checkbox\": true },' : '' }}\n    \"LI Connection Sent\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "bf1-node-8",
+      "name": "Update Existing Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1790, 200],
+      "notes": "Updates the existing Notion contact. Only advances status forward. Always sets LI Connection Sent checkbox."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the Notion status and checkboxes for a new contact\nconst item = $('Loop (1 at a time)').first().json;\nconst campaignStatus = item.campaign_status || '';\n\nlet status = 'Connection Sent';\nlet liAccepted = false;\nlet responded = false;\n\nif (campaignStatus.includes('replied') || campaignStatus.includes('response') || campaignStatus.includes('responded')) {\n  status = 'Responded';\n  liAccepted = true;\n  responded = true;\n} else if (campaignStatus.includes('accepted') || campaignStatus.includes('connected')) {\n  status = 'Connection Accepted';\n  liAccepted = true;\n} else {\n  status = 'Connection Sent';\n}\n\nreturn [{\n  json: {\n    full_name: item.full_name,\n    email: item.email,\n    linkedin_url: item.linkedin_url,\n    company: item.company,\n    title: item.title,\n    status: status,\n    li_accepted: liAccepted,\n    responded: responded\n  }\n}];"
+      },
+      "id": "bf1-node-9",
+      "name": "Prepare New Contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 420],
+      "notes": "Maps Prosp campaign status to Notion fields for new contact creation."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_CONTACTS_DB_ID\" },\n  \"properties\": {\n    \"Name\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify($json.full_name || 'Unknown') }} } }] },\n    \"Email\": { \"email\": {{ JSON.stringify($json.email || null) }} },\n    \"LinkedIn Profile\": { \"url\": {{ JSON.stringify($json.linkedin_url || null) }} },\n    \"Company\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.company || '') }} } }] },\n    \"Title\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify($json.title || '') }} } }] },\n    \"Source\": { \"select\": { \"name\": \"LI Loom Outreach\" } },\n    \"Status\": { \"select\": { \"name\": {{ JSON.stringify($json.status) }} } },\n    \"LI Connection Sent\": { \"checkbox\": true },\n    \"LI Connection Accepted\": { \"checkbox\": {{ $json.li_accepted }} },\n    \"Responded\": { \"checkbox\": {{ $json.responded }} },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "bf1-node-10",
+      "name": "Create New Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1790, 420],
+      "notes": "Creates a new Notion contact with all fields populated from Prosp export. Source = 'LI Loom Outreach'."
+    },
+    {
+      "parameters": {
+        "amount": 0.4
+      },
+      "id": "bf1-node-11",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2010, 300],
+      "webhookId": "bf1-rate-limit",
+      "notes": "400ms delay between contacts to stay under Notion's 3 req/sec rate limit."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run Backfill": {
+      "main": [
+        [{ "node": "Read Prosp Export Sheet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Prosp Export Sheet": {
+      "main": [
+        [{ "node": "Normalize Fields", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Fields": {
+      "main": [
+        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Loop (1 at a time)": {
+      "main": [
+        [],
+        [{ "node": "Find Existing Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Existing Contact": {
+      "main": [
+        [{ "node": "Contact Exists?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Contact Exists?": {
+      "main": [
+        [{ "node": "Status Priority Check", "type": "main", "index": 0 }],
+        [{ "node": "Prepare New Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Status Priority Check": {
+      "main": [
+        [{ "node": "Update Existing Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Existing Contact": {
+      "main": [
+        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare New Contact": {
+      "main": [
+        [{ "node": "Create New Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create New Contact": {
+      "main": [
+        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "bf1-v1-0",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": [{ "name": "Backfill" }]
+}
