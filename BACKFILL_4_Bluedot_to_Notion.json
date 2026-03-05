@@ -154,38 +154,51 @@
       "notes": "Processes one transcript at a time. Claude API calls take a few seconds each."
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": {{ JSON.stringify($json.attendee_email || '') }} }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": {{ JSON.stringify($json.attendee_name || '') }} }\n      }\n    ]\n  }\n}",
-        "options": {}
-      },
       "id": "bf4-node-6",
       "name": "Find Notion Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         1350,
         300
       ],
-      "notes": "Finds the contact in Notion by email or name."
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Finds the contact in Notion by email or name.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Email|email",
+              "condition": "string:equals",
+              "emailValue": "={{ $json.attendee_email || '' }}"
+            },
+            {
+              "key": "Name|title",
+              "condition": "string:equals",
+              "titleValue": "={{ $json.attendee_name || '' }}"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -197,11 +210,12 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.results?.length || 0 }}",
-              "rightValue": 0,
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
               }
             }
           ]
@@ -220,7 +234,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extract contact info for downstream nodes\nconst contact = $('Find Notion Contact').first().json.results[0];\nconst props = contact.properties;\nconst companyName = props['Company']?.rich_text?.[0]?.text?.content || 'Unknown-Company';\nconst contactName = props['Name']?.title?.[0]?.text?.content || 'Unknown';\nconst existingFolderId = props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '';\nconst currentStatus = props['Status']?.select?.name || '';\n\n// Status priority check\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\nconst meetingHeldPriority = STATUS_PRIORITY['Meeting Held'];\nconst shouldUpdateStatus = meetingHeldPriority > currentPriority;\n\nreturn [{\n  json: {\n    notion_page_id: contact.id,\n    contact_name: contactName,\n    company_name: companyName,\n    existing_folder_id: existingFolderId,\n    current_status: currentStatus,\n    should_update_status: shouldUpdateStatus\n  }\n}];"
+        "jsCode": "// Extract contact info for downstream nodes\nconst contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nconst companyName = props['Company']?.rich_text?.[0]?.text?.content || 'Unknown-Company';\nconst contactName = props['Name']?.title?.[0]?.text?.content || 'Unknown';\nconst existingFolderId = props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '';\nconst currentStatus = props['Status']?.select?.name || '';\n\n// Status priority check\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\nconst meetingHeldPriority = STATUS_PRIORITY['Meeting Held'];\nconst shouldUpdateStatus = meetingHeldPriority > currentPriority;\n\nreturn [{\n  json: {\n    notion_page_id: contact.id,\n    contact_name: contactName,\n    company_name: companyName,\n    existing_folder_id: existingFolderId,\n    current_status: currentStatus,\n    should_update_status: shouldUpdateStatus\n  }\n}];"
       },
       "id": "bf4-node-8",
       "name": "Extract Contact Info",
@@ -269,72 +283,103 @@
       "notes": "Uses the same Claude prompt as STEP4 to extract meeting notes, action items, and a proposal outline from the transcript."
     },
     {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $('Extract Contact Info').item.json.notion_page_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    {{ $('Extract Contact Info').item.json.should_update_status ? '\"Status\": { \"select\": { \"name\": \"Meeting Held\" } },' : '' }}\n    \"Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000)) }} } }] },\n    \"Last Contact Date\": { \"date\": { \"start\": {{ JSON.stringify($('Loop (1 at a time)').item.json.meeting_date || new Date().toISOString()) }} } }\n  }\n}",
-        "options": {}
-      },
       "id": "bf4-node-10",
       "name": "Update Notion (Meeting Held + Notes)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         2230,
         160
       ],
-      "notes": "Updates the contact's Notes field with Claude's extraction and optionally advances status to 'Meeting Held'. Uses the actual meeting date for Last Contact Date."
-    },
-    {
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Updates the contact's Notes field with Claude's extraction and optionally advances status to 'Meeting Held'. Uses the actual meeting date for Last Contact Date.",
       "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/pages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Extract Contact Info').item.json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
             {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
+              "key": "Status|select",
+              "selectValue": "={{ $('Extract Contact Info').item.json.should_update_status ? 'Meeting Held' : $('Extract Contact Info').item.json.current_status }}"
             },
             {
-              "name": "Content-Type",
-              "value": "application/json"
+              "key": "Notes|rich_text",
+              "richTextValue": "={{ ($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000) }}"
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $('Loop (1 at a time)').item.json.meeting_date || $now.toISO() }}",
+              "includeTime": true
             }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify($('Loop (1 at a time)').item.json.meeting_title || 'Discovery Call') }} } }] },\n    \"Date\": { \"date\": { \"start\": {{ JSON.stringify($('Loop (1 at a time)').item.json.meeting_date || new Date().toISOString()) }} } },\n    \"Meeting Type\": { \"select\": { \"name\": \"Completed\" } },\n    \"Meeting Category\": { \"select\": { \"name\": \"Discovery\" } },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $('Extract Contact Info').item.json.notion_page_id }}\" }] },\n    \"Attendee Email\": { \"email\": {{ JSON.stringify($('Loop (1 at a time)').item.json.attendee_email || '') }} },\n    \"BlueDot Notes\": { \"rich_text\": [{ \"text\": { \"content\": {{ JSON.stringify(($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000)) }} } }] }\n  }\n}",
         "options": {}
-      },
+      }
+    },
+    {
       "id": "bf4-node-11",
       "name": "Create Notion Meeting Record",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         2230,
         340
       ],
-      "notes": "Creates a meeting record in the Notion Meetings DB with Claude's extracted notes. Uses same schema as STEP4."
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Creates a meeting record in the Notion Meetings DB with Claude's extracted notes. Uses same schema as STEP4.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_MEETINGS_DB_ID",
+          "mode": "id"
+        },
+        "title": "={{ $('Loop (1 at a time)').item.json.meeting_title || 'Discovery Call' }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Date|date",
+              "dateValue": "={{ $('Loop (1 at a time)').item.json.meeting_date || $now.toISO() }}",
+              "includeTime": false
+            },
+            {
+              "key": "Meeting Type|select",
+              "selectValue": "Completed"
+            },
+            {
+              "key": "Meeting Category|select",
+              "selectValue": "Discovery"
+            },
+            {
+              "key": "Contact|relation",
+              "relationValue": [
+                "={{ $('Extract Contact Info').item.json.notion_page_id }}"
+              ]
+            },
+            {
+              "key": "Attendee Email|email",
+              "emailValue": "={{ $('Loop (1 at a time)').item.json.attendee_email || '' }}"
+            },
+            {
+              "key": "BlueDot Notes|rich_text",
+              "richTextValue": "={{ ($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000) }}"
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {

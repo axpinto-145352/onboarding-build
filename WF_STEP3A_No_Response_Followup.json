@@ -17,43 +17,86 @@
       "name": "Daily 9 AM Check",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "notes": "Runs every day at 9 AM to check for contacts who were sent a Loom video 3+ days ago with no response."
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"and\": [\n      {\n        \"property\": \"Status\",\n        \"select\": { \"equals\": \"Loom Sent\" }\n      },\n      {\n        \"property\": \"Loom Sent\",\n        \"checkbox\": { \"equals\": true }\n      },\n      {\n        \"property\": \"Responded\",\n        \"checkbox\": { \"equals\": false }\n      },\n      {\n        \"property\": \"Last Contact Date\",\n        \"date\": {\n          \"on_or_before\": \"{{ $now.minus({days: 3}).toISODate() }}\"\n        }\n      }\n    ]\n  }\n}",
-        "options": {}
-      },
       "id": "step5a-node-2",
       "name": "Query Notion: Loom Sent > 3 Days",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [470, 300],
-      "notes": "Finds all contacts where: Status = 'Loom Sent', Loom Sent = true, Responded = false, Last Contact Date >= 3 days ago."
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        470,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Finds all contacts where: Status = 'Loom Sent', Loom Sent = true, Responded = false, Last Contact Date >= 3 days ago.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|select",
+              "condition": "string:equals",
+              "selectValue": "Loom Sent"
+            },
+            {
+              "key": "Loom Sent|checkbox",
+              "condition": "boolean:equals",
+              "checkboxValue": true
+            },
+            {
+              "key": "Responded|checkbox",
+              "condition": "boolean:equals",
+              "checkboxValue": false
+            },
+            {
+              "key": "Last Contact Date|date",
+              "condition": "dateTime:onOrBefore",
+              "dateValue": "={{ $now.minus({days: 3}).toISODate() }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
-              "leftValue": "={{ $json.results?.length || 0 }}",
-              "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ]
         },
@@ -64,17 +107,23 @@
       "name": "Any Contacts Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [690, 300]
+      "position": [
+        690,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Extract contact data from Notion query results\nconst results = $input.first().json.results || [];\nreturn results.map(page => {\n  const props = page.properties;\n  return {\n    json: {\n      notion_page_id: page.id,\n      name: props['Name']?.title?.[0]?.text?.content || '',\n      email: props['Email']?.email || '',\n      linkedin_url: props['LinkedIn Profile']?.url || '',\n      company: props['Company']?.rich_text?.[0]?.text?.content || '',\n      last_contact: props['Last Contact Date']?.date?.start || '',\n      loom_sent_date: props['Last Contact Date']?.date?.start || ''\n    }\n  };\n});"
+        "jsCode": "// Extract contact data from Notion query results\nconst results = $input.all().map(i => i.json).filter(p => p.id);\nreturn results.map(page => {\n  const props = page.properties;\n  return {\n    json: {\n      notion_page_id: page.id,\n      name: props['Name']?.title?.[0]?.text?.content || '',\n      email: props['Email']?.email || '',\n      linkedin_url: props['LinkedIn Profile']?.url || '',\n      company: props['Company']?.rich_text?.[0]?.text?.content || '',\n      last_contact: props['Last Contact Date']?.date?.start || '',\n      loom_sent_date: props['Last Contact Date']?.date?.start || ''\n    }\n  };\n});"
       },
       "id": "step5a-node-4",
       "name": "Extract Contact Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [910, 240]
+      "position": [
+        910,
+        240
+      ]
     },
     {
       "parameters": {
@@ -84,7 +133,10 @@
       "name": "Loop Over Contacts",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1130, 240]
+      "position": [
+        1130,
+        240
+      ]
     },
     {
       "parameters": {
@@ -95,46 +147,70 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"linkedin_url\": {{ JSON.stringify($json.linkedin_url || '') }},\n  \"name\": {{ JSON.stringify($json.name || '') }},\n  \"email\": {{ JSON.stringify($json.email || '') }},\n  \"tags\": [\"follow-up-loom\", \"3-day-no-response\"]\n}",
-        "options": { "timeout": 10000 }
+        "options": {
+          "timeout": 10000
+        }
       },
       "id": "step5a-node-6",
       "name": "Add to Prosp.ai Follow-Up Campaign",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1350, 240],
+      "position": [
+        1350,
+        240
+      ],
       "notes": "Adds the contact to the Prosp.ai follow-up Loom video campaign (3-message sequence). Replace YOUR_FOLLOWUP_CAMPAIGN_ID with your Prosp.ai follow-up campaign ID. Set up HTTP Header Auth with your Prosp.ai API key.",
       "onError": "continueErrorOutput"
     },
     {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $('Loop Over Contacts').item.json.notion_page_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Follow-Up Sequence\" } },\n    \"Need to Follow Up Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
-        "options": {}
-      },
       "id": "step5a-node-7",
       "name": "Update Notion (Follow-Up Sequence)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1570, 240],
-      "notes": "Updates Notion contact: Status = 'Follow-Up Sequence', sets Need to Follow Up Date."
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1570,
+        240
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Updates Notion contact: Status = 'Follow-Up Sequence', sets Need to Follow Up Date.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Loop Over Contacts').item.json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Follow-Up Sequence"
+            },
+            {
+              "key": "Need to Follow Up Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {
@@ -144,7 +220,10 @@
       "name": "Wait",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [1790, 240],
+      "position": [
+        1790,
+        240
+      ],
       "webhookId": "step5a-wait"
     }
   ],
@@ -153,28 +232,44 @@
     "Daily 9 AM Check": {
       "main": [
         [
-          { "node": "Query Notion: Loom Sent > 3 Days", "type": "main", "index": 0 }
+          {
+            "node": "Query Notion: Loom Sent > 3 Days",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Query Notion: Loom Sent > 3 Days": {
       "main": [
         [
-          { "node": "Any Contacts Found?", "type": "main", "index": 0 }
+          {
+            "node": "Any Contacts Found?",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Any Contacts Found?": {
       "main": [
         [
-          { "node": "Extract Contact Data", "type": "main", "index": 0 }
+          {
+            "node": "Extract Contact Data",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Extract Contact Data": {
       "main": [
         [
-          { "node": "Loop Over Contacts", "type": "main", "index": 0 }
+          {
+            "node": "Loop Over Contacts",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -182,28 +277,44 @@
       "main": [
         [],
         [
-          { "node": "Add to Prosp.ai Follow-Up Campaign", "type": "main", "index": 0 }
+          {
+            "node": "Add to Prosp.ai Follow-Up Campaign",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Add to Prosp.ai Follow-Up Campaign": {
       "main": [
         [
-          { "node": "Update Notion (Follow-Up Sequence)", "type": "main", "index": 0 }
+          {
+            "node": "Update Notion (Follow-Up Sequence)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Update Notion (Follow-Up Sequence)": {
       "main": [
         [
-          { "node": "Wait", "type": "main", "index": 0 }
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Wait": {
       "main": [
         [
-          { "node": "Loop Over Contacts", "type": "main", "index": 0 }
+          {
+            "node": "Loop Over Contacts",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     }
@@ -216,7 +327,9 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "step5a-v1-0",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "id": "",
   "tags": []
 }

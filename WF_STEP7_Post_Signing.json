@@ -110,37 +110,50 @@
       ]
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      { \"property\": \"Email\", \"email\": { \"equals\": {{ JSON.stringify($json.client_email || '') }} } },\n      { \"property\": \"Name\", \"title\": { \"equals\": {{ JSON.stringify($json.client_name || '') }} } }\n    ]\n  }\n}",
-        "options": {}
-      },
       "id": "step7-node-5",
       "name": "Find Notion Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         1350,
         300
-      ]
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Email|email",
+              "condition": "string:equals",
+              "emailValue": "={{ $json.client_email || '' }}"
+            },
+            {
+              "key": "Name|title",
+              "condition": "string:equals",
+              "titleValue": "={{ $json.client_name || '' }}"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -152,11 +165,12 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.results?.length || 0 }}",
-              "rightValue": 0,
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
               }
             }
           ]
@@ -175,7 +189,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const contact = $('Find Notion Contact').first().json.results[0];\nconst props = contact.properties;\nconst currentStatus = props?.Status?.select?.name || '';\n\n// Idempotency: skip if already Project Started\nif (currentStatus === 'Project Started') {\n  return [{ json: { _skip: true, reason: 'Already onboarded' } }];\n}\n\nreturn [{ json: {\n  _skip: false,\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_subscription_id: props['Stripe Subscription ID']?.rich_text?.[0]?.text?.content || '',\n  current_status: currentStatus\n}}];"
+        "jsCode": "const contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nconst currentStatus = props?.Status?.select?.name || '';\n\n// Idempotency: skip if already Project Started\nif (currentStatus === 'Project Started') {\n  return [{ json: { _skip: true, reason: 'Already onboarded' } }];\n}\n\nreturn [{ json: {\n  _skip: false,\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_subscription_id: props['Stripe Subscription ID']?.rich_text?.[0]?.text?.content || '',\n  current_status: currentStatus\n}}];"
       },
       "id": "step7-node-7",
       "name": "Extract Contact + Idempotency Check",
@@ -281,103 +295,110 @@
       }
     },
     {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $('Extract Contact + Idempotency Check').item.json.notion_page_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Project Started\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
-        "options": {}
-      },
       "id": "step7-node-12",
       "name": "Update Notion (Project Started)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         2670,
         360
-      ]
-    },
-    {
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
       "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_PROJECTS_DB_ID/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Extract Contact + Idempotency Check').item.json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
             {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
+              "key": "Status|select",
+              "selectValue": "Project Started"
             },
             {
-              "name": "Content-Type",
-              "value": "application/json"
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
             }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"Client\",\n    \"relation\": { \"contains\": \"{{ $('Extract Contact + Idempotency Check').item.json.notion_page_id }}\" }\n  }\n}",
         "options": {}
-      },
+      }
+    },
+    {
       "id": "step7-node-13",
       "name": "Find Notion Project",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         2890,
         360
-      ]
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_PROJECTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Client|relation",
+              "condition": "string:contains",
+              "relationValue": "={{ $('Extract Contact + Idempotency Check').item.json.notion_page_id }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $json.results?.[0]?.id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Project Status\": { \"select\": { \"name\": \"Active\" } }\n  }\n}",
-        "options": {}
-      },
       "id": "step7-node-14",
       "name": "Update Project (Active)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         3110,
         360
-      ]
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Project Status|select",
+              "selectValue": "Active"
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {
