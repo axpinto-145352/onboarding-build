@@ -16,7 +16,7 @@
       "id": "step8-node-1",
       "name": "Every Other Day 9 AM",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
+      "typeVersion": 1.1,
       "position": [
         250,
         300
@@ -62,7 +62,7 @@
       "id": "step8-node-2",
       "name": "Is Reminder Day?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         690,
         300
@@ -72,7 +72,7 @@
       "id": "step8-node-3",
       "name": "Query Notion: Unsigned Contracts",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         910,
         240
@@ -140,7 +140,7 @@
       "id": "step8-node-4",
       "name": "Any Unsigned?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1130,
         240
@@ -246,7 +246,7 @@
       "id": "step8-node-7",
       "name": "Route by Reminder Type",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
+      "typeVersion": 3,
       "position": [
         1790,
         240
@@ -264,7 +264,7 @@
       "id": "step8-node-8a",
       "name": "Send Gentle Reminder",
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2010,
         100
@@ -288,7 +288,7 @@
       "id": "step8-node-8b",
       "name": "Send Escalation Email",
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2010,
         260
@@ -304,7 +304,7 @@
       "id": "step8-node-8c",
       "name": "Auto-Expire in Notion",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2010,
         420
@@ -340,7 +340,7 @@
       "id": "step8-node-9",
       "name": "Log Reminder in Notion",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         180

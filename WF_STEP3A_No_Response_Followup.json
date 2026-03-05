@@ -16,7 +16,7 @@
       "id": "step5a-node-1",
       "name": "Daily 9 AM Check",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
+      "typeVersion": 1.1,
       "position": [
         250,
         300
@@ -27,7 +27,7 @@
       "id": "step5a-node-2",
       "name": "Query Notion: Loom Sent > 3 Days",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         470,
         300
@@ -106,7 +106,7 @@
       "id": "step5a-node-3",
       "name": "Any Contacts Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         690,
         300
@@ -175,7 +175,7 @@
       "id": "step5a-node-7",
       "name": "Update Notion (Follow-Up Sequence)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1570,
         240

@@ -114,7 +114,7 @@
       "id": "bf3-node-5b",
       "name": "Has Events?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -179,7 +179,7 @@
       "id": "bf3-node-9",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         300
@@ -207,14 +207,9 @@
               "key": "Email|email",
               "condition": "string:equals",
               "emailValue": "={{ $json.invitee_email || '' }}"
-            },
-            {
-              "key": "Name|title",
-              "condition": "string:equals",
-              "titleValue": "={{ $json.invitee_name || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -248,7 +243,7 @@
       "id": "bf3-node-10",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         2450,
         300
@@ -272,7 +267,7 @@
       "id": "bf3-node-12",
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2890,
         180
@@ -327,7 +322,7 @@
       "id": "bf3-node-13",
       "name": "Update Contact Status",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2890,
         360

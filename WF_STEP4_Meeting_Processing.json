@@ -49,7 +49,7 @@
       "id": "step4-node-1",
       "name": "Meeting Transcript Form",
       "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         250,
         300
@@ -104,7 +104,7 @@
       "id": "step4-node-2",
       "name": "Extract Form Data",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "typeVersion": 3,
       "position": [
         470,
         300
@@ -114,7 +114,7 @@
       "id": "step4-node-3",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         690,
         300
@@ -141,14 +141,9 @@
               "key": "Email|email",
               "condition": "string:equals",
               "emailValue": "={{ $json.attendee_email || '' }}"
-            },
-            {
-              "key": "Name|title",
-              "condition": "string:equals",
-              "titleValue": "={{ $json.attendee_name || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -182,7 +177,7 @@
       "id": "step4-node-4",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         910,
         300
@@ -227,7 +222,7 @@
       "id": "step4-node-6",
       "name": "Folder Exists?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1350,
         240
@@ -275,7 +270,7 @@
       "id": "step4-node-8",
       "name": "Set Folder ID",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "typeVersion": 3,
       "position": [
         1790,
         240
@@ -320,7 +315,7 @@
       "id": "step4-node-10",
       "name": "Update Notion (Meeting Held)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         180
@@ -359,7 +354,7 @@
       "id": "step4-node-11",
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         340
@@ -417,7 +412,7 @@
       "id": "step4-node-12",
       "name": "Save Drive Folder ID to Notion",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2450,
         180

@@ -90,7 +90,7 @@
       "id": "bf1-node-3",
       "name": "Normalize Fields",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "typeVersion": 3,
       "position": [
         690,
         300
@@ -118,7 +118,7 @@
       "id": "bf1-node-5",
       "name": "Find Existing Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1130,
         300
@@ -143,17 +143,12 @@
         "filters": {
           "conditions": [
             {
-              "key": "LinkedIn Profile|url",
-              "condition": "string:equals",
-              "urlValue": "={{ $json.linkedin_url || '' }}"
-            },
-            {
               "key": "Email|email",
               "condition": "string:equals",
               "emailValue": "={{ $json.email || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -187,7 +182,7 @@
       "id": "bf1-node-6",
       "name": "Contact Exists?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -211,7 +206,7 @@
       "id": "bf1-node-8",
       "name": "Update Existing Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1790,
         200
@@ -273,7 +268,7 @@
       "id": "bf1-node-10",
       "name": "Create New Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1790,
         420

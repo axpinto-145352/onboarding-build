@@ -15,7 +15,7 @@
       "id": "step3c-node-1",
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         250,
         300
@@ -119,7 +119,7 @@
       "id": "step3c-node-5b",
       "name": "Has Discovery Events?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -181,7 +181,7 @@
       "id": "step3c-node-9",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         300
@@ -208,14 +208,9 @@
               "key": "Email|email",
               "condition": "string:equals",
               "emailValue": "={{ $json.invitee_email || '' }}"
-            },
-            {
-              "key": "Name|title",
-              "condition": "string:equals",
-              "titleValue": "={{ $json.invitee_name || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -249,7 +244,7 @@
       "id": "step3c-node-10",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         2450,
         300
@@ -293,7 +288,7 @@
       "id": "step3c-node-12",
       "name": "Not Already Processed?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         2890,
         300
@@ -324,7 +319,7 @@
       "id": "step3c-node-13",
       "name": "Revenue < $5K?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         3110,
         300
@@ -334,7 +329,7 @@
       "id": "step3c-node-14",
       "name": "Update Notion (Pending Approval)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         3330,
         200
@@ -380,7 +375,7 @@
       "id": "step3c-node-15",
       "name": "Email Anthony (Needs Review)",
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
+      "typeVersion": 2,
       "position": [
         3550,
         200
@@ -396,7 +391,7 @@
       "id": "step3c-node-16",
       "name": "Update Notion (Auto-Qualified)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         3330,
         420

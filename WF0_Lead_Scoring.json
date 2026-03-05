@@ -1,11 +1,14 @@
 {
-  "name": "WF0 - Lead Score & Loom Script (LinkedIn → Apify → Score → Claude → Sheet)",
+  "name": "WF0 - Lead Score & Loom Script (LinkedIn \u2192 Apify \u2192 Score \u2192 Claude \u2192 Sheet)",
   "nodes": [
     {
       "parameters": {},
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "id": "wf0-node-1",
       "name": "Score & Script Leads"
     },
@@ -37,7 +40,10 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.0,
-      "position": [470, 300],
+      "position": [
+        470,
+        300
+      ],
       "id": "wf0-node-2",
       "name": "Read Loom Videos Sheet",
       "retryOnFail": true,
@@ -54,7 +60,10 @@
       "parameters": {},
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [690, 300],
+      "position": [
+        690,
+        300
+      ],
       "id": "wf0-node-3",
       "name": "Wait",
       "webhookId": "76e94d6b-879f-4a73-99f7-70bacd3e6501"
@@ -86,7 +95,10 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.0,
-      "position": [910, 300],
+      "position": [
+        910,
+        300
+      ],
       "id": "wf0-node-4",
       "name": "Read Prompts",
       "retryOnFail": true,
@@ -126,12 +138,17 @@
         },
         "event": "rowUpdate",
         "options": {
-          "columnsToWatch": ["Run"]
+          "columnsToWatch": [
+            "Run"
+          ]
         }
       },
       "type": "n8n-nodes-base.googleSheetsTrigger",
       "typeVersion": 1,
-      "position": [250, 520],
+      "position": [
+        250,
+        520
+      ],
       "id": "wf0-node-5",
       "name": "Google Sheets Trigger",
       "retryOnFail": true,
@@ -180,8 +197,11 @@
         "options": {}
       },
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [470, 520],
+      "typeVersion": 2,
+      "position": [
+        470,
+        520
+      ],
       "id": "wf0-node-6",
       "name": "If Run=Yes"
     },
@@ -189,7 +209,10 @@
       "parameters": {},
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [690, 520],
+      "position": [
+        690,
+        520
+      ],
       "id": "wf0-node-7",
       "name": "Wait1",
       "webhookId": "cd7a819d-0930-4be1-b65f-690896d7cd44"
@@ -221,7 +244,10 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.0,
-      "position": [910, 520],
+      "position": [
+        910,
+        520
+      ],
       "id": "wf0-node-8",
       "name": "Read Prompts (Trigger)",
       "retryOnFail": true,
@@ -240,7 +266,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1130, 400],
+      "position": [
+        1130,
+        400
+      ],
       "id": "wf0-node-9",
       "name": "Merge Data"
     },
@@ -270,8 +299,11 @@
         "options": {}
       },
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [1350, 400],
+      "typeVersion": 2,
+      "position": [
+        1350,
+        400
+      ],
       "id": "wf0-node-10",
       "name": "Filter Not Done"
     },
@@ -281,7 +313,10 @@
       },
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1570, 400],
+      "position": [
+        1570,
+        400
+      ],
       "id": "wf0-node-11",
       "name": "Loop Over Items",
       "notes": "Processes leads one at a time. Apify and Claude each need time per lead."
@@ -293,14 +328,17 @@
           "__rl": true,
           "value": "2SyF0bVxmgGr8IVCZ",
           "mode": "list",
-          "cachedResultName": "✨Mass Linkedin Profile Scraper with Email 📧 (No Cookies) (dev_fusion/Linkedin-Profile-Scraper)",
+          "cachedResultName": "\u2728Mass Linkedin Profile Scraper with Email \ud83d\udce7 (No Cookies) (dev_fusion/Linkedin-Profile-Scraper)",
           "cachedResultUrl": "https://console.apify.com/actors/2SyF0bVxmgGr8IVCZ/input"
         },
         "customBody": "={\n    \"profileUrls\": [\n        \"{{ $json['LI Profile'] }}\"\n    ]\n}"
       },
       "type": "@apify/n8n-nodes-apify.apify",
       "typeVersion": 1,
-      "position": [1790, 400],
+      "position": [
+        1790,
+        400
+      ],
       "id": "wf0-node-12",
       "name": "Apify LinkedIn Scrape",
       "credentials": {
@@ -328,12 +366,15 @@
         "options": {
           "maxTokensToSample": 200,
           "temperature": 0.1,
-          "systemMessage": "You are a revenue estimation assistant. Given a company name, employee count, industry, and description, estimate annual revenue in USD. Use these heuristics:\n- Revenue per employee varies by industry: SaaS ~$200-300K, services ~$100-200K, manufacturing ~$150-250K, retail ~$150-200K.\n- Apply maturity adjustments: startups (<5yr) skew lower, established companies skew higher.\n- If employee count is unknown, estimate from the company description and title seniority.\n- Never return 0 — always provide your best estimate.\n- Return ONLY valid JSON. No markdown, no explanation outside the JSON."
+          "systemMessage": "You are a revenue estimation assistant. Given a company name, employee count, industry, and description, estimate annual revenue in USD. Use these heuristics:\n- Revenue per employee varies by industry: SaaS ~$200-300K, services ~$100-200K, manufacturing ~$150-250K, retail ~$150-200K.\n- Apply maturity adjustments: startups (<5yr) skew lower, established companies skew higher.\n- If employee count is unknown, estimate from the company description and title seniority.\n- Never return 0 \u2014 always provide your best estimate.\n- Return ONLY valid JSON. No markdown, no explanation outside the JSON."
         }
       },
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
-      "position": [2010, 400],
+      "position": [
+        2010,
+        400
+      ],
       "id": "wf0-node-17",
       "name": "Estimate Revenue",
       "credentials": {
@@ -342,18 +383,21 @@
           "name": "VV Claude"
         }
       },
-      "notes": "Lightweight Claude call to estimate company revenue from Apify profile data. Uses industry heuristics and revenue-per-employee benchmarks. Returns JSON with revenue_estimate, confidence, and reasoning. Max 200 tokens — fast and cheap."
+      "notes": "Lightweight Claude call to estimate company revenue from Apify profile data. Uses industry heuristics and revenue-per-employee benchmarks. Returns JSON with revenue_estimate, confidence, and reasoning. Max 200 tokens \u2014 fast and cheap."
     },
     {
       "parameters": {
-        "jsCode": "// Score lead from Apify data + Claude revenue estimate\n// Scoring: employee count (0-5) + revenue (0-5) + title (0-3) = max 13 pts\nconst revenueResponse = $input.first().json;\nconst apify = $('Apify LinkedIn Scrape').first().json;\nconst lead = $('Loop Over Items').first().json;\n\n// === PARSE CLAUDE REVENUE ESTIMATE ===\nlet revenue = 0;\nlet revenueConfidence = 'none';\nlet revenueReasoning = '';\ntry {\n  const responseText = revenueResponse.content?.[0]?.text || revenueResponse.text || '';\n  // Strip markdown code fences if present\n  const cleaned = responseText.replace(/```json\\n?|```\\n?/g, '').trim();\n  const parsed = JSON.parse(cleaned);\n  revenue = Number(parsed.revenue_estimate) || 0;\n  revenueConfidence = parsed.confidence || 'unknown';\n  revenueReasoning = parsed.reasoning || '';\n} catch(e) {\n  revenueReasoning = 'Failed to parse revenue estimate';\n}\n\n// === EXTRACT DATA FROM APIFY SCRAPE ===\nconst personTitle = apify.experiences?.[0]?.title || apify.headline || '';\nconst companyName = apify.experiences?.[0]?.companyName || '';\nconst fullName = apify.fullName || lead.Name || '';\n\n// Parse employee count from Apify\nlet employeeCount = 0;\nconst empSources = [\n  apify.experiences?.[0]?.companyEmployees,\n  apify.experiences?.[0]?.companySize,\n  apify.experiences?.[0]?.companyStaffCountRange,\n  apify.experiences?.[0]?.companyEmployeeCount,\n  apify.companySize,\n  apify.employeesCount\n];\nfor (const empRaw of empSources) {\n  if (empRaw == null) continue;\n  if (typeof empRaw === 'number' && empRaw > 0) {\n    employeeCount = empRaw;\n    break;\n  }\n  if (typeof empRaw === 'string') {\n    const rangeMatch = empRaw.match(/(\\d[\\d,]*)\\s*[-–]\\s*(\\d[\\d,]*)/);\n    if (rangeMatch) {\n      const low = parseInt(rangeMatch[1].replace(/,/g, ''));\n      const high = parseInt(rangeMatch[2].replace(/,/g, ''));\n      employeeCount = Math.round((low + high) / 2);\n      break;\n    }\n    const numMatch = empRaw.match(/(\\d[\\d,]*)/);\n    if (numMatch) {\n      employeeCount = parseInt(numMatch[1].replace(/,/g, ''));\n      break;\n    }\n  }\n}\n\n// ============ SCORING ALGORITHM (max 13 pts) ============\nlet score = 0;\nlet scoreBreakdown = [];\n\n// 1. Employee Count (max 5 pts)\nif (employeeCount >= 50 && employeeCount <= 200) {\n  score += 5; scoreBreakdown.push('Employees 50-200: +5');\n} else if (employeeCount >= 20 && employeeCount < 50) {\n  score += 4; scoreBreakdown.push('Employees 20-49: +4');\n} else if (employeeCount >= 10 && employeeCount < 20) {\n  score += 3; scoreBreakdown.push('Employees 10-19: +3');\n} else if (employeeCount > 200) {\n  score += 3; scoreBreakdown.push('Employees 200+: +3');\n} else if (employeeCount >= 5 && employeeCount < 10) {\n  score += 2; scoreBreakdown.push('Employees 5-9 (below ICP): +2');\n} else if (employeeCount > 0) {\n  score += 1; scoreBreakdown.push('Employees <5: +1');\n} else {\n  scoreBreakdown.push('Employees unknown: +0');\n}\n\n// 2. Revenue (max 5 pts) — from Claude estimate\nif (revenue >= 10000000) {\n  score += 5; scoreBreakdown.push('Revenue $10M+ (est ' + revenueConfidence + '): +5');\n} else if (revenue >= 5000000) {\n  score += 4; scoreBreakdown.push('Revenue $5-10M (est ' + revenueConfidence + '): +4');\n} else if (revenue >= 1000000) {\n  score += 3; scoreBreakdown.push('Revenue $1-5M (est ' + revenueConfidence + '): +3');\n} else if (revenue > 0) {\n  score += 1; scoreBreakdown.push('Revenue <$1M (est ' + revenueConfidence + '): +1');\n} else {\n  scoreBreakdown.push('Revenue unknown: +0');\n}\n\n// 3. Title (max 3 pts)\nconst titleLower = personTitle.toLowerCase();\nif (/\\b(ceo|founder|co-founder|owner)\\b/.test(titleLower)) {\n  score += 3; scoreBreakdown.push('CEO/Founder/Owner: +3');\n} else if (/\\b(coo|president|vp|vice president|chief)\\b/.test(titleLower)) {\n  score += 2; scoreBreakdown.push('COO/President/VP/Chief: +2');\n} else if (/\\b(director|head of)\\b/.test(titleLower)) {\n  score += 1; scoreBreakdown.push('Director/Head: +1');\n} else if (personTitle) {\n  scoreBreakdown.push('Other title: +0');\n} else {\n  scoreBreakdown.push('Title unknown: +0');\n}\n\n// ============ FLAGS ============\nconst flags = [];\nif (employeeCount > 0 && employeeCount < 10) {\n  flags.push('BELOW ICP: ' + employeeCount + ' employees');\n}\n\n// ============ TIER ASSIGNMENT ============\nlet tier, outreachType;\nif (score >= 10) {\n  tier = 'Tier 1'; outreachType = 'Loom Video (Priority)';\n} else if (score >= 7) {\n  tier = 'Tier 2'; outreachType = 'Loom Video';\n} else if (score >= 4) {\n  tier = 'Tier 3'; outreachType = 'Personalized Text';\n} else {\n  tier = 'Tier 4'; outreachType = 'Template Outreach';\n}\n\nconst revenueDisplay = revenue > 0\n  ? '$' + (revenue / 1000000).toFixed(1) + 'M (' + revenueConfidence + ')'\n  : 'Unknown';\n\n// Pass through ALL Apify data (so Claude Research Script prompt still works)\nreturn [{\n  json: {\n    ...apify,\n    _score: score,\n    _tier: tier,\n    _outreach_type: outreachType,\n    _employee_count: employeeCount,\n    _revenue: revenue,\n    _revenue_display: revenueDisplay,\n    _revenue_reasoning: revenueReasoning,\n    _company_name: companyName,\n    _person_title: personTitle,\n    _score_breakdown: scoreBreakdown.join(' | '),\n    _flags: flags.join(' | '),\n    _full_name: fullName\n  }\n}];"
+        "jsCode": "// Score lead from Apify data + Claude revenue estimate\n// Scoring: employee count (0-5) + revenue (0-5) + title (0-3) = max 13 pts\nconst revenueResponse = $input.first().json;\nconst apify = $('Apify LinkedIn Scrape').first().json;\nconst lead = $('Loop Over Items').first().json;\n\n// === PARSE CLAUDE REVENUE ESTIMATE ===\nlet revenue = 0;\nlet revenueConfidence = 'none';\nlet revenueReasoning = '';\ntry {\n  const responseText = revenueResponse.content?.[0]?.text || revenueResponse.text || '';\n  // Strip markdown code fences if present\n  const cleaned = responseText.replace(/```json\\n?|```\\n?/g, '').trim();\n  const parsed = JSON.parse(cleaned);\n  revenue = Number(parsed.revenue_estimate) || 0;\n  revenueConfidence = parsed.confidence || 'unknown';\n  revenueReasoning = parsed.reasoning || '';\n} catch(e) {\n  revenueReasoning = 'Failed to parse revenue estimate';\n}\n\n// === EXTRACT DATA FROM APIFY SCRAPE ===\nconst personTitle = apify.experiences?.[0]?.title || apify.headline || '';\nconst companyName = apify.experiences?.[0]?.companyName || '';\nconst fullName = apify.fullName || lead.Name || '';\n\n// Parse employee count from Apify\nlet employeeCount = 0;\nconst empSources = [\n  apify.experiences?.[0]?.companyEmployees,\n  apify.experiences?.[0]?.companySize,\n  apify.experiences?.[0]?.companyStaffCountRange,\n  apify.experiences?.[0]?.companyEmployeeCount,\n  apify.companySize,\n  apify.employeesCount\n];\nfor (const empRaw of empSources) {\n  if (empRaw == null) continue;\n  if (typeof empRaw === 'number' && empRaw > 0) {\n    employeeCount = empRaw;\n    break;\n  }\n  if (typeof empRaw === 'string') {\n    const rangeMatch = empRaw.match(/(\\d[\\d,]*)\\s*[-\u2013]\\s*(\\d[\\d,]*)/);\n    if (rangeMatch) {\n      const low = parseInt(rangeMatch[1].replace(/,/g, ''));\n      const high = parseInt(rangeMatch[2].replace(/,/g, ''));\n      employeeCount = Math.round((low + high) / 2);\n      break;\n    }\n    const numMatch = empRaw.match(/(\\d[\\d,]*)/);\n    if (numMatch) {\n      employeeCount = parseInt(numMatch[1].replace(/,/g, ''));\n      break;\n    }\n  }\n}\n\n// ============ SCORING ALGORITHM (max 13 pts) ============\nlet score = 0;\nlet scoreBreakdown = [];\n\n// 1. Employee Count (max 5 pts)\nif (employeeCount >= 50 && employeeCount <= 200) {\n  score += 5; scoreBreakdown.push('Employees 50-200: +5');\n} else if (employeeCount >= 20 && employeeCount < 50) {\n  score += 4; scoreBreakdown.push('Employees 20-49: +4');\n} else if (employeeCount >= 10 && employeeCount < 20) {\n  score += 3; scoreBreakdown.push('Employees 10-19: +3');\n} else if (employeeCount > 200) {\n  score += 3; scoreBreakdown.push('Employees 200+: +3');\n} else if (employeeCount >= 5 && employeeCount < 10) {\n  score += 2; scoreBreakdown.push('Employees 5-9 (below ICP): +2');\n} else if (employeeCount > 0) {\n  score += 1; scoreBreakdown.push('Employees <5: +1');\n} else {\n  scoreBreakdown.push('Employees unknown: +0');\n}\n\n// 2. Revenue (max 5 pts) \u2014 from Claude estimate\nif (revenue >= 10000000) {\n  score += 5; scoreBreakdown.push('Revenue $10M+ (est ' + revenueConfidence + '): +5');\n} else if (revenue >= 5000000) {\n  score += 4; scoreBreakdown.push('Revenue $5-10M (est ' + revenueConfidence + '): +4');\n} else if (revenue >= 1000000) {\n  score += 3; scoreBreakdown.push('Revenue $1-5M (est ' + revenueConfidence + '): +3');\n} else if (revenue > 0) {\n  score += 1; scoreBreakdown.push('Revenue <$1M (est ' + revenueConfidence + '): +1');\n} else {\n  scoreBreakdown.push('Revenue unknown: +0');\n}\n\n// 3. Title (max 3 pts)\nconst titleLower = personTitle.toLowerCase();\nif (/\\b(ceo|founder|co-founder|owner)\\b/.test(titleLower)) {\n  score += 3; scoreBreakdown.push('CEO/Founder/Owner: +3');\n} else if (/\\b(coo|president|vp|vice president|chief)\\b/.test(titleLower)) {\n  score += 2; scoreBreakdown.push('COO/President/VP/Chief: +2');\n} else if (/\\b(director|head of)\\b/.test(titleLower)) {\n  score += 1; scoreBreakdown.push('Director/Head: +1');\n} else if (personTitle) {\n  scoreBreakdown.push('Other title: +0');\n} else {\n  scoreBreakdown.push('Title unknown: +0');\n}\n\n// ============ FLAGS ============\nconst flags = [];\nif (employeeCount > 0 && employeeCount < 10) {\n  flags.push('BELOW ICP: ' + employeeCount + ' employees');\n}\n\n// ============ TIER ASSIGNMENT ============\nlet tier, outreachType;\nif (score >= 10) {\n  tier = 'Tier 1'; outreachType = 'Loom Video (Priority)';\n} else if (score >= 7) {\n  tier = 'Tier 2'; outreachType = 'Loom Video';\n} else if (score >= 4) {\n  tier = 'Tier 3'; outreachType = 'Personalized Text';\n} else {\n  tier = 'Tier 4'; outreachType = 'Template Outreach';\n}\n\nconst revenueDisplay = revenue > 0\n  ? '$' + (revenue / 1000000).toFixed(1) + 'M (' + revenueConfidence + ')'\n  : 'Unknown';\n\n// Pass through ALL Apify data (so Claude Research Script prompt still works)\nreturn [{\n  json: {\n    ...apify,\n    _score: score,\n    _tier: tier,\n    _outreach_type: outreachType,\n    _employee_count: employeeCount,\n    _revenue: revenue,\n    _revenue_display: revenueDisplay,\n    _revenue_reasoning: revenueReasoning,\n    _company_name: companyName,\n    _person_title: personTitle,\n    _score_breakdown: scoreBreakdown.join(' | '),\n    _flags: flags.join(' | '),\n    _full_name: fullName\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2230, 400],
+      "position": [
+        2230,
+        400
+      ],
       "id": "wf0-node-13",
       "name": "Score Lead",
-      "notes": "Scores from Apify profile data + Claude revenue estimate.\n\nScoring (max 13 pts):\n• Employee count (0-5): 50-200=5, 20-49=4, 10-19=3, 200+=3, 5-9=2 (below ICP), <5=1\n• Revenue (0-5): $10M+=5, $5-10M=4, $1-5M=3, <$1M=1 — estimated by Claude\n• Title (0-3): CEO/Founder/Owner=3, COO/VP/President=2, Director=1\n\nTiers: T1 (10-13) Loom Priority | T2 (7-9) Loom | T3 (4-6) Text | T4 (0-3) Template"
+      "notes": "Scores from Apify profile data + Claude revenue estimate.\n\nScoring (max 13 pts):\n\u2022 Employee count (0-5): 50-200=5, 20-49=4, 10-19=3, 200+=3, 5-9=2 (below ICP), <5=1\n\u2022 Revenue (0-5): $10M+=5, $5-10M=4, $1-5M=3, <$1M=1 \u2014 estimated by Claude\n\u2022 Title (0-3): CEO/Founder/Owner=3, COO/VP/President=2, Director=1\n\nTiers: T1 (10-13) Loom Priority | T2 (7-9) Loom | T3 (4-6) Text | T4 (0-3) Template"
     },
     {
       "parameters": {
@@ -376,7 +420,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
-      "position": [2450, 400],
+      "position": [
+        2450,
+        400
+      ],
       "id": "wf0-node-14",
       "name": "Claude Research Script",
       "credentials": {
@@ -421,22 +468,136 @@
             "Done?": "Done",
             "Run": "Done"
           },
-          "matchingColumns": ["LI Profile"],
+          "matchingColumns": [
+            "LI Profile"
+          ],
           "schema": [
-            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "LI Profile", "displayName": "LI Profile", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Script", "displayName": "Script", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Score", "displayName": "Score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Tier", "displayName": "Tier", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Outreach Type", "displayName": "Outreach Type", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Employee Count", "displayName": "Employee Count", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Company", "displayName": "Company", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Title", "displayName": "Title", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Score Breakdown", "displayName": "Score Breakdown", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Flags", "displayName": "Flags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Revenue Est", "displayName": "Revenue Est", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Done?", "displayName": "Done?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Run", "displayName": "Run", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LI Profile",
+              "displayName": "LI Profile",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Script",
+              "displayName": "Script",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tier",
+              "displayName": "Tier",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Outreach Type",
+              "displayName": "Outreach Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Employee Count",
+              "displayName": "Employee Count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score Breakdown",
+              "displayName": "Score Breakdown",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Flags",
+              "displayName": "Flags",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Revenue Est",
+              "displayName": "Revenue Est",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Done?",
+              "displayName": "Done?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Run",
+              "displayName": "Run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
@@ -445,7 +606,10 @@
       },
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.0,
-      "position": [2670, 400],
+      "position": [
+        2670,
+        400
+      ],
       "id": "wf0-node-15",
       "name": "Write Scores & Script to Sheet",
       "retryOnFail": true,
@@ -465,7 +629,10 @@
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2890, 400],
+      "position": [
+        2890,
+        400
+      ],
       "id": "wf0-node-16",
       "name": "Wait Between Items",
       "webhookId": "5437d6e2-2773-418f-b4ef-8a29e76de946"
@@ -473,58 +640,192 @@
   ],
   "connections": {
     "Score & Script Leads": {
-      "main": [[{ "node": "Read Loom Videos Sheet", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Read Loom Videos Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Loom Videos Sheet": {
-      "main": [[{ "node": "Wait", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait": {
-      "main": [[{ "node": "Read Prompts", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Read Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Prompts": {
-      "main": [[{ "node": "Merge Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Google Sheets Trigger": {
-      "main": [[{ "node": "If Run=Yes", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "If Run=Yes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "If Run=Yes": {
-      "main": [[{ "node": "Wait1", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait1": {
-      "main": [[{ "node": "Read Prompts (Trigger)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Read Prompts (Trigger)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Prompts (Trigger)": {
-      "main": [[{ "node": "Merge Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Merge Data": {
-      "main": [[{ "node": "Filter Not Done", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Filter Not Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Filter Not Done": {
-      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Loop Over Items": {
       "main": [
         [],
-        [{ "node": "Apify LinkedIn Scrape", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Apify LinkedIn Scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Apify LinkedIn Scrape": {
-      "main": [[{ "node": "Estimate Revenue", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Estimate Revenue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Estimate Revenue": {
-      "main": [[{ "node": "Score Lead", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Score Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Score Lead": {
-      "main": [[{ "node": "Claude Research Script", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Claude Research Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Claude Research Script": {
-      "main": [[{ "node": "Write Scores & Script to Sheet", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Write Scores & Script to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Write Scores & Script to Sheet": {
-      "main": [[{ "node": "Wait Between Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait Between Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait Between Items": {
-      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -532,5 +833,9 @@
     "timezone": "America/Los_Angeles",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "tags": [{ "name": "Veteran Vectors Pipeline" }]
+  "tags": [
+    {
+      "name": "Veteran Vectors Pipeline"
+    }
+  ]
 }

@@ -15,7 +15,7 @@
       "id": "step7-node-1",
       "name": "Every 15 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         250,
         300
@@ -87,7 +87,7 @@
       "id": "step7-node-3b",
       "name": "Has Completed Docs?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         910,
         300
@@ -113,7 +113,7 @@
       "id": "step7-node-5",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -140,14 +140,9 @@
               "key": "Email|email",
               "condition": "string:equals",
               "emailValue": "={{ $json.client_email || '' }}"
-            },
-            {
-              "key": "Name|title",
-              "condition": "string:equals",
-              "titleValue": "={{ $json.client_name || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -181,7 +176,7 @@
       "id": "step7-node-6",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1570,
         300
@@ -225,7 +220,7 @@
       "id": "step7-node-8",
       "name": "Not Already Onboarded?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         2010,
         300
@@ -282,7 +277,7 @@
       "id": "step7-node-11",
       "name": "Send Welcome Email",
       "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
+      "typeVersion": 2,
       "position": [
         2670,
         200
@@ -298,7 +293,7 @@
       "id": "step7-node-12",
       "name": "Update Notion (Project Started)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2670,
         360
@@ -333,7 +328,7 @@
       "id": "step7-node-13",
       "name": "Find Notion Project",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2890,
         360
@@ -374,7 +369,7 @@
       "id": "step7-node-14",
       "name": "Update Project (Active)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         3110,
         360
@@ -426,7 +421,7 @@
       "id": "step7-node-15",
       "name": "Has Stripe Invoice?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         2890,
         540
@@ -492,7 +487,7 @@
       "id": "step7-node-18",
       "name": "Has Subscription?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         3330,
         620

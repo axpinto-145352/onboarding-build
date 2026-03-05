@@ -15,7 +15,7 @@
       "id": "step2-node-1",
       "name": "Every 30 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         250,
         300
@@ -100,7 +100,7 @@
       "id": "step2-node-3",
       "name": "Filter: Done + Not Yet Synced",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         690,
         300
@@ -127,7 +127,7 @@
       "id": "step2-node-5",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1130,
         300
@@ -190,7 +190,7 @@
       "id": "step2-node-6",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -213,7 +213,7 @@
       "id": "step2-node-8",
       "name": "Update Notion (Loom Sent)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1790,
         240
