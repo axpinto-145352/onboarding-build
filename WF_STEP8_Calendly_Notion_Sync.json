@@ -1,15 +1,25 @@
 {
-  "name": "WF STEP8 - Calendly → Notion CRM Sync (Schedule → API Poll)",
+  "name": "WF STEP8 - Calendly \u2192 Notion CRM Sync (Schedule \u2192 API Poll)",
   "nodes": [
     {
       "parameters": {
-        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] }
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
       },
       "id": "step8-node-1",
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "notes": "Polls Calendly API every 5 minutes for new/cancelled events across ALL call types (Discovery, Audit, Onboarding, Check-In, Weekly). Replaces Calendly webhook for localhost."
     },
     {
@@ -20,29 +30,56 @@
       "name": "Get Poll Window",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [470, 300]
+      "position": [
+        470,
+        300
+      ]
     },
     {
-      "parameters": { "method": "GET", "url": "https://api.calendly.com/users/me", "authentication": "genericCredentialType", "genericAuthType": "oAuth2Api", "options": {} },
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.calendly.com/users/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
       "id": "step8-node-3",
       "name": "Get Calendly User",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [690, 300],
-      "credentials": { "oAuth2Api": { "id": "uFXaP32GB3oPzqwu", "name": "VV - Calendly" } }
+      "position": [
+        690,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      }
     },
     {
       "parameters": {
         "method": "GET",
         "url": "=https://api.calendly.com/scheduled_events?user={{ encodeURIComponent($json.resource?.uri || '') }}&min_start_time={{ encodeURIComponent($('Get Poll Window').first().json.min_start_time) }}&max_start_time={{ encodeURIComponent($('Get Poll Window').first().json.max_start_time) }}&count=100",
-        "authentication": "genericCredentialType", "genericAuthType": "oAuth2Api", "options": {}
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
       },
       "id": "step8-node-4",
       "name": "List All Calendly Events",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [910, 300],
-      "credentials": { "oAuth2Api": { "id": "uFXaP32GB3oPzqwu", "name": "VV - Calendly" } },
+      "position": [
+        910,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      },
       "notes": "Fetches ALL event types (not just Discovery). Includes both active and cancelled."
     },
     {
@@ -53,33 +90,81 @@
       "name": "Categorize Events",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1130, 300],
+      "position": [
+        1130,
+        300
+      ],
       "notes": "Auto-categorizes: Discovery, Audit, Onboarding, Check-In, Other. Same logic as original STEP8."
     },
     {
-      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "leftValue": "={{ $json._empty }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }] }, "looseTypeValidation": true, "options": {} },
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
       "id": "step8-node-5b",
       "name": "Has Events?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1350, 300]
+      "position": [
+        1350,
+        300
+      ]
     },
     {
-      "parameters": { "options": { "reset": false }, "batchSize": 1 },
+      "parameters": {
+        "options": {
+          "reset": false
+        },
+        "batchSize": 1
+      },
       "id": "step8-node-6",
       "name": "Loop Events",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1570, 300]
+      "position": [
+        1570,
+        300
+      ]
     },
     {
-      "parameters": { "method": "GET", "url": "=https://api.calendly.com/scheduled_events/{{ $json.event_uuid }}/invitees?count=10", "authentication": "genericCredentialType", "genericAuthType": "oAuth2Api", "options": {} },
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.calendly.com/scheduled_events/{{ $json.event_uuid }}/invitees?count=10",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
       "id": "step8-node-7",
       "name": "Get Event Invitees",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1790, 300],
-      "credentials": { "oAuth2Api": { "id": "uFXaP32GB3oPzqwu", "name": "VV - Calendly" } }
+      "position": [
+        1790,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      }
     },
     {
       "parameters": {
@@ -89,88 +174,336 @@
       "name": "Extract Invitee",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2010, 300]
+      "position": [
+        2010,
+        300
+      ]
     },
     {
       "parameters": {
-        "method": "POST", "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }, { "name": "Content-Type", "value": "application/json" }] },
-        "sendBody": true, "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": { \"or\": [\n    { \"property\": \"Email\", \"email\": { \"equals\": {{ JSON.stringify($json.invitee_email || '') }} } },\n    { \"property\": \"Name\", \"title\": { \"equals\": {{ JSON.stringify($json.invitee_name || '') }} } }\n  ] }\n}", "options": {}
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": { \"or\": [\n    { \"property\": \"Email\", \"email\": { \"equals\": {{ JSON.stringify($json.invitee_email || '') }} } },\n    { \"property\": \"Name\", \"title\": { \"equals\": {{ JSON.stringify($json.invitee_name || '') }} } }\n  ] }\n}",
+        "options": {}
       },
       "id": "step8-node-9",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2230, 300]
+      "position": [
+        2230,
+        300
+      ]
     },
     {
-      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "leftValue": "={{ $json.results?.length || 0 }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }] }, "looseTypeValidation": true, "options": {} },
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.results?.length || 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
       "id": "step8-node-10",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [2450, 300]
+      "position": [
+        2450,
+        300
+      ]
     },
     {
       "parameters": {
-        "method": "POST", "url": "https://api.notion.com/v1/pages",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }, { "name": "Content-Type", "value": "application/json" }] },
-        "sendBody": true, "specifyBody": "json",
-        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify(($('Extract Invitee').item.json.event_name || 'Meeting') + ' - ' + ($('Extract Invitee').item.json.invitee_name || '')) }} } }] },\n    \"Date\": { \"date\": { \"start\": {{ JSON.stringify($('Extract Invitee').item.json.start_time || '') }} } },\n    \"Meeting Category\": { \"select\": { \"name\": {{ JSON.stringify($('Extract Invitee').item.json.meeting_category || 'Other') }} } },\n    \"Meeting Type\": { \"select\": { \"name\": {{ JSON.stringify($('Extract Invitee').item.json.status === 'canceled' ? 'Cancelled' : 'Scheduled') }} } },\n    \"Attendee Email\": { \"email\": {{ JSON.stringify($('Extract Invitee').item.json.invitee_email || '') }} },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $json.results[0].id }}\" }] }\n  }\n}", "options": {}
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify(($('Extract Invitee').item.json.event_name || 'Meeting') + ' - ' + ($('Extract Invitee').item.json.invitee_name || '')) }} } }] },\n    \"Date\": { \"date\": { \"start\": {{ JSON.stringify($('Extract Invitee').item.json.start_time || '') }} } },\n    \"Meeting Category\": { \"select\": { \"name\": {{ JSON.stringify($('Extract Invitee').item.json.meeting_category || 'Other') }} } },\n    \"Meeting Type\": { \"select\": { \"name\": {{ JSON.stringify($('Extract Invitee').item.json.status === 'canceled' ? 'Cancelled' : 'Scheduled') }} } },\n    \"Attendee Email\": { \"email\": {{ JSON.stringify($('Extract Invitee').item.json.invitee_email || '') }} },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $json.results[0].id }}\" }] }\n  }\n}",
+        "options": {}
       },
       "id": "step8-node-11",
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2670, 240]
+      "position": [
+        2670,
+        240
+      ]
     },
     {
       "parameters": {
-        "method": "PATCH", "url": "=https://api.notion.com/v1/pages/{{ $('Find Notion Contact').item.json.results[0].id }}",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }, { "name": "Content-Type", "value": "application/json" }] },
-        "sendBody": true, "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Last Contact Date\": { \"date\": { \"start\": {{ JSON.stringify($('Extract Invitee').item.json.start_time || $now.toISO()) }} } }\n  }\n}", "options": {}
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Find Notion Contact').item.json.results[0].id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Last Contact Date\": { \"date\": { \"start\": {{ JSON.stringify($('Extract Invitee').item.json.start_time || $now.toISO()) }} } }\n  }\n}",
+        "options": {}
       },
       "id": "step8-node-12",
       "name": "Update Contact Last Contact Date",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2670, 400]
+      "position": [
+        2670,
+        400
+      ]
     },
     {
-      "parameters": { "amount": 0.5 },
+      "parameters": {
+        "amount": 0.5
+      },
       "id": "step8-node-13",
       "name": "Rate Limit Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2890, 300],
+      "position": [
+        2890,
+        300
+      ],
       "webhookId": "step8-rate-limit"
     }
   ],
   "pinData": {},
   "connections": {
-    "Every 5 Minutes": { "main": [[ { "node": "Get Poll Window", "type": "main", "index": 0 } ]] },
-    "Get Poll Window": { "main": [[ { "node": "Get Calendly User", "type": "main", "index": 0 } ]] },
-    "Get Calendly User": { "main": [[ { "node": "List All Calendly Events", "type": "main", "index": 0 } ]] },
-    "List All Calendly Events": { "main": [[ { "node": "Categorize Events", "type": "main", "index": 0 } ]] },
-    "Categorize Events": { "main": [[ { "node": "Has Events?", "type": "main", "index": 0 } ]] },
-    "Has Events?": { "main": [[ { "node": "Loop Events", "type": "main", "index": 0 } ]] },
-    "Loop Events": { "main": [[], [ { "node": "Get Event Invitees", "type": "main", "index": 0 } ]] },
-    "Get Event Invitees": { "main": [[ { "node": "Extract Invitee", "type": "main", "index": 0 } ]] },
-    "Extract Invitee": { "main": [[ { "node": "Find Notion Contact", "type": "main", "index": 0 } ]] },
-    "Find Notion Contact": { "main": [[ { "node": "Contact Found?", "type": "main", "index": 0 } ]] },
-    "Contact Found?": { "main": [[ { "node": "Create Notion Meeting Record", "type": "main", "index": 0 }, { "node": "Update Contact Last Contact Date", "type": "main", "index": 0 } ], [ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]] },
-    "Create Notion Meeting Record": { "main": [[ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]] },
-    "Rate Limit Delay": { "main": [[ { "node": "Loop Events", "type": "main", "index": 0 } ]] }
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Poll Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Poll Window": {
+      "main": [
+        [
+          {
+            "node": "Get Calendly User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendly User": {
+      "main": [
+        [
+          {
+            "node": "List All Calendly Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List All Calendly Events": {
+      "main": [
+        [
+          {
+            "node": "Categorize Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Categorize Events": {
+      "main": [
+        [
+          {
+            "node": "Has Events?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Events?": {
+      "main": [
+        [
+          {
+            "node": "Loop Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Events": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get Event Invitees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Event Invitees": {
+      "main": [
+        [
+          {
+            "node": "Extract Invitee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invitee": {
+      "main": [
+        [
+          {
+            "node": "Find Notion Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Notion Contact": {
+      "main": [
+        [
+          {
+            "node": "Contact Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Found?": {
+      "main": [
+        [
+          {
+            "node": "Create Notion Meeting Record",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Contact Last Contact Date",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Notion Meeting Record": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [
+          {
+            "node": "Loop Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Contact Last Contact Date": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
-  "settings": { "executionOrder": "v1", "availableInMCP": true, "callerPolicy": "workflowsFromSameOwner" },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
   "versionId": "step8-v2-localhost",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "id": "",
   "tags": []
 }

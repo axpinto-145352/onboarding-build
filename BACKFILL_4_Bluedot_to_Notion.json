@@ -1,5 +1,5 @@
 {
-  "name": "BACKFILL 4 - Bluedot Meeting Notes → Notion Contacts + Meetings (One-Time)",
+  "name": "BACKFILL 4 - Bluedot Meeting Notes \u2192 Notion Contacts + Meetings (One-Time)",
   "nodes": [
     {
       "parameters": {},
@@ -7,8 +7,11 @@
       "name": "Run Backfill",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [250, 300],
-      "notes": "Click 'Execute Workflow' to backfill Bluedot meeting notes into Notion.\n\nPREREQUISITE: Export your Bluedot transcripts and paste into a Google Sheet tab called 'Bluedot Export'.\n\nRequired columns:\n- Attendee Name (the client name)\n- Attendee Email\n- Meeting Title\n- Meeting Date (YYYY-MM-DD or any parseable date)\n- Transcript (the full meeting transcript text)\n- Summary (optional - Bluedot's own summary)\n- Action Items (optional - Bluedot's extracted action items)\n\nTo export from Bluedot:\n1. Go to your Bluedot dashboard → Meetings\n2. For each meeting, copy the transcript text\n3. Paste into the Google Sheet row by row\n\nAlternatively, if Bluedot has an API export, you can use that to populate the sheet."
+      "position": [
+        250,
+        300
+      ],
+      "notes": "Click 'Execute Workflow' to backfill Bluedot meeting notes into Notion.\n\nPREREQUISITE: Export your Bluedot transcripts and paste into a Google Sheet tab called 'Bluedot Export'.\n\nRequired columns:\n- Attendee Name (the client name)\n- Attendee Email\n- Meeting Title\n- Meeting Date (YYYY-MM-DD or any parseable date)\n- Transcript (the full meeting transcript text)\n- Summary (optional - Bluedot's own summary)\n- Action Items (optional - Bluedot's extracted action items)\n\nTo export from Bluedot:\n1. Go to your Bluedot dashboard \u2192 Meetings\n2. For each meeting, copy the transcript text\n3. Paste into the Google Sheet row by row\n\nAlternatively, if Bluedot has an API export, you can use that to populate the sheet."
     },
     {
       "parameters": {
@@ -28,7 +31,10 @@
       "name": "Read Bluedot Export Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [470, 300],
+      "position": [
+        470,
+        300
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "wi6bAEK3LwBuXnNr",
@@ -40,12 +46,20 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "leftValue": "={{ $json['Transcript'] || $json['transcript'] || '' }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ]
         },
@@ -56,7 +70,10 @@
       "name": "Has Transcript?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [690, 300],
+      "position": [
+        690,
+        300
+      ],
       "notes": "Only processes rows that have transcript data."
     },
     {
@@ -113,7 +130,10 @@
       "name": "Normalize Fields",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [910, 300],
+      "position": [
+        910,
+        300
+      ],
       "notes": "Normalizes column names from the Bluedot export sheet."
     },
     {
@@ -127,7 +147,10 @@
       "name": "Loop (1 at a time)",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1130, 300],
+      "position": [
+        1130,
+        300
+      ],
       "notes": "Processes one transcript at a time. Claude API calls take a few seconds each."
     },
     {
@@ -139,8 +162,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -152,18 +181,28 @@
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1350, 300],
+      "position": [
+        1350,
+        300
+      ],
       "notes": "Finds the contact in Notion by email or name."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "leftValue": "={{ $json.results?.length || 0 }}",
               "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ]
         },
@@ -174,7 +213,10 @@
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1570, 300]
+      "position": [
+        1570,
+        300
+      ]
     },
     {
       "parameters": {
@@ -184,7 +226,10 @@
       "name": "Extract Contact Info",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1790, 240],
+      "position": [
+        1790,
+        240
+      ],
       "notes": "Extracts contact info and checks if status should advance to 'Meeting Held'."
     },
     {
@@ -211,7 +256,10 @@
       "name": "Claude: Extract Notes + Proposal Brief",
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
-      "position": [2010, 240],
+      "position": [
+        2010,
+        240
+      ],
       "credentials": {
         "anthropicApi": {
           "id": "au1c518sMzUt89ul",
@@ -229,8 +277,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -242,7 +296,10 @@
       "name": "Update Notion (Meeting Held + Notes)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2230, 160],
+      "position": [
+        2230,
+        160
+      ],
       "notes": "Updates the contact's Notes field with Claude's extraction and optionally advances status to 'Meeting Held'. Uses the actual meeting date for Last Contact Date."
     },
     {
@@ -254,8 +311,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -267,7 +330,10 @@
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2230, 340],
+      "position": [
+        2230,
+        340
+      ],
       "notes": "Creates a meeting record in the Notion Meetings DB with Claude's extracted notes. Uses same schema as STEP4."
     },
     {
@@ -278,7 +344,10 @@
       "name": "Rate Limit Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2450, 300],
+      "position": [
+        2450,
+        300
+      ],
       "webhookId": "bf4-rate-limit",
       "notes": "1 second delay between transcripts (Claude processing + 3 Notion API calls per transcript)."
     }
@@ -287,62 +356,147 @@
   "connections": {
     "Run Backfill": {
       "main": [
-        [{ "node": "Read Bluedot Export Sheet", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Read Bluedot Export Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Read Bluedot Export Sheet": {
       "main": [
-        [{ "node": "Has Transcript?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Has Transcript?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Has Transcript?": {
       "main": [
-        [{ "node": "Normalize Fields", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Normalize Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Normalize Fields": {
       "main": [
-        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Loop (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Loop (1 at a time)": {
       "main": [
         [],
-        [{ "node": "Find Notion Contact", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Find Notion Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Find Notion Contact": {
       "main": [
-        [{ "node": "Contact Found?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Contact Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Contact Found?": {
       "main": [
-        [{ "node": "Extract Contact Info", "type": "main", "index": 0 }],
-        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Extract Contact Info",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Extract Contact Info": {
       "main": [
-        [{ "node": "Claude: Extract Notes + Proposal Brief", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Claude: Extract Notes + Proposal Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Claude: Extract Notes + Proposal Brief": {
       "main": [
         [
-          { "node": "Update Notion (Meeting Held + Notes)", "type": "main", "index": 0 },
-          { "node": "Create Notion Meeting Record", "type": "main", "index": 0 }
+          {
+            "node": "Update Notion (Meeting Held + Notes)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create Notion Meeting Record",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Update Notion (Meeting Held + Notes)": {
       "main": [
-        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Rate Limit Delay": {
       "main": [
-        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Loop (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Notion Meeting Record": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -353,7 +507,13 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "bf4-v1-0",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "id": "",
-  "tags": [{ "name": "Backfill" }]
+  "tags": [
+    {
+      "name": "Backfill"
+    }
+  ]
 }
