@@ -15,7 +15,7 @@
       "id": "step8-node-1",
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "typeVersion": 1.1,
       "position": [
         250,
         300
@@ -121,7 +121,7 @@
       "id": "step8-node-5b",
       "name": "Has Events?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -183,7 +183,7 @@
       "id": "step8-node-9",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         300
@@ -210,14 +210,9 @@
               "key": "Email|email",
               "condition": "string:equals",
               "emailValue": "={{ $json.invitee_email || '' }}"
-            },
-            {
-              "key": "Name|title",
-              "condition": "string:equals",
-              "titleValue": "={{ $json.invitee_name || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -251,7 +246,7 @@
       "id": "step8-node-10",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         2450,
         300
@@ -261,7 +256,7 @@
       "id": "step8-node-11",
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2670,
         240
@@ -315,7 +310,7 @@
       "id": "step8-node-12",
       "name": "Update Contact Last Contact Date",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2670,
         400

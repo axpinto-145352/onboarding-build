@@ -115,7 +115,7 @@
       "id": "step7-node-1",
       "name": "SOW Contract Form",
       "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         250,
         300
@@ -146,7 +146,7 @@
       "id": "step7-node-2",
       "name": "Calculate Amounts",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "typeVersion": 3,
       "position": [
         470,
         300
@@ -445,7 +445,7 @@
       "id": "step7-node-10",
       "name": "Has Fixed Cost?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         910,
         600
@@ -586,7 +586,7 @@
       "id": "step7-node-14",
       "name": "Has Retainer?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1570,
         600
@@ -679,7 +679,7 @@
       "id": "step7-node-17",
       "name": "Update Notion (Contract Sent)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2010,
         300
@@ -714,7 +714,7 @@
       "id": "step7-node-18",
       "name": "Create Notion Project",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         300
@@ -783,7 +783,7 @@
       "id": "step7-node-20",
       "name": "Save Stripe IDs to Notion",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2450,
         600

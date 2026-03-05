@@ -82,7 +82,7 @@
       "id": "bf2-node-3",
       "name": "Filter: Done + Has LI Profile",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         690,
         300
@@ -110,7 +110,7 @@
       "id": "bf2-node-5",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1130,
         300
@@ -138,14 +138,9 @@
               "key": "LinkedIn Profile|url",
               "condition": "string:equals",
               "urlValue": "={{ $json['LI Profile'] || $json['LinkedIn URL'] || '' }}"
-            },
-            {
-              "key": "Name|title",
-              "condition": "string:equals",
-              "titleValue": "={{ $json['Name'] || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -179,7 +174,7 @@
       "id": "bf2-node-6",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -203,7 +198,7 @@
       "id": "bf2-node-8",
       "name": "Update Notion (Loom Sent)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1790,
         240

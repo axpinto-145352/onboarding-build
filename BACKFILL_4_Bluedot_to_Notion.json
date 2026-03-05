@@ -69,7 +69,7 @@
       "id": "bf4-node-3",
       "name": "Has Transcript?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         690,
         300
@@ -129,7 +129,7 @@
       "id": "bf4-node-4",
       "name": "Normalize Fields",
       "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "typeVersion": 3,
       "position": [
         910,
         300
@@ -157,7 +157,7 @@
       "id": "bf4-node-6",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         1350,
         300
@@ -185,14 +185,9 @@
               "key": "Email|email",
               "condition": "string:equals",
               "emailValue": "={{ $json.attendee_email || '' }}"
-            },
-            {
-              "key": "Name|title",
-              "condition": "string:equals",
-              "titleValue": "={{ $json.attendee_name || '' }}"
             }
           ],
-          "combinator": "or"
+          "combinator": "and"
         },
         "options": {
           "simple": false
@@ -226,7 +221,7 @@
       "id": "bf4-node-7",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "typeVersion": 2,
       "position": [
         1570,
         300
@@ -286,7 +281,7 @@
       "id": "bf4-node-10",
       "name": "Update Notion (Meeting Held + Notes)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         160
@@ -326,7 +321,7 @@
       "id": "bf4-node-11",
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2.2,
+      "typeVersion": 2,
       "position": [
         2230,
         340
