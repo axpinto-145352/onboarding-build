@@ -139,8 +139,7 @@
               "condition": "string:equals",
               "urlValue": "={{ $json['LI Profile'] || $json['LinkedIn URL'] || '' }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false

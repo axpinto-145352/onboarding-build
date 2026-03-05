@@ -209,8 +209,7 @@
               "condition": "string:equals",
               "emailValue": "={{ $json.invitee_email || '' }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false

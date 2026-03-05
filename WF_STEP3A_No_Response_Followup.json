@@ -71,8 +71,7 @@
               "condition": "dateTime:onOrBefore",
               "dateValue": "={{ $now.minus({days: 3}).toISODate() }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false

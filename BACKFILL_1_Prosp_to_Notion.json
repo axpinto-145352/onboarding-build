@@ -147,8 +147,7 @@
               "condition": "string:equals",
               "emailValue": "={{ $json.email || '' }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false
