@@ -34,7 +34,7 @@
       "id": "bf2-node-2",
       "name": "Read Loom Videos Sheet",
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
+      "typeVersion": 4.0,
       "position": [
         470,
         300
