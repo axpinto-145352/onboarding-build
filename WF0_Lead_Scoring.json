@@ -36,7 +36,7 @@
         "options": {}
       },
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
+      "typeVersion": 4.0,
       "position": [470, 300],
       "id": "wf0-node-2",
       "name": "Read Loom Videos Sheet",
@@ -85,7 +85,7 @@
         }
       },
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
+      "typeVersion": 4.0,
       "position": [910, 300],
       "id": "wf0-node-4",
       "name": "Read Prompts",
@@ -220,7 +220,7 @@
         }
       },
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
+      "typeVersion": 4.0,
       "position": [910, 520],
       "id": "wf0-node-8",
       "name": "Read Prompts (Trigger)",
@@ -444,7 +444,7 @@
         "options": {}
       },
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
+      "typeVersion": 4.0,
       "position": [2670, 400],
       "id": "wf0-node-15",
       "name": "Write Scores & Script to Sheet",
