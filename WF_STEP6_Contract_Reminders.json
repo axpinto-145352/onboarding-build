@@ -105,8 +105,7 @@
               "condition": "dateTime:onOrBefore",
               "dateValue": "={{ $now.minus({days: 1}).toISODate() }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false

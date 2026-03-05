@@ -142,8 +142,7 @@
               "condition": "string:equals",
               "emailValue": "={{ $json.attendee_email || '' }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false

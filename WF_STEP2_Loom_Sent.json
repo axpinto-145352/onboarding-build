@@ -155,8 +155,7 @@
               "condition": "string:equals",
               "urlValue": "={{ $json['LI Profile'] || '' }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false

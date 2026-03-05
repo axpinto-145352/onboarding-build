@@ -141,8 +141,7 @@
               "condition": "string:equals",
               "emailValue": "={{ $json.client_email || '' }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false
@@ -356,8 +355,7 @@
               "condition": "string:contains",
               "relationValue": "={{ $('Extract Contact + Idempotency Check').item.json.notion_page_id }}"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {
           "simple": false
