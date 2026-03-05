@@ -1,5 +1,5 @@
 {
-  "name": "BACKFILL 3 - Calendly Historical Events → Notion Meetings + Contacts (One-Time)",
+  "name": "BACKFILL 3 - Calendly Historical Events \u2192 Notion Meetings + Contacts (One-Time)",
   "nodes": [
     {
       "parameters": {},
@@ -7,8 +7,11 @@
       "name": "Run Backfill",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [250, 300],
-      "notes": "Click 'Execute Workflow' to pull ALL historical Calendly events from the past 3 months and sync them to Notion. No manual export needed — calls the Calendly API directly."
+      "position": [
+        250,
+        300
+      ],
+      "notes": "Click 'Execute Workflow' to pull ALL historical Calendly events from the past 3 months and sync them to Notion. No manual export needed \u2014 calls the Calendly API directly."
     },
     {
       "parameters": {
@@ -22,7 +25,10 @@
       "name": "Get Calendly User",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [470, 300],
+      "position": [
+        470,
+        300
+      ],
       "credentials": {
         "oAuth2Api": {
           "id": "uFXaP32GB3oPzqwu",
@@ -39,7 +45,10 @@
       "name": "Set Date Range (3 months)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [690, 300],
+      "position": [
+        690,
+        300
+      ],
       "notes": "Sets the date range to pull the last 3 months of Calendly events. Adjust threeMonthsAgo if you need a different range."
     },
     {
@@ -54,7 +63,10 @@
       "name": "List All Calendly Events",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [910, 300],
+      "position": [
+        910,
+        300
+      ],
       "credentials": {
         "oAuth2Api": {
           "id": "uFXaP32GB3oPzqwu",
@@ -71,18 +83,28 @@
       "name": "Split Events",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1130, 300],
+      "position": [
+        1130,
+        300
+      ],
       "notes": "Converts the events collection into individual items. Auto-categorizes each event (Discovery, Audit, Onboarding, Check-In, Other) using the same logic as STEP8."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "leftValue": "={{ $json._empty }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "notTrue" }
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
             }
           ]
         },
@@ -93,7 +115,10 @@
       "name": "Has Events?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1350, 300]
+      "position": [
+        1350,
+        300
+      ]
     },
     {
       "parameters": {
@@ -106,7 +131,10 @@
       "name": "Loop Events",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1570, 300],
+      "position": [
+        1570,
+        300
+      ],
       "notes": "Processes one event at a time to respect API rate limits."
     },
     {
@@ -121,7 +149,10 @@
       "name": "Get Event Invitees",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1790, 300],
+      "position": [
+        1790,
+        300
+      ],
       "credentials": {
         "oAuth2Api": {
           "id": "uFXaP32GB3oPzqwu",
@@ -138,7 +169,10 @@
       "name": "Extract Invitee Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2010, 300],
+      "position": [
+        2010,
+        300
+      ],
       "notes": "Extracts the first invitee's name, email, and any custom question answers from the Calendly event."
     },
     {
@@ -150,8 +184,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -163,18 +203,28 @@
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2230, 300],
+      "position": [
+        2230,
+        300
+      ],
       "notes": "Finds the contact in Notion by email or name."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "leftValue": "={{ $json.results?.length || 0 }}",
               "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ]
         },
@@ -185,7 +235,10 @@
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [2450, 300]
+      "position": [
+        2450,
+        300
+      ]
     },
     {
       "parameters": {
@@ -195,8 +248,11 @@
       "name": "Determine Status + Meeting Type",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2670, 240],
-      "notes": "Checks if the meeting already happened (→ Meeting Held) or is upcoming (→ Meeting Booked). Only advances status forward."
+      "position": [
+        2670,
+        240
+      ],
+      "notes": "Checks if the meeting already happened (\u2192 Meeting Held) or is upcoming (\u2192 Meeting Booked). Only advances status forward."
     },
     {
       "parameters": {
@@ -207,8 +263,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -220,7 +282,10 @@
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2890, 180],
+      "position": [
+        2890,
+        180
+      ],
       "notes": "Creates a meeting record in Notion Meetings DB linked to the contact. Uses same schema as STEP8."
     },
     {
@@ -232,8 +297,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -245,7 +316,10 @@
       "name": "Update Contact Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2890, 360],
+      "position": [
+        2890,
+        360
+      ],
       "notes": "Updates the contact's Call Booked checkbox, Last Contact Date, and Status (only if advancing forward)."
     },
     {
@@ -256,7 +330,10 @@
       "name": "Rate Limit Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [3110, 300],
+      "position": [
+        3110,
+        300
+      ],
       "webhookId": "bf3-rate-limit",
       "notes": "500ms delay between events (3 API calls per event: invitees + create meeting + update contact)."
     }
@@ -265,77 +342,180 @@
   "connections": {
     "Run Backfill": {
       "main": [
-        [{ "node": "Get Calendly User", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Get Calendly User",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Get Calendly User": {
       "main": [
-        [{ "node": "Set Date Range (3 months)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Set Date Range (3 months)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Set Date Range (3 months)": {
       "main": [
-        [{ "node": "List All Calendly Events", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "List All Calendly Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "List All Calendly Events": {
       "main": [
-        [{ "node": "Split Events", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Split Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Split Events": {
       "main": [
-        [{ "node": "Has Events?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Has Events?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Has Events?": {
       "main": [
-        [{ "node": "Loop Events", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Loop Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Loop Events": {
       "main": [
         [],
-        [{ "node": "Get Event Invitees", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Get Event Invitees",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Get Event Invitees": {
       "main": [
-        [{ "node": "Extract Invitee Data", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Extract Invitee Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Extract Invitee Data": {
       "main": [
-        [{ "node": "Find Notion Contact", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Find Notion Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Find Notion Contact": {
       "main": [
-        [{ "node": "Contact Found?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Contact Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Contact Found?": {
       "main": [
-        [{ "node": "Determine Status + Meeting Type", "type": "main", "index": 0 }],
-        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Determine Status + Meeting Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Determine Status + Meeting Type": {
       "main": [
         [
-          { "node": "Create Notion Meeting Record", "type": "main", "index": 0 },
-          { "node": "Update Contact Status", "type": "main", "index": 0 }
+          {
+            "node": "Create Notion Meeting Record",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Contact Status",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Create Notion Meeting Record": {
       "main": [
-        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Rate Limit Delay": {
       "main": [
-        [{ "node": "Loop Events", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Loop Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Contact Status": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -346,7 +526,13 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "bf3-v1-0",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "id": "",
-  "tags": [{ "name": "Backfill" }]
+  "tags": [
+    {
+      "name": "Backfill"
+    }
+  ]
 }
