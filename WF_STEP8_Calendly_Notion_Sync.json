@@ -24,7 +24,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst now = new Date();\nconst lastPollTime = staticData.lastPollStep8 || new Date(now.getTime() - 10 * 60 * 1000).toISOString();\nstaticData.lastPollStep8 = now.toISOString();\nreturn [{ json: { min_start_time: lastPollTime, max_start_time: new Date(now.getTime() + 60*24*60*60*1000).toISOString() }}];"
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst now = new Date();\nconst lastPollTime = staticData.lastPollStep8 || new Date(now.getTime() - 10 * 60 * 1000).toISOString();\nstaticData.lastPollStep8 = now.toISOString();\nreturn [{ json: { min_start_time: lastPollTime, max_start_time: now.toISOString() }}];"
       },
       "id": "step8-node-2",
       "name": "Get Poll Window",
