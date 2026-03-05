@@ -1,53 +1,51 @@
 {
-  "name": "WF STEP2 - Prosp.ai Loom Sent Tracking",
+  "name": "WF STEP2 - Loom Sent Tracking (Schedule → Sheet Poll → Notion)",
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "prosp-loom-sent",
-        "options": {
-          "rawBody": true
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 30 }
+          ]
         }
       },
-      "id": "step4-node-1",
-      "name": "Prosp.ai Webhook (Message Sent)",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "id": "step2-node-1",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [250, 300],
-      "webhookId": "prosp-loom-sent",
-      "notes": "Receives Prosp.ai message_sent events. Filters for messages containing Loom links to track Loom video outreach."
+      "notes": "Polls the Loom Videos Google Sheet every 30 minutes for new Loom scripts that haven't been synced to Notion yet. Replaces the Prosp.ai webhook trigger for localhost compatibility."
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "parse-linkedin",
-              "name": "linkedin_url",
-              "value": "={{ $json.body.prospect?.linkedin_url || $json.body.prospect?.linkedinUrl || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "parse-name",
-              "name": "full_name",
-              "value": "={{ $json.body.prospect?.name || $json.body.prospect?.first_name + ' ' + ($json.body.prospect?.last_name || '') || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "parse-message",
-              "name": "message_content",
-              "value": "={{ $json.body.message?.content || $json.body.message?.text || $json.body.message || '' }}",
-              "type": "string"
-            }
-          ]
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 126409621,
+          "mode": "list",
+          "cachedResultName": "Loom Videos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw/edit#gid=126409621"
         },
         "options": {}
       },
-      "id": "step4-node-2",
-      "name": "Parse Event",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [470, 300]
+      "id": "step2-node-2",
+      "name": "Read Loom Videos Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [470, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      },
+      "notes": "Reads all rows from the Loom Videos sheet. Expects columns: Name, LI Profile, Done?, Notion Synced."
     },
     {
       "parameters": {
@@ -55,21 +53,45 @@
           "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
             {
-              "leftValue": "={{ $json.message_content }}",
-              "rightValue": "loom.com",
-              "operator": { "type": "string", "operation": "contains" }
+              "leftValue": "={{ $json['Done?'] || '' }}",
+              "rightValue": "Done",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ $json['Notion Synced'] || '' }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "empty", "singleValue": true }
+            },
+            {
+              "leftValue": "={{ $json['LI Profile'] || '' }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
             }
-          ]
+          ],
+          "combinator": "and"
         },
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step4-node-3",
-      "name": "Contains Loom Link?",
+      "id": "step2-node-3",
+      "name": "Filter: Done + Not Yet Synced",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [690, 300],
-      "notes": "Filters to only process messages that contain a loom.com link, indicating a Loom video was sent."
+      "notes": "Only processes rows where: Done?='Done' (Loom script generated), Notion Synced is empty (not yet pushed to Notion), and LI Profile exists (needed for matching). Add a 'Notion Synced' column to your Loom Videos sheet."
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        },
+        "batchSize": 1
+      },
+      "id": "step2-node-4",
+      "name": "Loop (1 at a time)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [910, 300]
     },
     {
       "parameters": {
@@ -86,14 +108,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json.linkedin_url || '') }}\n    }\n  }\n}",
+        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json['LI Profile'] || '') }}\n    }\n  }\n}",
         "options": {}
       },
-      "id": "step4-node-4",
+      "id": "step2-node-5",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [910, 240]
+      "position": [1130, 300]
     },
     {
       "parameters": {
@@ -110,16 +132,26 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step4-node-5",
+      "id": "step2-node-6",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1130, 240]
+      "position": [1350, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check status priority — only advance to 'Loom Sent' if current status is lower\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1, 'Connection Accepted': 2, 'Loom Sent': 3,\n  'Follow-Up Sequence': 4, 'Responded': 5, 'Pending Approval': 6,\n  'Meeting Booked': 7, 'Meeting Held': 8, 'Proposal Sent': 9,\n  'Contract Sent': 10, 'Project Started': 11, 'Declined': 0\n};\nconst contact = $('Find Notion Contact').first().json.results[0];\nconst currentStatus = contact?.properties?.Status?.select?.name || '';\nconst shouldUpdate = (STATUS_PRIORITY['Loom Sent'] || 3) > (STATUS_PRIORITY[currentStatus] || 0);\n\nreturn [{ json: {\n  notion_page_id: contact.id,\n  should_update_status: shouldUpdate,\n  current_status: currentStatus\n}}];"
+      },
+      "id": "step2-node-7",
+      "name": "Status Priority Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 240]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $('Find Notion Contact').item.json.results[0].id }}",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.notion_page_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -131,63 +163,118 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Loom Sent\": { \"checkbox\": true },\n    \"Status\": { \"select\": { \"name\": \"Loom Sent\" } },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
+        "jsonBody": "={\n  \"properties\": {\n    \"Loom Sent\": { \"checkbox\": true },\n    {{ $json.should_update_status ? '\"Status\": { \"select\": { \"name\": \"Loom Sent\" } },' : '' }}\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
         "options": {}
       },
-      "id": "step4-node-6",
+      "id": "step2-node-8",
       "name": "Update Notion (Loom Sent)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1350, 240],
-      "notes": "Updates Notion contact: Loom Sent checkbox = true, Status = 'Loom Sent', Last Contact Date = now."
+      "position": [1790, 240],
+      "notes": "Updates Notion contact: Loom Sent checkbox = true, Status = 'Loom Sent' (only if advancing), Last Contact Date = now."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 126409621,
+          "mode": "list",
+          "cachedResultName": "Loom Videos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "LI Profile": "={{ $('Loop (1 at a time)').item.json['LI Profile'] }}",
+            "Notion Synced": "Yes"
+          },
+          "matchingColumns": ["LI Profile"],
+          "schema": [
+            { "id": "LI Profile", "displayName": "LI Profile", "required": false, "defaultMatch": true, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Notion Synced", "displayName": "Notion Synced", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step2-node-9",
+      "name": "Mark Row as Synced",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2010, 240],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wi6bAEK3LwBuXnNr",
+          "name": "VV Google Sheets account"
+        }
+      },
+      "notes": "Marks the row as 'Notion Synced = Yes' so it won't be processed again on the next poll. Add a 'Notion Synced' column to your Loom Videos sheet header row."
+    },
+    {
+      "parameters": {
+        "amount": 0.4
+      },
+      "id": "step2-node-10",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2230, 300],
+      "webhookId": "step2-rate-limit"
     }
   ],
   "pinData": {},
   "connections": {
-    "Prosp.ai Webhook (Message Sent)": {
+    "Every 30 Minutes": {
+      "main": [[ { "node": "Read Loom Videos Sheet", "type": "main", "index": 0 } ]]
+    },
+    "Read Loom Videos Sheet": {
+      "main": [[ { "node": "Filter: Done + Not Yet Synced", "type": "main", "index": 0 } ]]
+    },
+    "Filter: Done + Not Yet Synced": {
       "main": [
-        [
-          { "node": "Parse Event", "type": "main", "index": 0 }
-        ]
+        [ { "node": "Loop (1 at a time)", "type": "main", "index": 0 } ]
       ]
     },
-    "Parse Event": {
+    "Loop (1 at a time)": {
       "main": [
-        [
-          { "node": "Contains Loom Link?", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "Contains Loom Link?": {
-      "main": [
-        [
-          { "node": "Find Notion Contact", "type": "main", "index": 0 }
-        ]
+        [],
+        [ { "node": "Find Notion Contact", "type": "main", "index": 0 } ]
       ]
     },
     "Find Notion Contact": {
-      "main": [
-        [
-          { "node": "Contact Found?", "type": "main", "index": 0 }
-        ]
-      ]
+      "main": [[ { "node": "Contact Found?", "type": "main", "index": 0 } ]]
     },
     "Contact Found?": {
       "main": [
-        [
-          { "node": "Update Notion (Loom Sent)", "type": "main", "index": 0 }
-        ]
+        [ { "node": "Status Priority Check", "type": "main", "index": 0 } ],
+        [ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]
       ]
+    },
+    "Status Priority Check": {
+      "main": [[ { "node": "Update Notion (Loom Sent)", "type": "main", "index": 0 } ]]
+    },
+    "Update Notion (Loom Sent)": {
+      "main": [[ { "node": "Mark Row as Synced", "type": "main", "index": 0 } ]]
+    },
+    "Mark Row as Synced": {
+      "main": [[ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]]
+    },
+    "Rate Limit Delay": {
+      "main": [[ { "node": "Loop (1 at a time)", "type": "main", "index": 0 } ]]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step4-v1-0",
+  "versionId": "step2-v2-localhost",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []
