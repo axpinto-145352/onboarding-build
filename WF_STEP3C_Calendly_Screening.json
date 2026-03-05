@@ -1,11 +1,14 @@
 {
-  "name": "WF STEP3C - Calendly Screening (Schedule → API Poll → Notion Approval)",
+  "name": "WF STEP3C - Calendly Screening (Schedule \u2192 API Poll \u2192 Notion Approval)",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "minutes", "minutesInterval": 5 }
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
           ]
         }
       },
@@ -13,7 +16,10 @@
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "notes": "Polls Calendly API every 5 minutes for new Discovery Call invitees. Replaces Calendly webhook for localhost.\n\nAPPROVAL CHANGE: Low-revenue contacts are set to 'Pending Approval' in Notion. Anthony changes status directly in Notion to 'Meeting Booked' (approve) or 'Declined' (reject)."
     },
     {
@@ -24,29 +30,56 @@
       "name": "Get Poll Window",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [470, 300]
+      "position": [
+        470,
+        300
+      ]
     },
     {
-      "parameters": { "method": "GET", "url": "https://api.calendly.com/users/me", "authentication": "genericCredentialType", "genericAuthType": "oAuth2Api", "options": {} },
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.calendly.com/users/me",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
       "id": "step3c-node-3",
       "name": "Get Calendly User",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [690, 300],
-      "credentials": { "oAuth2Api": { "id": "uFXaP32GB3oPzqwu", "name": "VV - Calendly" } }
+      "position": [
+        690,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      }
     },
     {
       "parameters": {
         "method": "GET",
         "url": "=https://api.calendly.com/scheduled_events?user={{ encodeURIComponent($json.resource?.uri || '') }}&min_start_time={{ encodeURIComponent($('Get Poll Window').first().json.min_start_time) }}&max_start_time={{ encodeURIComponent($('Get Poll Window').first().json.max_start_time) }}&count=100&status=active",
-        "authentication": "genericCredentialType", "genericAuthType": "oAuth2Api", "options": {}
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
       },
       "id": "step3c-node-4",
       "name": "List Recent Calendly Events",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [910, 300],
-      "credentials": { "oAuth2Api": { "id": "uFXaP32GB3oPzqwu", "name": "VV - Calendly" } }
+      "position": [
+        910,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      }
     },
     {
       "parameters": {
@@ -56,32 +89,80 @@
       "name": "Filter Discovery Calls",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1130, 300]
+      "position": [
+        1130,
+        300
+      ]
     },
     {
-      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "leftValue": "={{ $json._empty }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }] }, "looseTypeValidation": true, "options": {} },
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
       "id": "step3c-node-5b",
       "name": "Has Discovery Events?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1350, 300]
+      "position": [
+        1350,
+        300
+      ]
     },
     {
-      "parameters": { "options": { "reset": false }, "batchSize": 1 },
+      "parameters": {
+        "options": {
+          "reset": false
+        },
+        "batchSize": 1
+      },
       "id": "step3c-node-6",
       "name": "Loop Events",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1570, 300]
+      "position": [
+        1570,
+        300
+      ]
     },
     {
-      "parameters": { "method": "GET", "url": "=https://api.calendly.com/scheduled_events/{{ $json.event_uuid }}/invitees?count=10", "authentication": "genericCredentialType", "genericAuthType": "oAuth2Api", "options": {} },
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.calendly.com/scheduled_events/{{ $json.event_uuid }}/invitees?count=10",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
       "id": "step3c-node-7",
       "name": "Get Event Invitees",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1790, 300],
-      "credentials": { "oAuth2Api": { "id": "uFXaP32GB3oPzqwu", "name": "VV - Calendly" } }
+      "position": [
+        1790,
+        300
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "uFXaP32GB3oPzqwu",
+          "name": "VV - Calendly"
+        }
+      }
     },
     {
       "parameters": {
@@ -91,134 +172,517 @@
       "name": "Extract Invitee + Screening Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2010, 300]
+      "position": [
+        2010,
+        300
+      ]
+    },
+    {
+      "id": "step3c-node-9",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        2230,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Email|email",
+              "condition": "string:equals",
+              "emailValue": "={{ $json.invitee_email || '' }}"
+            },
+            {
+              "key": "Name|title",
+              "condition": "string:equals",
+              "titleValue": "={{ $json.invitee_name || '' }}"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
-        "method": "POST", "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }, { "name": "Content-Type", "value": "application/json" }] },
-        "sendBody": true, "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": { \"or\": [\n    { \"property\": \"Email\", \"email\": { \"equals\": {{ JSON.stringify($json.invitee_email || '') }} } },\n    { \"property\": \"Name\", \"title\": { \"equals\": {{ JSON.stringify($json.invitee_name || '') }} } }\n  ] }\n}", "options": {}
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
       },
-      "id": "step3c-node-9",
-      "name": "Find Notion Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2230, 300]
-    },
-    {
-      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "leftValue": "={{ $json.results?.length || 0 }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }] }, "looseTypeValidation": true, "options": {} },
       "id": "step3c-node-10",
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [2450, 300]
+      "position": [
+        2450,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const SP = { 'Connection Sent':1,'Connection Accepted':2,'Loom Sent':3,'Follow-Up Sequence':4,'Responded':5,'Pending Approval':6,'Meeting Booked':7,'Meeting Held':8,'Proposal Sent':9,'Contract Sent':10,'Project Started':11,'Declined':0 };\nconst c = $('Find Notion Contact').first().json.results[0];\nconst cs = c?.properties?.Status?.select?.name||''; const cp = SP[cs]||0;\nconst cb = c?.properties?.['Call Booked']?.checkbox||false;\nif (cb || cp >= SP['Pending Approval']) return [{ json: { _skip: true } }];\nconst d = $('Extract Invitee + Screening Data').first().json;\nconst rs = (d.revenue||'').replace(/[^0-9.kKmM]/g,'');\nlet rn=0; if (rs.toLowerCase().includes('m')) rn=parseFloat(rs)*1e6; else if (rs.toLowerCase().includes('k')) rn=parseFloat(rs)*1e3; else rn=parseFloat(rs)||0;\nreturn [{ json: { _skip:false, notion_page_id:c.id, contact_name:c?.properties?.Name?.title?.[0]?.text?.content||'', is_low_revenue:rn>0&&rn<=5000, revenue_raw:d.revenue, invitee_email:d.invitee_email, invitee_name:d.invitee_name, company:d.company, employees:d.employees, budget:d.budget, pain_points:d.pain_points, event_uuid:d.event_uuid, start_time:d.start_time } }];"
+        "jsCode": "const SP = { 'Connection Sent':1,'Connection Accepted':2,'Loom Sent':3,'Follow-Up Sequence':4,'Responded':5,'Pending Approval':6,'Meeting Booked':7,'Meeting Held':8,'Proposal Sent':9,'Contract Sent':10,'Project Started':11,'Declined':0 };\nconst c = $('Find Notion Contact').first().json;\nconst cs = c?.properties?.Status?.select?.name||''; const cp = SP[cs]||0;\nconst cb = c?.properties?.['Call Booked']?.checkbox||false;\nif (cb || cp >= SP['Pending Approval']) return [{ json: { _skip: true } }];\nconst d = $('Extract Invitee + Screening Data').first().json;\nconst rs = (d.revenue||'').replace(/[^0-9.kKmM]/g,'');\nlet rn=0; if (rs.toLowerCase().includes('m')) rn=parseFloat(rs)*1e6; else if (rs.toLowerCase().includes('k')) rn=parseFloat(rs)*1e3; else rn=parseFloat(rs)||0;\nreturn [{ json: { _skip:false, notion_page_id:c.id, contact_name:c?.properties?.Name?.title?.[0]?.text?.content||'', is_low_revenue:rn>0&&rn<=5000, revenue_raw:d.revenue, invitee_email:d.invitee_email, invitee_name:d.invitee_name, company:d.company, employees:d.employees, budget:d.budget, pain_points:d.pain_points, event_uuid:d.event_uuid, start_time:d.start_time } }];"
       },
       "id": "step3c-node-11",
       "name": "Check Already Processed + Revenue",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2670, 300]
+      "position": [
+        2670,
+        300
+      ]
     },
     {
-      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "leftValue": "={{ $json._skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }] }, "looseTypeValidation": true, "options": {} },
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notTrue"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
       "id": "step3c-node-12",
       "name": "Not Already Processed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [2890, 300]
+      "position": [
+        2890,
+        300
+      ]
     },
     {
-      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" }, "conditions": [{ "leftValue": "={{ $json.is_low_revenue }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] }, "looseTypeValidation": true, "options": {} },
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.is_low_revenue }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
       "id": "step3c-node-13",
       "name": "Revenue < $5K?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [3110, 300]
+      "position": [
+        3110,
+        300
+      ]
     },
     {
-      "parameters": {
-        "method": "PATCH", "url": "=https://api.notion.com/v1/pages/{{ $json.notion_page_id }}",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }, { "name": "Content-Type", "value": "application/json" }] },
-        "sendBody": true, "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Pending Approval\" } },\n    \"Call Booked\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}", "options": {}
-      },
       "id": "step3c-node-14",
       "name": "Update Notion (Pending Approval)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [3330, 200]
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        3330,
+        200
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Pending Approval"
+            },
+            {
+              "key": "Call Booked|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {
         "sendTo": "anthony@veteranvectors.io",
-        "subject": "=🔍 Low-Revenue Screening: {{ $('Check Already Processed + Revenue').item.json.invitee_name }} ({{ $('Check Already Processed + Revenue').item.json.revenue_raw || 'Unknown' }}/mo)",
+        "subject": "=\ud83d\udd0d Low-Revenue Screening: {{ $('Check Already Processed + Revenue').item.json.invitee_name }} ({{ $('Check Already Processed + Revenue').item.json.revenue_raw || 'Unknown' }}/mo)",
         "emailType": "html",
-        "message": "=<h2>Discovery Call Screening Required</h2><p><strong>Contact:</strong> {{ $('Check Already Processed + Revenue').item.json.invitee_name }}</p><p><strong>Email:</strong> {{ $('Check Already Processed + Revenue').item.json.invitee_email }}</p><p><strong>Company:</strong> {{ $('Check Already Processed + Revenue').item.json.company || 'Not provided' }}</p><p><strong>Monthly Revenue:</strong> {{ $('Check Already Processed + Revenue').item.json.revenue_raw || 'Not provided' }}</p><p><strong>Employees:</strong> {{ $('Check Already Processed + Revenue').item.json.employees || 'Not provided' }}</p><p><strong>Budget:</strong> {{ $('Check Already Processed + Revenue').item.json.budget || 'Not provided' }}</p><p><strong>Pain Points:</strong> {{ $('Check Already Processed + Revenue').item.json.pain_points || 'Not provided' }}</p><hr><p><strong>⚠️ Revenue below $5K/month threshold.</strong></p><p>To approve or decline, open the contact in Notion and change status:</p><ul><li><strong>'Meeting Booked'</strong> → approve</li><li><strong>'Declined'</strong> → reject (manually cancel the Calendly event)</li></ul>",
+        "message": "=<h2>Discovery Call Screening Required</h2><p><strong>Contact:</strong> {{ $('Check Already Processed + Revenue').item.json.invitee_name }}</p><p><strong>Email:</strong> {{ $('Check Already Processed + Revenue').item.json.invitee_email }}</p><p><strong>Company:</strong> {{ $('Check Already Processed + Revenue').item.json.company || 'Not provided' }}</p><p><strong>Monthly Revenue:</strong> {{ $('Check Already Processed + Revenue').item.json.revenue_raw || 'Not provided' }}</p><p><strong>Employees:</strong> {{ $('Check Already Processed + Revenue').item.json.employees || 'Not provided' }}</p><p><strong>Budget:</strong> {{ $('Check Already Processed + Revenue').item.json.budget || 'Not provided' }}</p><p><strong>Pain Points:</strong> {{ $('Check Already Processed + Revenue').item.json.pain_points || 'Not provided' }}</p><hr><p><strong>\u26a0\ufe0f Revenue below $5K/month threshold.</strong></p><p>To approve or decline, open the contact in Notion and change status:</p><ul><li><strong>'Meeting Booked'</strong> \u2192 approve</li><li><strong>'Declined'</strong> \u2192 reject (manually cancel the Calendly event)</li></ul>",
         "options": {}
       },
       "id": "step3c-node-15",
       "name": "Email Anthony (Needs Review)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [3550, 200],
-      "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } }
+      "position": [
+        3550,
+        200
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      }
+    },
+    {
+      "id": "step3c-node-16",
+      "name": "Update Notion (Auto-Qualified)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        3330,
+        420
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Meeting Booked"
+            },
+            {
+              "key": "Call Booked|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Responded|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {
-        "method": "PATCH", "url": "=https://api.notion.com/v1/pages/{{ $json.notion_page_id }}",
-        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }, { "name": "Content-Type", "value": "application/json" }] },
-        "sendBody": true, "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Status\": { \"select\": { \"name\": \"Meeting Booked\" } },\n    \"Call Booked\": { \"checkbox\": true },\n    \"Responded\": { \"checkbox\": true },\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}", "options": {}
+        "amount": 0.5
       },
-      "id": "step3c-node-16",
-      "name": "Update Notion (Auto-Qualified)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [3330, 420]
-    },
-    {
-      "parameters": { "amount": 0.5 },
       "id": "step3c-node-17",
       "name": "Rate Limit Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [3550, 420],
+      "position": [
+        3550,
+        420
+      ],
       "webhookId": "step3c-rate-limit"
     }
   ],
   "pinData": {},
   "connections": {
-    "Every 5 Minutes": { "main": [[ { "node": "Get Poll Window", "type": "main", "index": 0 } ]] },
-    "Get Poll Window": { "main": [[ { "node": "Get Calendly User", "type": "main", "index": 0 } ]] },
-    "Get Calendly User": { "main": [[ { "node": "List Recent Calendly Events", "type": "main", "index": 0 } ]] },
-    "List Recent Calendly Events": { "main": [[ { "node": "Filter Discovery Calls", "type": "main", "index": 0 } ]] },
-    "Filter Discovery Calls": { "main": [[ { "node": "Has Discovery Events?", "type": "main", "index": 0 } ]] },
-    "Has Discovery Events?": { "main": [[ { "node": "Loop Events", "type": "main", "index": 0 } ]] },
-    "Loop Events": { "main": [[], [ { "node": "Get Event Invitees", "type": "main", "index": 0 } ]] },
-    "Get Event Invitees": { "main": [[ { "node": "Extract Invitee + Screening Data", "type": "main", "index": 0 } ]] },
-    "Extract Invitee + Screening Data": { "main": [[ { "node": "Find Notion Contact", "type": "main", "index": 0 } ]] },
-    "Find Notion Contact": { "main": [[ { "node": "Contact Found?", "type": "main", "index": 0 } ]] },
-    "Contact Found?": { "main": [[ { "node": "Check Already Processed + Revenue", "type": "main", "index": 0 } ], [ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]] },
-    "Check Already Processed + Revenue": { "main": [[ { "node": "Not Already Processed?", "type": "main", "index": 0 } ]] },
-    "Not Already Processed?": { "main": [[ { "node": "Revenue < $5K?", "type": "main", "index": 0 } ], [ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]] },
-    "Revenue < $5K?": { "main": [[ { "node": "Update Notion (Pending Approval)", "type": "main", "index": 0 } ], [ { "node": "Update Notion (Auto-Qualified)", "type": "main", "index": 0 } ]] },
-    "Update Notion (Pending Approval)": { "main": [[ { "node": "Email Anthony (Needs Review)", "type": "main", "index": 0 } ]] },
-    "Email Anthony (Needs Review)": { "main": [[ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]] },
-    "Update Notion (Auto-Qualified)": { "main": [[ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]] },
-    "Rate Limit Delay": { "main": [[ { "node": "Loop Events", "type": "main", "index": 0 } ]] }
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Poll Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Poll Window": {
+      "main": [
+        [
+          {
+            "node": "Get Calendly User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendly User": {
+      "main": [
+        [
+          {
+            "node": "List Recent Calendly Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Recent Calendly Events": {
+      "main": [
+        [
+          {
+            "node": "Filter Discovery Calls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Discovery Calls": {
+      "main": [
+        [
+          {
+            "node": "Has Discovery Events?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Discovery Events?": {
+      "main": [
+        [
+          {
+            "node": "Loop Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Events": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get Event Invitees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Event Invitees": {
+      "main": [
+        [
+          {
+            "node": "Extract Invitee + Screening Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invitee + Screening Data": {
+      "main": [
+        [
+          {
+            "node": "Find Notion Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Notion Contact": {
+      "main": [
+        [
+          {
+            "node": "Contact Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Found?": {
+      "main": [
+        [
+          {
+            "node": "Check Already Processed + Revenue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Already Processed + Revenue": {
+      "main": [
+        [
+          {
+            "node": "Not Already Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not Already Processed?": {
+      "main": [
+        [
+          {
+            "node": "Revenue < $5K?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revenue < $5K?": {
+      "main": [
+        [
+          {
+            "node": "Update Notion (Pending Approval)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Notion (Auto-Qualified)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion (Pending Approval)": {
+      "main": [
+        [
+          {
+            "node": "Email Anthony (Needs Review)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Anthony (Needs Review)": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion (Auto-Qualified)": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [
+          {
+            "node": "Loop Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
-  "settings": { "executionOrder": "v1", "availableInMCP": true, "callerPolicy": "workflowsFromSameOwner" },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
   "versionId": "step3c-v2-localhost",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "id": "",
   "tags": []
 }

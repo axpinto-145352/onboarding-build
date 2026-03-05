@@ -1,11 +1,14 @@
 {
-  "name": "WF STEP2 - Loom Sent Tracking (Schedule → Sheet Poll → Notion)",
+  "name": "WF STEP2 - Loom Sent Tracking (Schedule \u2192 Sheet Poll \u2192 Notion)",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "minutes", "minutesInterval": 30 }
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
           ]
         }
       },
@@ -13,7 +16,10 @@
       "name": "Every 30 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "notes": "Polls the Loom Videos Google Sheet every 30 minutes for new Loom scripts that haven't been synced to Notion yet. Replaces the Prosp.ai webhook trigger for localhost compatibility."
     },
     {
@@ -38,7 +44,10 @@
       "name": "Read Loom Videos Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [470, 300],
+      "position": [
+        470,
+        300
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "wi6bAEK3LwBuXnNr",
@@ -50,22 +59,37 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "leftValue": "={{ $json['Done?'] || '' }}",
               "rightValue": "Done",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             },
             {
               "leftValue": "={{ $json['Notion Synced'] || '' }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "empty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
             },
             {
               "leftValue": "={{ $json['LI Profile'] || '' }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -77,7 +101,10 @@
       "name": "Filter: Done + Not Yet Synced",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [690, 300],
+      "position": [
+        690,
+        300
+      ],
       "notes": "Only processes rows where: Done?='Done' (Loom script generated), Notion Synced is empty (not yet pushed to Notion), and LI Profile exists (needed for matching). Add a 'Notion Synced' column to your Loom Videos sheet."
     },
     {
@@ -91,41 +118,69 @@
       "name": "Loop (1 at a time)",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [910, 300]
+      "position": [
+        910,
+        300
+      ]
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"property\": \"LinkedIn Profile\",\n    \"url\": {\n      \"equals\": {{ JSON.stringify($json['LI Profile'] || '') }}\n    }\n  }\n}",
-        "options": {}
-      },
       "id": "step2-node-5",
       "name": "Find Notion Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1130, 300]
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1130,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "LinkedIn Profile|url",
+              "condition": "string:equals",
+              "urlValue": "={{ $json['LI Profile'] || '' }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
-              "leftValue": "={{ $json.results?.length || 0 }}",
-              "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ]
         },
@@ -136,42 +191,63 @@
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1350, 300]
+      "position": [
+        1350,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Check status priority — only advance to 'Loom Sent' if current status is lower\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1, 'Connection Accepted': 2, 'Loom Sent': 3,\n  'Follow-Up Sequence': 4, 'Responded': 5, 'Pending Approval': 6,\n  'Meeting Booked': 7, 'Meeting Held': 8, 'Proposal Sent': 9,\n  'Contract Sent': 10, 'Project Started': 11, 'Declined': 0\n};\nconst contact = $('Find Notion Contact').first().json.results[0];\nconst currentStatus = contact?.properties?.Status?.select?.name || '';\nconst shouldUpdate = (STATUS_PRIORITY['Loom Sent'] || 3) > (STATUS_PRIORITY[currentStatus] || 0);\n\nreturn [{ json: {\n  notion_page_id: contact.id,\n  should_update_status: shouldUpdate,\n  current_status: currentStatus\n}}];"
+        "jsCode": "// Check status priority \u2014 only advance to 'Loom Sent' if current status is lower\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1, 'Connection Accepted': 2, 'Loom Sent': 3,\n  'Follow-Up Sequence': 4, 'Responded': 5, 'Pending Approval': 6,\n  'Meeting Booked': 7, 'Meeting Held': 8, 'Proposal Sent': 9,\n  'Contract Sent': 10, 'Project Started': 11, 'Declined': 0\n};\nconst contact = $('Find Notion Contact').first().json;\nconst currentStatus = contact?.properties?.Status?.select?.name || '';\nconst shouldUpdate = (STATUS_PRIORITY['Loom Sent'] || 3) > (STATUS_PRIORITY[currentStatus] || 0);\n\nreturn [{ json: {\n  notion_page_id: contact.id,\n  should_update_status: shouldUpdate,\n  current_status: currentStatus\n}}];"
       },
       "id": "step2-node-7",
       "name": "Status Priority Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1570, 240]
+      "position": [
+        1570,
+        240
+      ]
     },
     {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $json.notion_page_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Loom Sent\": { \"checkbox\": true },\n    {{ $json.should_update_status ? '\"Status\": { \"select\": { \"name\": \"Loom Sent\" } },' : '' }}\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
-        "options": {}
-      },
       "id": "step2-node-8",
       "name": "Update Notion (Loom Sent)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1790, 240],
-      "notes": "Updates Notion contact: Loom Sent checkbox = true, Status = 'Loom Sent' (only if advancing), Last Contact Date = now."
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1790,
+        240
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Updates Notion contact: Loom Sent checkbox = true, Status = 'Loom Sent' (only if advancing), Last Contact Date = now.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Loom Sent|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "={{ $json.should_update_status ? 'Loom Sent' : $json.current_status }}"
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {
@@ -194,10 +270,28 @@
             "LI Profile": "={{ $('Loop (1 at a time)').item.json['LI Profile'] }}",
             "Notion Synced": "Yes"
           },
-          "matchingColumns": ["LI Profile"],
+          "matchingColumns": [
+            "LI Profile"
+          ],
           "schema": [
-            { "id": "LI Profile", "displayName": "LI Profile", "required": false, "defaultMatch": true, "display": true, "type": "string", "canBeUsedToMatch": true },
-            { "id": "Notion Synced", "displayName": "Notion Synced", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false }
+            {
+              "id": "LI Profile",
+              "displayName": "LI Profile",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notion Synced",
+              "displayName": "Notion Synced",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
           ]
         },
         "options": {}
@@ -206,7 +300,10 @@
       "name": "Mark Row as Synced",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [2010, 240],
+      "position": [
+        2010,
+        240
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "wi6bAEK3LwBuXnNr",
@@ -223,49 +320,132 @@
       "name": "Rate Limit Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2230, 300],
+      "position": [
+        2230,
+        300
+      ],
       "webhookId": "step2-rate-limit"
     }
   ],
   "pinData": {},
   "connections": {
     "Every 30 Minutes": {
-      "main": [[ { "node": "Read Loom Videos Sheet", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Read Loom Videos Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Read Loom Videos Sheet": {
-      "main": [[ { "node": "Filter: Done + Not Yet Synced", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Filter: Done + Not Yet Synced",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Filter: Done + Not Yet Synced": {
       "main": [
-        [ { "node": "Loop (1 at a time)", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Loop (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Loop (1 at a time)": {
       "main": [
         [],
-        [ { "node": "Find Notion Contact", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Find Notion Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Find Notion Contact": {
-      "main": [[ { "node": "Contact Found?", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Contact Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Contact Found?": {
       "main": [
-        [ { "node": "Status Priority Check", "type": "main", "index": 0 } ],
-        [ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Status Priority Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Status Priority Check": {
-      "main": [[ { "node": "Update Notion (Loom Sent)", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Update Notion (Loom Sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Update Notion (Loom Sent)": {
-      "main": [[ { "node": "Mark Row as Synced", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Mark Row as Synced",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Mark Row as Synced": {
-      "main": [[ { "node": "Rate Limit Delay", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Rate Limit Delay": {
-      "main": [[ { "node": "Loop (1 at a time)", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Loop (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -275,7 +455,9 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "step2-v2-localhost",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "id": "",
   "tags": []
 }

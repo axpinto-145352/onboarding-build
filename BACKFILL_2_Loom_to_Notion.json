@@ -1,5 +1,5 @@
 {
-  "name": "BACKFILL 2 - Loom Videos Sheet → Update Notion Contacts (One-Time)",
+  "name": "BACKFILL 2 - Loom Videos Sheet \u2192 Update Notion Contacts (One-Time)",
   "nodes": [
     {
       "parameters": {},
@@ -7,8 +7,11 @@
       "name": "Run Backfill",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [250, 300],
-      "notes": "Click 'Execute Workflow' to backfill Loom Sent data from your existing Loom Videos Google Sheet into Notion. No manual export needed — reads directly from your existing sheet."
+      "position": [
+        250,
+        300
+      ],
+      "notes": "Click 'Execute Workflow' to backfill Loom Sent data from your existing Loom Videos Google Sheet into Notion. No manual export needed \u2014 reads directly from your existing sheet."
     },
     {
       "parameters": {
@@ -32,7 +35,10 @@
       "name": "Read Loom Videos Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [470, 300],
+      "position": [
+        470,
+        300
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "wi6bAEK3LwBuXnNr",
@@ -44,17 +50,28 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "leftValue": "={{ $json['Done?'] || $json['Done'] || '' }}",
               "rightValue": "Done",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             },
             {
               "leftValue": "={{ $json['LI Profile'] || $json['LinkedIn URL'] || '' }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -66,7 +83,10 @@
       "name": "Filter: Done + Has LI Profile",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [690, 300],
+      "position": [
+        690,
+        300
+      ],
       "notes": "Only processes rows where Loom script was completed (Done? = 'Done') AND has a LinkedIn Profile URL for matching."
     },
     {
@@ -80,43 +100,76 @@
       "name": "Loop (1 at a time)",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [910, 300],
+      "position": [
+        910,
+        300
+      ],
       "notes": "Processes one contact at a time for Notion rate limiting."
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"LinkedIn Profile\",\n        \"url\": { \"equals\": {{ JSON.stringify($json['LI Profile'] || $json['LinkedIn URL'] || '') }} }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": {{ JSON.stringify($json['Name'] || '') }} }\n      }\n    ]\n  }\n}",
-        "options": {}
-      },
       "id": "bf2-node-5",
       "name": "Find Notion Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1130, 300],
-      "notes": "Finds the contact in Notion by LinkedIn Profile URL or Name."
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1130,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Finds the contact in Notion by LinkedIn Profile URL or Name.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "LinkedIn Profile|url",
+              "condition": "string:equals",
+              "urlValue": "={{ $json['LI Profile'] || $json['LinkedIn URL'] || '' }}"
+            },
+            {
+              "key": "Name|title",
+              "condition": "string:equals",
+              "titleValue": "={{ $json['Name'] || '' }}"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
-              "leftValue": "={{ $json.results?.length || 0 }}",
-              "rightValue": 0,
-              "operator": { "type": "number", "operation": "gt" }
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ]
         },
@@ -127,43 +180,64 @@
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1350, 300]
+      "position": [
+        1350,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Check if we should advance to 'Loom Sent' status\n// Only advance if current status is Connection Sent or Connection Accepted\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\n\nconst contact = $('Find Notion Contact').first().json.results[0];\nconst currentStatus = contact?.properties?.Status?.select?.name || '';\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\nconst loomSentPriority = STATUS_PRIORITY['Loom Sent'];\n\n// Only update status if it would advance forward\nconst shouldUpdateStatus = loomSentPriority > currentPriority;\n\n// Get score data from sheet if available\nconst loopItem = $('Loop (1 at a time)').first().json;\n\nreturn [{\n  json: {\n    notion_page_id: contact.id,\n    current_status: currentStatus,\n    should_update_status: shouldUpdateStatus,\n    contact_name: contact?.properties?.Name?.title?.[0]?.text?.content || 'Unknown',\n    score: loopItem['Score'] || '',\n    tier: loopItem['Tier'] || '',\n    company: loopItem['Company'] || ''\n  }\n}];"
+        "jsCode": "// Check if we should advance to 'Loom Sent' status\n// Only advance if current status is Connection Sent or Connection Accepted\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\n\nconst contact = $('Find Notion Contact').first().json;\nconst currentStatus = contact?.properties?.Status?.select?.name || '';\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\nconst loomSentPriority = STATUS_PRIORITY['Loom Sent'];\n\n// Only update status if it would advance forward\nconst shouldUpdateStatus = loomSentPriority > currentPriority;\n\n// Get score data from sheet if available\nconst loopItem = $('Loop (1 at a time)').first().json;\n\nreturn [{\n  json: {\n    notion_page_id: contact.id,\n    current_status: currentStatus,\n    should_update_status: shouldUpdateStatus,\n    contact_name: contact?.properties?.Name?.title?.[0]?.text?.content || 'Unknown',\n    score: loopItem['Score'] || '',\n    tier: loopItem['Tier'] || '',\n    company: loopItem['Company'] || ''\n  }\n}];"
       },
       "id": "bf2-node-7",
       "name": "Status Priority Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1570, 240],
+      "position": [
+        1570,
+        240
+      ],
       "notes": "Only advances to 'Loom Sent' if current status is lower priority (Connection Sent or Connection Accepted). Never downgrades."
     },
     {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $json.notion_page_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Notion-Version", "value": "2022-06-28" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Loom Sent\": { \"checkbox\": true },\n    {{ $json.should_update_status ? '\"Status\": { \"select\": { \"name\": \"Loom Sent\" } },' : '' }}\n    \"Last Contact Date\": { \"date\": { \"start\": \"{{ $now.toISO() }}\" } }\n  }\n}",
-        "options": {}
-      },
       "id": "bf2-node-8",
       "name": "Update Notion (Loom Sent)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1790, 240],
-      "notes": "Sets Loom Sent checkbox = true. Only updates Status to 'Loom Sent' if it would advance the contact forward."
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1790,
+        240
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Sets Loom Sent checkbox = true. Only updates Status to 'Loom Sent' if it would advance the contact forward.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Loom Sent|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "={{ $json.should_update_status ? 'Loom Sent' : $json.current_status }}"
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {
@@ -173,7 +247,10 @@
       "name": "Rate Limit Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2010, 300],
+      "position": [
+        2010,
+        300
+      ],
       "webhookId": "bf2-rate-limit",
       "notes": "400ms delay between updates for Notion rate limiting."
     }
@@ -182,49 +259,109 @@
   "connections": {
     "Run Backfill": {
       "main": [
-        [{ "node": "Read Loom Videos Sheet", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Read Loom Videos Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Read Loom Videos Sheet": {
       "main": [
-        [{ "node": "Filter: Done + Has LI Profile", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Filter: Done + Has LI Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Filter: Done + Has LI Profile": {
       "main": [
-        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Loop (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Loop (1 at a time)": {
       "main": [
         [],
-        [{ "node": "Find Notion Contact", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Find Notion Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Find Notion Contact": {
       "main": [
-        [{ "node": "Contact Found?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Contact Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Contact Found?": {
       "main": [
-        [{ "node": "Status Priority Check", "type": "main", "index": 0 }],
-        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Status Priority Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Status Priority Check": {
       "main": [
-        [{ "node": "Update Notion (Loom Sent)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Update Notion (Loom Sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Notion (Loom Sent)": {
       "main": [
-        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Rate Limit Delay": {
       "main": [
-        [{ "node": "Loop (1 at a time)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Loop (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -235,7 +372,13 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "bf2-v1-0",
-  "meta": { "templateCredsSetupCompleted": false },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
   "id": "",
-  "tags": [{ "name": "Backfill" }]
+  "tags": [
+    {
+      "name": "Backfill"
+    }
+  ]
 }

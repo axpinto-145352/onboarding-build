@@ -176,38 +176,51 @@
       "notes": "Extracts the first invitee's name, email, and any custom question answers from the Calendly event."
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/databases/YOUR_NOTION_CONTACTS_DB_ID/query",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"filter\": {\n    \"or\": [\n      {\n        \"property\": \"Email\",\n        \"email\": { \"equals\": {{ JSON.stringify($json.invitee_email || '') }} }\n      },\n      {\n        \"property\": \"Name\",\n        \"title\": { \"equals\": {{ JSON.stringify($json.invitee_name || '') }} }\n      }\n    ]\n  }\n}",
-        "options": {}
-      },
       "id": "bf3-node-9",
       "name": "Find Notion Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         2230,
         300
       ],
-      "notes": "Finds the contact in Notion by email or name."
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Finds the contact in Notion by email or name.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Email|email",
+              "condition": "string:equals",
+              "emailValue": "={{ $json.invitee_email || '' }}"
+            },
+            {
+              "key": "Name|title",
+              "condition": "string:equals",
+              "titleValue": "={{ $json.invitee_name || '' }}"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {
+          "simple": false
+        }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -219,11 +232,12 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.results?.length || 0 }}",
-              "rightValue": 0,
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
               }
             }
           ]
@@ -242,7 +256,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Determine the correct status update based on meeting category and timing\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\n\nconst contact = $('Find Notion Contact').first().json.results[0];\nconst contactId = contact.id;\nconst currentStatus = contact?.properties?.Status?.select?.name || '';\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\n\nconst eventData = $('Extract Invitee Data').first().json;\nconst startTime = new Date(eventData.start_time);\nconst now = new Date();\nconst meetingHappened = startTime < now;\n\n// Determine new status\nlet newStatus;\nif (meetingHappened) {\n  newStatus = 'Meeting Held';\n} else {\n  newStatus = 'Meeting Booked';\n}\n\nconst newPriority = STATUS_PRIORITY[newStatus] || 0;\nconst shouldUpdateStatus = newPriority > currentPriority;\n\nreturn [{\n  json: {\n    contact_id: contactId,\n    current_status: currentStatus,\n    new_status: shouldUpdateStatus ? newStatus : null,\n    should_update_status: shouldUpdateStatus,\n    meeting_happened: meetingHappened,\n    invitee_name: eventData.invitee_name,\n    invitee_email: eventData.invitee_email,\n    event_name: eventData.event_name,\n    start_time: eventData.start_time,\n    meeting_category: eventData.meeting_category\n  }\n}];"
+        "jsCode": "// Determine the correct status update based on meeting category and timing\nconst STATUS_PRIORITY = {\n  'Connection Sent': 1,\n  'Connection Accepted': 2,\n  'Loom Sent': 3,\n  'Follow-Up Sequence': 4,\n  'Responded': 5,\n  'Pending Approval': 6,\n  'Meeting Booked': 7,\n  'Meeting Held': 8,\n  'Proposal Sent': 9,\n  'Contract Sent': 10,\n  'Project Started': 11,\n  'Declined': 0\n};\n\nconst contact = $('Find Notion Contact').first().json;\nconst contactId = contact.id;\nconst currentStatus = contact?.properties?.Status?.select?.name || '';\nconst currentPriority = STATUS_PRIORITY[currentStatus] || 0;\n\nconst eventData = $('Extract Invitee Data').first().json;\nconst startTime = new Date(eventData.start_time);\nconst now = new Date();\nconst meetingHappened = startTime < now;\n\n// Determine new status\nlet newStatus;\nif (meetingHappened) {\n  newStatus = 'Meeting Held';\n} else {\n  newStatus = 'Meeting Booked';\n}\n\nconst newPriority = STATUS_PRIORITY[newStatus] || 0;\nconst shouldUpdateStatus = newPriority > currentPriority;\n\nreturn [{\n  json: {\n    contact_id: contactId,\n    current_status: currentStatus,\n    new_status: shouldUpdateStatus ? newStatus : null,\n    should_update_status: shouldUpdateStatus,\n    meeting_happened: meetingHappened,\n    invitee_name: eventData.invitee_name,\n    invitee_email: eventData.invitee_email,\n    event_name: eventData.event_name,\n    start_time: eventData.start_time,\n    meeting_category: eventData.meeting_category\n  }\n}];"
       },
       "id": "bf3-node-11",
       "name": "Determine Status + Meeting Type",
@@ -255,72 +269,99 @@
       "notes": "Checks if the meeting already happened (\u2192 Meeting Held) or is upcoming (\u2192 Meeting Booked). Only advances status forward."
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.notion.com/v1/pages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"parent\": { \"database_id\": \"YOUR_NOTION_MEETINGS_DB_ID\" },\n  \"properties\": {\n    \"Meeting Title\": { \"title\": [{ \"text\": { \"content\": {{ JSON.stringify(($json.event_name || 'Meeting') + ' - ' + ($json.invitee_name || '')) }} } }] },\n    \"Date\": { \"date\": { \"start\": {{ JSON.stringify($json.start_time || '') }} } },\n    \"Meeting Category\": { \"select\": { \"name\": {{ JSON.stringify($json.meeting_category || 'Other') }} } },\n    \"Meeting Type\": { \"select\": { \"name\": {{ JSON.stringify($json.meeting_happened ? 'Completed' : 'Scheduled') }} } },\n    \"Attendee Email\": { \"email\": {{ JSON.stringify($json.invitee_email || '') }} },\n    \"Contact\": { \"relation\": [{ \"id\": \"{{ $json.contact_id }}\" }] }\n  }\n}",
-        "options": {}
-      },
       "id": "bf3-node-12",
       "name": "Create Notion Meeting Record",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         2890,
         180
       ],
-      "notes": "Creates a meeting record in Notion Meetings DB linked to the contact. Uses same schema as STEP8."
-    },
-    {
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Creates a meeting record in Notion Meetings DB linked to the contact. Uses same schema as STEP8.",
       "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.notion.com/v1/pages/{{ $('Determine Status + Meeting Type').item.json.contact_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_MEETINGS_DB_ID",
+          "mode": "id"
+        },
+        "title": "={{ ($json.event_name || 'Meeting') + ' - ' + ($json.invitee_name || '') }}",
+        "propertiesUi": {
+          "propertyValues": [
             {
-              "name": "Notion-Version",
-              "value": "2022-06-28"
+              "key": "Date|date",
+              "dateValue": "={{ $json.start_time || '' }}",
+              "includeTime": false
             },
             {
-              "name": "Content-Type",
-              "value": "application/json"
+              "key": "Meeting Category|select",
+              "selectValue": "={{ $json.meeting_category || 'Other' }}"
+            },
+            {
+              "key": "Meeting Type|select",
+              "selectValue": "={{ $json.meeting_happened ? 'Completed' : 'Scheduled' }}"
+            },
+            {
+              "key": "Attendee Email|email",
+              "emailValue": "={{ $json.invitee_email || '' }}"
+            },
+            {
+              "key": "Contact|relation",
+              "relationValue": [
+                "={{ $json.contact_id }}"
+              ]
             }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"properties\": {\n    \"Call Booked\": { \"checkbox\": true },\n    {{ $('Determine Status + Meeting Type').item.json.should_update_status ? '\"Status\": { \"select\": { \"name\": ' + JSON.stringify($('Determine Status + Meeting Type').item.json.new_status) + ' } },' : '' }}\n    \"Last Contact Date\": { \"date\": { \"start\": {{ JSON.stringify($('Determine Status + Meeting Type').item.json.start_time || new Date().toISOString()) }} } }\n  }\n}",
         "options": {}
-      },
+      }
+    },
+    {
       "id": "bf3-node-13",
       "name": "Update Contact Status",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
         2890,
         360
       ],
-      "notes": "Updates the contact's Call Booked checkbox, Last Contact Date, and Status (only if advancing forward)."
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Updates the contact's Call Booked checkbox, Last Contact Date, and Status (only if advancing forward).",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Determine Status + Meeting Type').item.json.contact_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Call Booked|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "={{ $('Determine Status + Meeting Type').item.json.should_update_status ? $('Determine Status + Meeting Type').item.json.new_status : ($('Find Notion Contact').first().json.properties?.Status?.select?.name || '') }}"
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $('Determine Status + Meeting Type').item.json.start_time || $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
     },
     {
       "parameters": {
