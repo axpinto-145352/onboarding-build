@@ -1,97 +1,48 @@
 {
-  "name": "Lead Gen WF3C \u2014 Calendly Discovery Call Screening",
+  "name": "Lead Gen WF3C — Calendly Discovery Call Screening",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 5
-            }
-          ]
-        }
+        "httpMethod": "POST",
+        "path": "calendly-discovery-screening",
+        "responseMode": "onReceived",
+        "options": {}
       },
       "id": "step3c-node-1",
-      "name": "Every 5 Minutes",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.1,
+      "name": "Calendly Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
         250,
-        300
+        500
       ],
-      "notes": "Polls Calendly API every 5 minutes for new Discovery Call invitees. Replaces Calendly webhook for localhost.\n\nAPPROVAL CHANGE: Low-revenue contacts are set to 'Pending Approval' in Notion. Anthony changes status directly in Notion to 'Meeting Booked' (approve) or 'Declined' (reject)."
+      "webhookId": "calendly-discovery-screening",
+      "notes": "Receives Calendly invitee.created webhooks for 'Veteran Vectors - Discovery Call' events. Responds immediately with 200."
     },
     {
       "parameters": {
-        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst now = new Date();\nconst lastPollTime = staticData.lastPollCalendly || new Date(now.getTime() - 10 * 60 * 1000).toISOString();\nstaticData.lastPollCalendly = now.toISOString();\nreturn [{ json: { min_start_time: lastPollTime, max_start_time: new Date(now.getTime() + 30*24*60*60*1000).toISOString() }}];"
+        "jsCode": "const payload = $json.body || $json;\nconst eventPayload = payload.payload || {};\nconst event = eventPayload.event || {};\nconst invitee = eventPayload.invitee || {};\n\nconst eventUri = event.uri || eventPayload.event || '';\nconst eventUuid = eventUri ? eventUri.split('/').pop() : '';\nconst eventName = event.name || eventPayload.event_type?.name || 'Discovery Call';\nconst startTime = event.start_time || '';\n\nconst inviteeName = invitee.name || '';\nconst inviteeEmail = invitee.email || '';\n\nconst qAndA = invitee.questions_and_answers || [];\n\nlet q1_decision_maker = '';\nlet q2_budget = '';\nlet q3_employees = '';\nlet q4_processes = '';\nlet q5_current_tools = '';\nlet q6_phone = '';\n\nfor (const qa of qAndA) {\n  const q = (qa.question || '').toLowerCase();\n  const a = qa.answer || '';\n\n  if (q.includes('business owner') || q.includes('decision maker')) {\n    q1_decision_maker = a;\n  } else if (q.includes('$2,000') || q.includes('2,000') || q.includes('budget')) {\n    q2_budget = a;\n  } else if (q.includes('how many employees')) {\n    q3_employees = a;\n  } else if (q.includes('processes are you looking to automate') || q.includes('specific processes')) {\n    q4_processes = a;\n  } else if (q.includes('currently handling') || q.includes('tools, processes')) {\n    q5_current_tools = a;\n  } else if (q.includes('phone number')) {\n    q6_phone = a;\n  }\n}\n\nreturn [{\n  json: {\n    event_uri: eventUri,\n    event_uuid: eventUuid,\n    event_name: eventName,\n    start_time: startTime,\n    invitee_name: inviteeName,\n    invitee_email: inviteeEmail,\n    q1_decision_maker,\n    q2_budget,\n    q3_employees,\n    q4_processes,\n    q5_current_tools,\n    q6_phone\n  }\n}];"
       },
       "id": "step3c-node-2",
-      "name": "Get Poll Window",
+      "name": "Extract Event + Invitee Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        470,
-        300
+        500,
+        500
       ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://api.calendly.com/users/me",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api",
-        "options": {}
+        "jsCode": "const d = $json;\nconst q1Fail = (d.q1_decision_maker || '').toLowerCase() === 'no';\nconst q2Fail = (d.q2_budget || '').toLowerCase().includes('not quite yet');\nconst q3Fail = ['1-5', '6-10'].includes(d.q3_employees || '');\nconst isPotentialDecline = q1Fail && q2Fail && q3Fail;\nreturn [{ json: { ...d, is_potential_decline: isPotentialDecline, q1_fail: q1Fail, q2_fail: q2Fail, q3_fail: q3Fail } }];"
       },
       "id": "step3c-node-3",
-      "name": "Get Calendly User",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        690,
-        300
-      ],
-      "credentials": {
-        "oAuth2Api": {
-          "id": "uFXaP32GB3oPzqwu",
-          "name": "VV - Calendly"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "=https://api.calendly.com/scheduled_events?user={{ encodeURIComponent($json.resource?.uri || '') }}&min_start_time={{ encodeURIComponent($('Get Poll Window').first().json.min_start_time) }}&max_start_time={{ encodeURIComponent($('Get Poll Window').first().json.max_start_time) }}&count=100&status=active",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api",
-        "options": {}
-      },
-      "id": "step3c-node-4",
-      "name": "List Recent Calendly Events",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        910,
-        300
-      ],
-      "credentials": {
-        "oAuth2Api": {
-          "id": "uFXaP32GB3oPzqwu",
-          "name": "VV - Calendly"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const events = $json.collection || [];\nconst disc = events.filter(e => { const n = (e.name||'').toLowerCase(); return n.includes('discovery')||n.includes('screening')||n.includes('intro')||n.includes('audit')||n.includes('consultation'); });\nif (!disc.length) return [{ json: { _empty: true } }];\nreturn disc.map(e => ({ json: { event_uri: e.uri||'', event_uuid: (e.uri||'').split('/').pop(), event_name: e.name||'Discovery Call', start_time: e.start_time||'' } }));"
-      },
-      "id": "step3c-node-5",
-      "name": "Filter Discovery Calls",
+      "name": "Check Decline Criteria",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1130,
-        300
+        750,
+        500
       ]
     },
     {
@@ -104,11 +55,12 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json._empty }}",
+              "id": "condition-decline",
+              "leftValue": "={{ $json.is_potential_decline }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
-                "operation": "notTrue"
+                "operation": "true"
               }
             }
           ]
@@ -116,46 +68,126 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step3c-node-5b",
-      "name": "Has Discovery Events?",
+      "id": "step3c-node-4",
+      "name": "Potential Decline?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1350,
-        300
+        1000,
+        500
       ]
     },
     {
       "parameters": {
-        "options": {
-          "reset": false
-        },
-        "batchSize": 1
+        "sendTo": "anthony@veteranvectors.io",
+        "subject": "=⚠️ Discovery Call Screening: {{ $json.invitee_name }} — Potential Decline",
+        "emailType": "html",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px;\">\n<h2 style=\"color: #d35400;\">⚠️ Discovery Call Screening — Potential Decline</h2>\n<hr>\n<table style=\"width:100%; border-collapse:collapse;\">\n<tr><td style=\"padding:6px 12px; font-weight:bold;\">Name:</td><td style=\"padding:6px 12px;\">{{ $json.invitee_name }}</td></tr>\n<tr><td style=\"padding:6px 12px; font-weight:bold;\">Email:</td><td style=\"padding:6px 12px;\">{{ $json.invitee_email }}</td></tr>\n<tr><td style=\"padding:6px 12px; font-weight:bold;\">Event:</td><td style=\"padding:6px 12px;\">{{ $json.event_name }}</td></tr>\n<tr><td style=\"padding:6px 12px; font-weight:bold;\">Scheduled:</td><td style=\"padding:6px 12px;\">{{ $json.start_time }}</td></tr>\n</table>\n<h3 style=\"margin-top:20px;\">Screening Answers</h3>\n<table style=\"width:100%; border-collapse:collapse; border:1px solid #ddd;\">\n<tr style=\"background:#f8f8f8;\"><td style=\"padding:8px; font-weight:bold; border:1px solid #ddd;\">Q1: Business Owner / Decision Maker?</td><td style=\"padding:8px; border:1px solid #ddd; color:{{ $json.q1_fail ? '#c0392b' : '#27ae60' }};\">{{ $json.q1_decision_maker || 'No answer' }} {{ $json.q1_fail ? '❌' : '✅' }}</td></tr>\n<tr><td style=\"padding:8px; font-weight:bold; border:1px solid #ddd;\">Q2: Budget ($2,000+ OK)?</td><td style=\"padding:8px; border:1px solid #ddd; color:{{ $json.q2_fail ? '#c0392b' : '#27ae60' }};\">{{ $json.q2_budget || 'No answer' }} {{ $json.q2_fail ? '❌' : '✅' }}</td></tr>\n<tr style=\"background:#f8f8f8;\"><td style=\"padding:8px; font-weight:bold; border:1px solid #ddd;\">Q3: Employees</td><td style=\"padding:8px; border:1px solid #ddd; color:{{ $json.q3_fail ? '#c0392b' : '#27ae60' }};\">{{ $json.q3_employees || 'No answer' }} {{ $json.q3_fail ? '❌' : '✅' }}</td></tr>\n<tr><td style=\"padding:8px; font-weight:bold; border:1px solid #ddd;\">Q4: Processes to Automate</td><td style=\"padding:8px; border:1px solid #ddd;\">{{ $json.q4_processes || 'No answer' }}</td></tr>\n<tr style=\"background:#f8f8f8;\"><td style=\"padding:8px; font-weight:bold; border:1px solid #ddd;\">Q5: Current Tools/Processes</td><td style=\"padding:8px; border:1px solid #ddd;\">{{ $json.q5_current_tools || 'No answer' }}</td></tr>\n<tr><td style=\"padding:8px; font-weight:bold; border:1px solid #ddd;\">Q6: Phone Number</td><td style=\"padding:8px; border:1px solid #ddd;\">{{ $json.q6_phone || 'No answer' }}</td></tr>\n</table>\n<p style=\"margin-top:20px; color:#c0392b; font-weight:bold;\">All 3 decline criteria met. Action required:</p>\n<div style=\"margin-top:16px; text-align:center;\">\n<a href=\"{{ $execution.resumeUrl }}?action=approve&event_uuid={{ $json.event_uuid }}&invitee_email={{ encodeURIComponent($json.invitee_email) }}\" style=\"display:inline-block; padding:12px 32px; background:#27ae60; color:#fff; text-decoration:none; border-radius:6px; font-size:16px; margin-right:12px;\">✅ Approve — Keep Call</a>\n<a href=\"{{ $execution.resumeUrl }}?action=disapprove&event_uuid={{ $json.event_uuid }}&invitee_email={{ encodeURIComponent($json.invitee_email) }}\" style=\"display:inline-block; padding:12px 32px; background:#c0392b; color:#fff; text-decoration:none; border-radius:6px; font-size:16px;\">❌ Disapprove — Cancel Call</a>\n</div>\n</div>",
+        "options": {}
+      },
+      "id": "step3c-node-5",
+      "name": "Email Anthony for Approval",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        350
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
       },
       "id": "step3c-node-6",
-      "name": "Loop Events",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
+      "name": "Wait for Anthony's Decision",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
       "position": [
-        1570,
-        300
-      ]
+        1530,
+        350
+      ],
+      "webhookId": "calendly-screening-decision"
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "=https://api.calendly.com/scheduled_events/{{ $json.event_uuid }}/invitees?count=10",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api",
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "condition-approved",
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
         "options": {}
       },
       "id": "step3c-node-7",
-      "name": "Get Event Invitees",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Check Decline Criteria').item.json.invitee_email }}",
+        "subject": "Thank you for your interest — A gift from Veteran Vectors",
+        "emailType": "html",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; line-height: 1.6;\">\n<p>Hi {{ $('Check Decline Criteria').item.json.invitee_name.split(' ')[0] || 'there' }},</p>\n<p>Thank you so much for taking the time to book a discovery call with Veteran Vectors. We truly appreciate your interest in exploring how automation can transform your business.</p>\n<p>After reviewing the details, it looks like the timing may not be the perfect fit right now — and that's completely okay. We want to make sure that when we work together, we can deliver the maximum value for where your business is at.</p>\n<p>In the meantime, we'd love to share something with you that can help right away:</p>\n<p style=\"text-align:center; margin: 24px 0;\">\n<a href=\"YOUR_LEAD_MAGNET_URL\" style=\"display:inline-block; padding:14px 36px; background:#2c3e50; color:#fff; text-decoration:none; border-radius:6px; font-size:16px;\">Download Your Free Automation Guide</a>\n</p>\n<p>This guide covers practical automation strategies you can start implementing today, no matter the size of your team.</p>\n<p>When the time is right, we'd love to reconnect. Don't hesitate to reach out — we're always here to help.</p>\n<p>Wishing you continued success,</p>\n<p><strong>The Veteran Vectors Team</strong><br>anthony@veteranvectors.io</p>\n</div>",
+        "options": {}
+      },
+      "id": "step3c-node-8",
+      "name": "Send Apology Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        450
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.calendly.com/scheduled_events/{{ $('Check Decline Criteria').item.json.event_uuid }}/cancellation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"reason\": \"After reviewing your screening responses, we determined this isn't the best fit at the moment. We wish you the best and hope to connect in the future.\" }",
+        "options": {}
+      },
+      "id": "step3c-node-9",
+      "name": "Cancel Calendly Event",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1790,
-        300
+        2310,
+        450
       ],
       "credentials": {
         "oAuth2Api": {
@@ -166,25 +198,25 @@
     },
     {
       "parameters": {
-        "jsCode": "const invitees = $json.collection || [];\nconst inv = invitees[0] || {};\nconst ev = $('Loop Events').first().json;\nconst qAndA = inv.questions_and_answers || [];\nlet revenue='',employees='',company='',budget='',decisionMaker='',painPoints='';\nfor (const qa of qAndA) { const q=(qa.question||'').toLowerCase(), a=qa.answer||'';\n  if (q.includes('revenue')) revenue=a; else if (q.includes('employee')||q.includes('team size')) employees=a;\n  else if (q.includes('company')) company=a; else if (q.includes('budget')) budget=a;\n  else if (q.includes('decision')) decisionMaker=a; else if (q.includes('pain')||q.includes('challenge')) painPoints=a;\n}\nreturn [{ json: { invitee_name:inv.name||'', invitee_email:inv.email||'', event_name:ev.event_name||'', event_uuid:ev.event_uuid||'', start_time:ev.start_time||'', revenue, employees, company, budget, decision_maker:decisionMaker, pain_points:painPoints } }];"
+        "jsCode": "// Merge data from the decline path (after Anthony approves) or the non-decline path\n// We need to get the original screening data from Check Decline Criteria\nconst d = $('Check Decline Criteria').first().json;\nreturn [{ json: {\n  invitee_name: d.invitee_name,\n  invitee_email: d.invitee_email,\n  event_name: d.event_name,\n  event_uuid: d.event_uuid,\n  start_time: d.start_time,\n  q1_decision_maker: d.q1_decision_maker,\n  q2_budget: d.q2_budget,\n  q3_employees: d.q3_employees,\n  q4_processes: d.q4_processes,\n  q5_current_tools: d.q5_current_tools,\n  q6_phone: d.q6_phone\n} }];"
       },
-      "id": "step3c-node-8",
-      "name": "Extract Invitee + Screening Data",
+      "id": "step3c-node-10",
+      "name": "Consolidate Screening Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2010,
-        300
+        1280,
+        750
       ]
     },
     {
-      "id": "step3c-node-9",
+      "id": "step3c-node-11",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
-        2230,
-        300
+        1530,
+        750
       ],
       "credentials": {
         "notionApi": {
@@ -200,14 +232,15 @@
           "value": "YOUR_NOTION_CONTACTS_DB_ID",
           "mode": "id"
         },
-        "returnAll": true,
+        "returnAll": false,
+        "limit": 1,
         "filterType": "manual",
         "filters": {
           "conditions": [
             {
               "key": "Email|email",
               "condition": "string:equals",
-              "emailValue": "={{ $json.invitee_email || '' }}"
+              "emailValue": "={{ $json.invitee_email }}"
             }
           ]
         },
@@ -227,6 +260,7 @@
           },
           "conditions": [
             {
+              "id": "condition-contact-exists",
               "leftValue": "={{ $json.id || '' }}",
               "rightValue": "",
               "operator": {
@@ -240,160 +274,82 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step3c-node-10",
-      "name": "Contact Found?",
+      "id": "step3c-node-12",
+      "name": "Contact Exists?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        2450,
-        300
+        1780,
+        750
       ]
     },
     {
-      "parameters": {
-        "jsCode": "const SP = { 'Connection Sent':1,'Connection Accepted':2,'Loom Sent':3,'Follow-Up Sequence':4,'Responded':5,'Pending Approval':6,'Meeting Booked':7,'Meeting Held':8,'Proposal Sent':9,'Contract Sent':10,'Project Started':11,'Declined':0 };\nconst c = $('Find Notion Contact').first().json;\nconst cs = c?.properties?.Status?.select?.name||''; const cp = SP[cs]||0;\nconst cb = c?.properties?.['Call Booked']?.checkbox||false;\nif (cb || cp >= SP['Pending Approval']) return [{ json: { _skip: true } }];\nconst d = $('Extract Invitee + Screening Data').first().json;\nconst rs = (d.revenue||'').replace(/[^0-9.kKmM]/g,'');\nlet rn=0; if (rs.toLowerCase().includes('m')) rn=parseFloat(rs)*1e6; else if (rs.toLowerCase().includes('k')) rn=parseFloat(rs)*1e3; else rn=parseFloat(rs)||0;\nreturn [{ json: { _skip:false, notion_page_id:c.id, contact_name:c?.properties?.Name?.title?.[0]?.text?.content||'', is_low_revenue:rn>0&&rn<=5000, revenue_raw:d.revenue, invitee_email:d.invitee_email, invitee_name:d.invitee_name, company:d.company, employees:d.employees, budget:d.budget, pain_points:d.pain_points, event_uuid:d.event_uuid, start_time:d.start_time } }];"
+      "id": "step3c-node-13",
+      "name": "Create Contact if New",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        2060,
+        900
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
       },
-      "id": "step3c-node-11",
-      "name": "Check Already Processed + Revenue",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "textValue": "={{ $('Consolidate Screening Data').item.json.invitee_name }}"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $('Consolidate Screening Data').item.json.invitee_email }}"
+            },
+            {
+              "key": "Phone|phone_number",
+              "phoneValue": "={{ $('Consolidate Screening Data').item.json.q6_phone }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "Meeting Scheduled"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get contact page ID from either the found contact or the newly created one\nlet contactId = '';\ntry {\n  const found = $('Contact Exists?').first().json;\n  if (found && found.id) {\n    contactId = found.id;\n  }\n} catch(e) {}\n\nif (!contactId) {\n  try {\n    const created = $('Create Contact if New').first().json;\n    if (created && created.id) {\n      contactId = created.id;\n    }\n  } catch(e) {}\n}\n\nconst d = $('Consolidate Screening Data').first().json;\nreturn [{ json: { ...d, notion_contact_id: contactId } }];"
+      },
+      "id": "step3c-node-14",
+      "name": "Set Contact ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2670,
-        300
+        2310,
+        750
       ]
     },
     {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json._skip }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ]
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "id": "step3c-node-12",
-      "name": "Not Already Processed?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        2890,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.is_low_revenue }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true"
-              }
-            }
-          ]
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "id": "step3c-node-13",
-      "name": "Revenue < $5K?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        3110,
-        300
-      ]
-    },
-    {
-      "id": "step3c-node-14",
-      "name": "Update Notion (Pending Approval)",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
-      "position": [
-        3330,
-        200
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
-      "parameters": {
-        "resource": "databasePage",
-        "operation": "update",
-        "pageId": "={{ $json.notion_page_id }}",
-        "propertiesUi": {
-          "propertyValues": [
-            {
-              "key": "Status|select",
-              "selectValue": "Pending Approval"
-            },
-            {
-              "key": "Call Booked|checkbox",
-              "checkboxValue": true
-            },
-            {
-              "key": "Last Contact Date|date",
-              "dateValue": "={{ $now.toISO() }}",
-              "includeTime": true
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "parameters": {
-        "sendTo": "anthony@veteranvectors.io",
-        "subject": "=\ud83d\udd0d Low-Revenue Screening: {{ $('Check Already Processed + Revenue').item.json.invitee_name }} ({{ $('Check Already Processed + Revenue').item.json.revenue_raw || 'Unknown' }}/mo)",
-        "emailType": "html",
-        "message": "=<h2>Discovery Call Screening Required</h2><p><strong>Contact:</strong> {{ $('Check Already Processed + Revenue').item.json.invitee_name }}</p><p><strong>Email:</strong> {{ $('Check Already Processed + Revenue').item.json.invitee_email }}</p><p><strong>Company:</strong> {{ $('Check Already Processed + Revenue').item.json.company || 'Not provided' }}</p><p><strong>Monthly Revenue:</strong> {{ $('Check Already Processed + Revenue').item.json.revenue_raw || 'Not provided' }}</p><p><strong>Employees:</strong> {{ $('Check Already Processed + Revenue').item.json.employees || 'Not provided' }}</p><p><strong>Budget:</strong> {{ $('Check Already Processed + Revenue').item.json.budget || 'Not provided' }}</p><p><strong>Pain Points:</strong> {{ $('Check Already Processed + Revenue').item.json.pain_points || 'Not provided' }}</p><hr><p><strong>\u26a0\ufe0f Revenue below $5K/month threshold.</strong></p><p>To approve or decline, open the contact in Notion and change status:</p><ul><li><strong>'Meeting Booked'</strong> \u2192 approve</li><li><strong>'Declined'</strong> \u2192 reject (manually cancel the Calendly event)</li></ul>",
-        "options": {}
-      },
       "id": "step3c-node-15",
-      "name": "Email Anthony (Needs Review)",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [
-        3550,
-        200
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "r13jnGsjwNOqcBvt",
-          "name": "VV Gmail account"
-        }
-      }
-    },
-    {
-      "id": "step3c-node-16",
-      "name": "Update Notion (Auto-Qualified)",
+      "name": "Update Notion (Meeting Scheduled)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
-        3330,
-        420
+        2560,
+        750
       ],
       "credentials": {
         "notionApi": {
@@ -404,12 +360,12 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
-        "pageId": "={{ $json.notion_page_id }}",
+        "pageId": "={{ $json.notion_contact_id }}",
         "propertiesUi": {
           "propertyValues": [
             {
               "key": "Status|select",
-              "selectValue": "Meeting Booked"
+              "selectValue": "Meeting Scheduled"
             },
             {
               "key": "Call Booked|checkbox",
@@ -423,6 +379,10 @@
               "key": "Last Contact Date|date",
               "dateValue": "={{ $now.toISO() }}",
               "includeTime": true
+            },
+            {
+              "key": "Phone|phone_number",
+              "phoneValue": "={{ $json.q6_phone }}"
             }
           ]
         },
@@ -430,112 +390,166 @@
       }
     },
     {
-      "parameters": {
-        "amount": 0.5
-      },
-      "id": "step3c-node-17",
-      "name": "Rate Limit Delay",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
+      "id": "step3c-node-16",
+      "name": "Create Notion Meeting Record",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
       "position": [
-        3550,
-        420
+        2810,
+        750
       ],
-      "webhookId": "step3c-rate-limit"
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_MEETINGS_DB_ID",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "textValue": "={{ $json.event_name }}"
+            },
+            {
+              "key": "Date|date",
+              "dateValue": "={{ $json.start_time }}",
+              "includeTime": true
+            },
+            {
+              "key": "Meeting Type|select",
+              "selectValue": "Scheduled"
+            },
+            {
+              "key": "Meeting Category|select",
+              "selectValue": "Discovery"
+            },
+            {
+              "key": "Contact|relation",
+              "relationValue": "={{ $json.notion_contact_id }}"
+            },
+            {
+              "key": "Attendee Email|email",
+              "emailValue": "={{ $json.invitee_email }}"
+            }
+          ]
+        },
+        "options": {}
+      }
     }
   ],
   "pinData": {},
   "connections": {
-    "Every 5 Minutes": {
+    "Calendly Webhook": {
       "main": [
         [
           {
-            "node": "Get Poll Window",
+            "node": "Extract Event + Invitee Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Poll Window": {
+    "Extract Event + Invitee Data": {
       "main": [
         [
           {
-            "node": "Get Calendly User",
+            "node": "Check Decline Criteria",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Calendly User": {
+    "Check Decline Criteria": {
       "main": [
         [
           {
-            "node": "List Recent Calendly Events",
+            "node": "Potential Decline?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "List Recent Calendly Events": {
+    "Potential Decline?": {
       "main": [
         [
           {
-            "node": "Filter Discovery Calls",
+            "node": "Email Anthony for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Consolidate Screening Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Filter Discovery Calls": {
+    "Email Anthony for Approval": {
       "main": [
         [
           {
-            "node": "Has Discovery Events?",
+            "node": "Wait for Anthony's Decision",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has Discovery Events?": {
+    "Wait for Anthony's Decision": {
       "main": [
         [
           {
-            "node": "Loop Events",
+            "node": "Approved?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Loop Events": {
+    "Approved?": {
       "main": [
-        [],
         [
           {
-            "node": "Get Event Invitees",
+            "node": "Consolidate Screening Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Apology Email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Event Invitees": {
+    "Send Apology Email": {
       "main": [
         [
           {
-            "node": "Extract Invitee + Screening Data",
+            "node": "Cancel Calendly Event",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract Invitee + Screening Data": {
+    "Consolidate Screening Data": {
       "main": [
         [
           {
@@ -550,116 +564,58 @@
       "main": [
         [
           {
-            "node": "Contact Found?",
+            "node": "Contact Exists?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Contact Found?": {
+    "Contact Exists?": {
       "main": [
         [
           {
-            "node": "Check Already Processed + Revenue",
+            "node": "Set Contact ID",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Rate Limit Delay",
+            "node": "Create Contact if New",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Already Processed + Revenue": {
+    "Create Contact if New": {
       "main": [
         [
           {
-            "node": "Not Already Processed?",
+            "node": "Set Contact ID",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Not Already Processed?": {
+    "Set Contact ID": {
       "main": [
         [
           {
-            "node": "Revenue < $5K?",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Rate Limit Delay",
+            "node": "Update Notion (Meeting Scheduled)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Revenue < $5K?": {
+    "Update Notion (Meeting Scheduled)": {
       "main": [
         [
           {
-            "node": "Update Notion (Pending Approval)",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Update Notion (Auto-Qualified)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Notion (Pending Approval)": {
-      "main": [
-        [
-          {
-            "node": "Email Anthony (Needs Review)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Email Anthony (Needs Review)": {
-      "main": [
-        [
-          {
-            "node": "Rate Limit Delay",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Notion (Auto-Qualified)": {
-      "main": [
-        [
-          {
-            "node": "Rate Limit Delay",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Rate Limit Delay": {
-      "main": [
-        [
-          {
-            "node": "Loop Events",
+            "node": "Create Notion Meeting Record",
             "type": "main",
             "index": 0
           }
@@ -673,7 +629,7 @@
     "availableInMCP": true,
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step3c-v2-localhost",
+  "versionId": "step3c-v3-webhook",
   "meta": {
     "templateCredsSetupCompleted": false
   },

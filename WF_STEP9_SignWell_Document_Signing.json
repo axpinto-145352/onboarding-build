@@ -1,0 +1,251 @@
+{
+  "name": "Onboarding WF9 \u2014 SignWell Document Signing (Drive PDF \u2192 SignWell)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Send Document for Signing",
+        "formDescription": "Upload a Google Drive PDF link to send for e-signature via SignWell.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Client_Email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Client_Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Google_Drive_Document_URL",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Send for Signing"
+        }
+      },
+      "id": "step9-node-1",
+      "name": "Signing Request Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "signwell-signing-form",
+      "notes": "Form trigger collecting client email, client name, and a Google Drive shareable PDF link."
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $json.Google_Drive_Document_URL || '';\n// Extract file ID from Google Drive URL patterns:\n// https://drive.google.com/file/d/FILE_ID/view\n// https://drive.google.com/file/d/FILE_ID/view?usp=sharing\n// https://drive.google.com/open?id=FILE_ID\nlet fileId = '';\nconst match1 = url.match(/\\/file\\/d\\/([^/]+)/);\nconst match2 = url.match(/[?&]id=([^&]+)/);\nif (match1) {\n  fileId = match1[1];\n} else if (match2) {\n  fileId = match2[1];\n}\nif (!fileId) {\n  throw new Error('Could not extract file ID from Google Drive URL: ' + url);\n}\nreturn [{ json: { fileId, originalUrl: url } }];"
+      },
+      "id": "step9-node-2",
+      "name": "Extract File ID from URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ],
+      "notes": "Parses the Google Drive shareable link to extract the file ID for downloading."
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/pdf"
+            }
+          }
+        }
+      },
+      "id": "step9-node-3",
+      "name": "Download PDF from Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        690,
+        300
+      ],
+      "notes": "Downloads the PDF file from Google Drive using the extracted file ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst item = items[0];\nconst binaryData = item.binary;\nif (!binaryData || !binaryData.data) {\n  throw new Error('No binary data found from Google Drive download');\n}\nconst binaryObj = binaryData.data;\nconst base64 = binaryObj.data;\nconst fileName = binaryObj.fileName || 'document.pdf';\nconst mimeType = binaryObj.mimeType || 'application/pdf';\nreturn [{ json: { file_base64: base64, fileName, mimeType } }];"
+      },
+      "id": "step9-node-4",
+      "name": "Convert Binary to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        910,
+        300
+      ],
+      "notes": "Extracts the binary PDF data and converts it to base64 for the SignWell API upload."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.signwell.com/api/v1/documents/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "YOUR_SIGNWELL_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"test_mode\": false,\n  \"draft\": true,\n  \"text_tags\": true,\n  \"name\": {{ JSON.stringify($('Convert Binary to Base64').item.json.fileName) }},\n  \"files\": [{\n    \"name\": {{ JSON.stringify($('Convert Binary to Base64').item.json.fileName) }},\n    \"file_base64\": {{ JSON.stringify($('Convert Binary to Base64').item.json.file_base64) }}\n  }],\n  \"recipients\": [\n    { \"id\": \"1\", \"email\": \"anthony@veteranvectors.io\", \"name\": \"Anthony Pinto\", \"order\": 1 },\n    { \"id\": \"2\", \"email\": {{ JSON.stringify($('Signing Request Form').item.json.Client_Email) }}, \"name\": {{ JSON.stringify($('Signing Request Form').item.json.Client_Name) }}, \"order\": 2 }\n  ]\n}",
+        "options": {}
+      },
+      "id": "step9-node-5",
+      "name": "Create SignWell Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1130,
+        300
+      ],
+      "notes": "Uploads the PDF to SignWell as a draft document with text tags enabled. Anthony signs first (order 1), then the client (order 2)."
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "step9-node-6",
+      "name": "Wait for SignWell Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1350,
+        300
+      ],
+      "webhookId": "step9-signwell-wait"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.signwell.com/api/v1/documents/{{ $('Create SignWell Document').item.json.id }}/send/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "YOUR_SIGNWELL_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "step9-node-7",
+      "name": "Send Document for Signing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1570,
+        300
+      ],
+      "notes": "Sends the SignWell document for signing to both recipients."
+    }
+  ],
+  "connections": {
+    "Signing Request Form": {
+      "main": [
+        [
+          {
+            "node": "Extract File ID from URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract File ID from URL": {
+      "main": [
+        [
+          {
+            "node": "Download PDF from Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF from Drive": {
+      "main": [
+        [
+          {
+            "node": "Convert Binary to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Binary to Base64": {
+      "main": [
+        [
+          {
+            "node": "Create SignWell Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create SignWell Document": {
+      "main": [
+        [
+          {
+            "node": "Wait for SignWell Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for SignWell Processing": {
+      "main": [
+        [
+          {
+            "node": "Send Document for Signing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "step9-v1-signwell-signing",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": ""
+}
