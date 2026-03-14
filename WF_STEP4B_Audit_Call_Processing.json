@@ -1,50 +1,29 @@
 {
-  "name": "Onboarding WF4B \u2014 Audit Call Processing (Form \u2192 AI \u2192 Update GitHub + Notion)",
+  "name": "Onboarding WF4B — Audit Call Processing (Webhook → AI → Update GitHub + Notion)",
   "nodes": [
     {
       "parameters": {
-        "formTitle": "Audit Call Transcript Processing",
-        "formDescription": "Paste the BlueDot transcript after an audit call. Claude will refine the proposal and implementation guide, update the existing GitHub repo, and log the audit in Notion.",
-        "formFields": {
-          "values": [
-            { "fieldLabel": "Attendee Name", "fieldType": "text", "requiredField": true, "placeholder": "Client's full name" },
-            { "fieldLabel": "Attendee Email", "fieldType": "text", "requiredField": true, "placeholder": "client@company.com" },
-            { "fieldLabel": "Meeting Title", "fieldType": "text", "requiredField": false, "placeholder": "Audit Call - Company Name" },
-            { "fieldLabel": "Meeting Date", "fieldType": "date", "requiredField": false },
-            { "fieldLabel": "GitHub Repo Name", "fieldType": "text", "requiredField": true, "placeholder": "john-doe-acme-corp (from STEP4 output)" },
-            { "fieldLabel": "Transcript", "fieldType": "textarea", "requiredField": true, "placeholder": "Paste the full BlueDot transcript here..." },
-            { "fieldLabel": "BlueDot Summary", "fieldType": "textarea", "requiredField": false, "placeholder": "Optional: Paste BlueDot's own summary if available" }
-          ]
-        },
+        "httpMethod": "POST",
+        "path": "audit-call-processing",
+        "responseMode": "onReceived",
         "options": {}
       },
       "id": "step4b-node-1",
-      "name": "Audit Call Transcript Form",
-      "type": "n8n-nodes-base.formTrigger",
+      "name": "Audit Call Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [250, 300],
-      "webhookId": "audit-call-transcript-form",
-      "notes": "Localhost form trigger for audit call transcripts. For production: replace with n8n Webhook node for BlueDot Svix webhooks."
+      "webhookId": "audit-call-processing",
+      "notes": "Receives webhook from BlueDot (transcript ready) or Calendly (for Audit Call events). Can also be triggered by calendar event integration."
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            { "id": "ab-name", "name": "attendee_name", "value": "={{ $json['Attendee Name'] || '' }}", "type": "string" },
-            { "id": "ab-email", "name": "attendee_email", "value": "={{ $json['Attendee Email'] || '' }}", "type": "string" },
-            { "id": "ab-title", "name": "meeting_title", "value": "={{ $json['Meeting Title'] || 'Audit Call' }}", "type": "string" },
-            { "id": "ab-date", "name": "meeting_date", "value": "={{ $json['Meeting Date'] || $now.toISO() }}", "type": "string" },
-            { "id": "ab-repo", "name": "github_repo_name", "value": "={{ $json['GitHub Repo Name'] || '' }}", "type": "string" },
-            { "id": "ab-transcript", "name": "transcript", "value": "={{ ($json['Transcript'] || '').substring(0, 15000) }}", "type": "string" },
-            { "id": "ab-summary", "name": "bluedot_summary", "value": "={{ $json['BlueDot Summary'] || '' }}", "type": "string" }
-          ]
-        },
-        "options": {}
+        "jsCode": "const raw = $json;\n// BlueDot / direct payload\nif (raw.transcript || raw.body?.transcript) {\n  const t = raw.transcript || raw.body?.transcript || '';\n  return [{ json: {\n    attendee_name: raw.attendee_name || raw.body?.attendee_name || raw.participants?.[0]?.name || '',\n    attendee_email: raw.attendee_email || raw.body?.attendee_email || raw.participants?.[0]?.email || '',\n    meeting_title: raw.meeting_title || raw.body?.meeting_title || raw.title || 'Audit Call',\n    meeting_date: raw.meeting_date || raw.body?.meeting_date || raw.created_at || new Date().toISOString(),\n    github_repo_name: raw.github_repo_name || raw.body?.github_repo_name || '',\n    transcript: t.substring(0, 15000),\n    bluedot_summary: raw.summary || raw.body?.summary || ''\n  }}];\n}\n// Calendly format\nconst payload = raw.payload || raw;\nconst invitee = payload.invitee || {};\nconst event = payload.event || payload.scheduled_event || {};\nreturn [{ json: {\n  attendee_name: invitee.name || raw.name || '',\n  attendee_email: invitee.email || raw.email || '',\n  meeting_title: event.name || raw.event_type?.name || 'Audit Call',\n  meeting_date: event.start_time || raw.start_time || new Date().toISOString(),\n  github_repo_name: raw.github_repo_name || '',\n  transcript: raw.transcript || '(Transcript pending)',\n  bluedot_summary: ''\n}}];"
       },
       "id": "step4b-node-2",
       "name": "Extract Form Data",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [470, 300]
     },
     {
@@ -140,7 +119,7 @@
         "messages": {
           "values": [
             {
-              "content": "=You are a business consultant for Veteran Vectors, an automation consulting firm that helps small businesses (2-20 employees) automate their operations using n8n, Notion, and AI tools.\n\nThis is an AUDIT CALL \u2014 a follow-up to a previous discovery call. The client has already seen an initial proposal and is now doing a deeper dive into their systems and requirements. Your job is to REFINE and IMPROVE the existing proposal and implementation guide based on the new information.\n\nProduce FOUR clearly separated sections using the exact markers below.\n\n===MEETING_NOTES===\n1. AUDIT CALL SUMMARY (2-3 paragraphs covering what was audited, key findings, and assessment)\n2. SYSTEMS AUDITED (bulleted list of specific systems, processes, or workflows reviewed)\n3. NEW REQUIREMENTS or CHANGES (anything that differs from the original discovery call)\n4. TECHNICAL FINDINGS (specific pain points, bottlenecks, integration challenges discovered)\n5. NEXT STEPS (what was agreed upon)\n\n===PROPOSAL===\nWrite a REFINED proposal that incorporates audit findings:\n- Executive Summary (updated with audit insights)\n- Refined Automations/Solutions (updated based on what was actually seen in the audit)\n- Updated ROI & Hours Saved (more accurate estimates based on audit data)\n- Revised Timeline (adjusted based on complexity discovered in audit)\n- Final Investment/Pricing (refined pricing based on actual scope)\n- Implementation Priority Order (which automations to build first based on impact)\n\n===IMPLEMENTATION_GUIDE===\nWrite a REFINED step-by-step implementation guide:\n- Phase 1: Foundation (data model, core integrations based on audit findings)\n- Phase 2: High-Impact Automations (build highest-ROI automations first)\n- Phase 3: Secondary Automations (remaining automations)\n- Phase 4: Testing, Training & Handoff\n- Technical Requirements (specific tools, APIs, credentials needed)\n- Risk Mitigation (potential issues identified during audit and how to address them)\n\n===ACTION_ITEMS===\nReturn a JSON array of action items. Each item must have exactly these fields:\n[{\"task\": \"description\", \"owner\": \"Anthony\" or \"Client\", \"priority\": \"high\" or \"medium\" or \"low\"}]\nInclude 5-10 action items. Focus on what's needed to move from proposal to Statement of Work.\n\nAUDIT CALL TRANSCRIPT:\n{{ $('Extract Form Data').item.json.transcript.substring(0, 12000) }}"
+              "content": "=You are a business consultant for Veteran Vectors, an automation consulting firm that helps small businesses (2-20 employees) automate their operations using n8n, Notion, and AI tools.\n\nThis is an AUDIT CALL — a follow-up to a previous discovery call. The client has already seen an initial proposal and is now doing a deeper dive into their systems and requirements. Your job is to REFINE and IMPROVE the existing proposal and implementation guide based on the new information.\n\nProduce FOUR clearly separated sections using the exact markers below.\n\n===MEETING_NOTES===\n1. AUDIT CALL SUMMARY (2-3 paragraphs covering what was audited, key findings, and assessment)\n2. SYSTEMS AUDITED (bulleted list of specific systems, processes, or workflows reviewed)\n3. NEW REQUIREMENTS or CHANGES (anything that differs from the original discovery call)\n4. TECHNICAL FINDINGS (specific pain points, bottlenecks, integration challenges discovered)\n5. NEXT STEPS (what was agreed upon)\n\n===PROPOSAL===\nWrite a REFINED proposal that incorporates audit findings:\n- Executive Summary (updated with audit insights)\n- Refined Automations/Solutions (updated based on what was actually seen in the audit)\n- Updated ROI & Hours Saved (more accurate estimates based on audit data)\n- Revised Timeline (adjusted based on complexity discovered in audit)\n- Final Investment/Pricing (refined pricing based on actual scope)\n- Implementation Priority Order (which automations to build first based on impact)\n\n===IMPLEMENTATION_GUIDE===\nWrite a REFINED step-by-step implementation guide:\n- Phase 1: Foundation (data model, core integrations based on audit findings)\n- Phase 2: High-Impact Automations (build highest-ROI automations first)\n- Phase 3: Secondary Automations (remaining automations)\n- Phase 4: Testing, Training & Handoff\n- Technical Requirements (specific tools, APIs, credentials needed)\n- Risk Mitigation (potential issues identified during audit and how to address them)\n\n===ACTION_ITEMS===\nReturn a JSON array of action items. Each item must have exactly these fields:\n[{\"task\": \"description\", \"owner\": \"Anthony\" or \"Client\", \"priority\": \"high\" or \"medium\" or \"low\"}]\nInclude 5-10 action items. Focus on what's needed to move from proposal to Statement of Work.\n\nAUDIT CALL TRANSCRIPT:\n{{ $('Extract Form Data').item.json.transcript.substring(0, 12000) }}"
             }
           ]
         },
@@ -178,7 +157,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
-        "pageId": "={{ $('Extract Contact Info').item.json.notion_page_id }}",
+        "pageId": "={{ $('Extract Contact Info').item.json.notion_page_id || $('Extract New Contact Info').item.json.notion_page_id }}",
         "propertiesUi": {
           "propertyValues": [
             { "key": "Notes|rich_text", "richTextValue": "={{ 'AUDIT CALL NOTES:\\n' + $json.meeting_notes.substring(0, 1500) + '\\n\\nAction Items:\\n' + $json.action_items_text.substring(0, 500) }}" },
@@ -205,7 +184,7 @@
             { "key": "Date|date", "dateValue": "={{ $('Extract Form Data').item.json.meeting_date || $now.toISO() }}", "includeTime": false },
             { "key": "Meeting Type|select", "selectValue": "Completed" },
             { "key": "Meeting Category|select", "selectValue": "Audit" },
-            { "key": "Contact|relation", "relationValue": ["={{ $('Extract Contact Info').item.json.notion_page_id }}"] },
+            { "key": "Contact|relation", "relationValue": ["={{ $('Extract Contact Info').item.json.notion_page_id || $('Extract New Contact Info').item.json.notion_page_id }}"] },
             { "key": "Attendee Email|email", "emailValue": "={{ $('Extract Form Data').item.json.attendee_email || '' }}" },
             { "key": "BlueDot Notes|rich_text", "richTextValue": "={{ $json.meeting_notes.substring(0, 2000) }}" }
           ]
@@ -216,11 +195,11 @@
     {
       "parameters": {
         "owner": "YOUR_GITHUB_USERNAME",
-        "repository": "={{ $('Extract Contact Info').item.json.github_repo_name }}",
+        "repository": "={{ $('Extract Contact Info').item.json.github_repo_name || $('Extract New Contact Info').item.json.github_repo_name }}",
         "operation": "edit",
         "filePath": "proposals/proposal-draft.md",
         "commitMessage": "Refine proposal based on audit call findings",
-        "fileContent": "=# Proposal (Revised After Audit) \u2014 {{ $('Extract Contact Info').item.json.company_name }}\n\n**Last Updated:** {{ $now.toISODate() }}\n**Client:** {{ $('Extract Contact Info').item.json.contact_name }}\n**Company:** {{ $('Extract Contact Info').item.json.company_name }}\n\n---\n\n{{ $json.proposal }}",
+        "fileContent": "=# Proposal (Revised After Audit) — {{ $('Extract Contact Info').item.json.company_name || $('Extract New Contact Info').item.json.company_name }}\n\n**Last Updated:** {{ $now.toISODate() }}\n**Client:** {{ $('Extract Contact Info').item.json.contact_name || $('Extract New Contact Info').item.json.contact_name }}\n**Company:** {{ $('Extract Contact Info').item.json.company_name || $('Extract New Contact Info').item.json.company_name }}\n\n---\n\n{{ $json.proposal }}",
         "additionalParameters": {}
       },
       "id": "step4b-node-12",
@@ -234,11 +213,11 @@
     {
       "parameters": {
         "owner": "YOUR_GITHUB_USERNAME",
-        "repository": "={{ $('Extract Contact Info').item.json.github_repo_name }}",
+        "repository": "={{ $('Extract Contact Info').item.json.github_repo_name || $('Extract New Contact Info').item.json.github_repo_name }}",
         "operation": "edit",
         "filePath": "docs/implementation-guide.md",
         "commitMessage": "Refine implementation guide based on audit call findings",
-        "fileContent": "=# Implementation Guide (Revised After Audit) \u2014 {{ $('Extract Contact Info').item.json.company_name }}\n\n**Last Updated:** {{ $now.toISODate() }}\n**Client:** {{ $('Extract Contact Info').item.json.contact_name }}\n\n---\n\n{{ $json.implementation_guide }}",
+        "fileContent": "=# Implementation Guide (Revised After Audit) — {{ $('Extract Contact Info').item.json.company_name || $('Extract New Contact Info').item.json.company_name }}\n\n**Last Updated:** {{ $now.toISODate() }}\n**Client:** {{ $('Extract Contact Info').item.json.contact_name || $('Extract New Contact Info').item.json.contact_name }}\n\n---\n\n{{ $json.implementation_guide }}",
         "additionalParameters": {}
       },
       "id": "step4b-node-13",
@@ -248,11 +227,44 @@
       "position": [2230, 360],
       "credentials": { "githubApi": { "id": "YOUR_GITHUB_CRED_ID", "name": "GitHub account" } },
       "notes": "Overwrites the existing implementation-guide.md with the refined version from the audit call. Uses GitHub File > Edit operation."
+    },
+    {
+      "id": "step4b-node-20",
+      "name": "Create New Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1130, 420],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "title": "={{ $('Extract Form Data').item.json.attendee_name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Email|email", "emailValue": "={{ $('Extract Form Data').item.json.attendee_email }}" },
+            { "key": "Status|select", "selectValue": "Meeting Booked" },
+            { "key": "Source|select", "selectValue": "Calendly" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $json;\nconst formData = $('Extract Form Data').first().json;\nconst contactName = formData.attendee_name || 'Unknown';\nconst companyName = 'Unknown-Company';\nconst repoName = formData.github_repo_name || (contactName + '-' + companyName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\nreturn [{ json: {\n  notion_page_id: contact.id,\n  contact_name: contactName,\n  company_name: companyName,\n  contact_email: formData.attendee_email || '',\n  existing_folder_id: '',\n  github_repo_name: repoName\n}}];"
+      },
+      "id": "step4b-node-21",
+      "name": "Extract New Contact Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1350, 480]
     }
   ],
   "pinData": {},
   "connections": {
-    "Audit Call Transcript Form": {
+    "Audit Call Webhook Trigger": {
       "main": [[{ "node": "Extract Form Data", "type": "main", "index": 0 }]]
     },
     "Extract Form Data": {
@@ -262,9 +274,24 @@
       "main": [[{ "node": "Contact Found?", "type": "main", "index": 0 }]]
     },
     "Contact Found?": {
-      "main": [[{ "node": "Extract Contact Info", "type": "main", "index": 0 }]]
+      "main": [
+        [{ "node": "Extract Contact Info", "type": "main", "index": 0 }],
+        [{ "node": "Create New Contact", "type": "main", "index": 0 }]
+      ]
     },
     "Extract Contact Info": {
+      "main": [
+        [
+          { "node": "Upload Transcript to Drive", "type": "main", "index": 0 },
+          { "node": "GitHub: Upload Audit Transcript", "type": "main", "index": 0 },
+          { "node": "Claude: Audit Analysis + Refined Proposal", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Create New Contact": {
+      "main": [[{ "node": "Extract New Contact Info", "type": "main", "index": 0 }]]
+    },
+    "Extract New Contact Info": {
       "main": [
         [
           { "node": "Upload Transcript to Drive", "type": "main", "index": 0 },

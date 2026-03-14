@@ -139,6 +139,130 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "=https://api.prosp.ai/v1/prospects/search?linkedin_url={{ encodeURIComponent($json.linkedin_url) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "step5a-node-9",
+      "name": "Check Prosp.ai for Replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1350,
+        240
+      ],
+      "notes": "Checks Prosp.ai to see if the prospect has replied to any outreach. Uses the LinkedIn URL to look up the prospect.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_PROSP_HEADER_AUTH_CRED_ID",
+          "name": "Prosp.ai API Key"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const prospData = $json;\nconst contact = $('Loop Over Contacts').item.json;\nconst prospects = prospData.results || prospData.data || [prospData];\nconst prospect = prospects[0] || {};\nconst replyStatus = (prospect.reply_status || prospect.status || '').toLowerCase();\nconst hasReplied = prospect.replied || prospect.has_replied || false;\nconst replyText = (prospect.last_reply || prospect.reply_message || '').toLowerCase();\n\nlet action = 'follow_up'; // default: add to follow-up campaign\n\nif (hasReplied || replyStatus === 'replied') {\n  // Check if positive (meeting set) or negative (declined)\n  const positiveKeywords = ['yes', 'interested', 'schedule', 'meeting', 'call', 'book', 'available', 'let\\'s', 'sounds good'];\n  const negativeKeywords = ['no', 'not interested', 'unsubscribe', 'remove', 'stop', 'decline', 'pass'];\n\n  const isPositive = positiveKeywords.some(k => replyText.includes(k));\n  const isNegative = negativeKeywords.some(k => replyText.includes(k));\n\n  if (isPositive) {\n    action = 'meeting_set'; // Contact replied positively, don't follow up\n  } else if (isNegative) {\n    action = 'declined'; // Contact declined, mark as declined\n  }\n  // If replied but unclear, still follow up\n}\n\nreturn [{ json: { ...contact, prosp_action: action, prosp_reply_status: replyStatus, prosp_has_replied: hasReplied } }];"
+      },
+      "id": "step5a-node-10",
+      "name": "Parse Prosp Reply Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1570,
+        240
+      ],
+      "notes": "Parses the Prosp.ai response to determine if the prospect replied positively (meeting set), negatively (declined), or not at all (follow up)."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.prosp_action }}",
+                    "rightValue": "follow_up",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "follow_up"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.prosp_action }}",
+                    "rightValue": "meeting_set",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "meeting_set"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.prosp_action }}",
+                    "rightValue": "declined",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "declined"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "step5a-node-11",
+      "name": "Route by Reply Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1790,
+        240
+      ],
+      "notes": "Routes contacts based on Prosp.ai reply status: follow_up (no reply), meeting_set (positive reply), or declined (negative reply)."
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://api.prosp.ai/v1/campaigns/YOUR_FOLLOWUP_CAMPAIGN_ID/prospects",
         "authentication": "genericCredentialType",
@@ -164,8 +288,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1350,
-        240
+        2060,
+        100
       ],
       "notes": "Adds the contact to the Prosp.ai follow-up Loom video campaign (3-message sequence). Replace YOUR_FOLLOWUP_CAMPAIGN_ID with your Prosp.ai follow-up campaign ID. Set up HTTP Header Auth with your Prosp.ai API key.",
       "onError": "continueErrorOutput"
@@ -176,8 +300,8 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
       "position": [
-        1570,
-        240
+        2280,
+        100
       ],
       "credentials": {
         "notionApi": {
@@ -212,18 +336,126 @@
       }
     },
     {
+      "id": "step5a-node-12",
+      "name": "Update Notion (Meeting Set)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Updates Notion contact when Prosp.ai shows a positive reply: Status = 'Responded', Responded = true.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Responded"
+            },
+            {
+              "key": "Responded|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "step5a-node-13",
+      "name": "Update Notion (Declined)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        500
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Updates Notion contact when Prosp.ai shows a negative reply: Status = 'Declined', Responded = true.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Declined"
+            },
+            {
+              "key": "Responded|checkbox",
+              "checkboxValue": true
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
       "parameters": {
         "amount": 2
       },
       "id": "step5a-node-8",
-      "name": "Wait",
+      "name": "Wait (Follow-Up)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1790,
-        240
+        2500,
+        100
       ],
-      "webhookId": "step5a-wait"
+      "webhookId": "step5a-wait-followup"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "step5a-node-14",
+      "name": "Wait (Meeting Set)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2280,
+        300
+      ],
+      "webhookId": "step5a-wait-meeting"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "step5a-node-15",
+      "name": "Wait (Declined)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2280,
+        500
+      ],
+      "webhookId": "step5a-wait-declined"
     }
   ],
   "pinData": {},
@@ -277,7 +509,54 @@
         [],
         [
           {
+            "node": "Check Prosp.ai for Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Prosp.ai for Replies": {
+      "main": [
+        [
+          {
+            "node": "Parse Prosp Reply Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Prosp Reply Status": {
+      "main": [
+        [
+          {
+            "node": "Route by Reply Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Reply Status": {
+      "main": [
+        [
+          {
             "node": "Add to Prosp.ai Follow-Up Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Notion (Meeting Set)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Notion (Declined)",
             "type": "main",
             "index": 0
           }
@@ -299,14 +578,58 @@
       "main": [
         [
           {
-            "node": "Wait",
+            "node": "Wait (Follow-Up)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Wait": {
+    "Update Notion (Meeting Set)": {
+      "main": [
+        [
+          {
+            "node": "Wait (Meeting Set)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion (Declined)": {
+      "main": [
+        [
+          {
+            "node": "Wait (Declined)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Follow-Up)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Meeting Set)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Declined)": {
       "main": [
         [
           {
@@ -322,7 +645,6 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
   "versionId": "step5a-v1-0",

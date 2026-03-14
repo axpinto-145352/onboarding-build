@@ -1,12 +1,17 @@
 {
-  "name": "Onboarding WF5 \u2014 SOW/Contract Creation + Invoicing + Onboarding Doc",
+  "name": "Onboarding WF5 — SOW/Contract Creation + Invoicing + Welcome Email",
   "nodes": [
     {
       "parameters": {
         "formTitle": "New Client SOW / Contract Submission",
-        "formDescription": "Fill out to generate Statement of Work, contract, invoicing, and onboarding doc for a new client.",
+        "formDescription": "Fill out to generate Statement of Work, contract, invoicing, and welcome email for a new client.",
         "formFields": {
           "values": [
+            {
+              "fieldLabel": "Proposal_Google_Drive_URL",
+              "requiredField": true,
+              "placeholder": "https://drive.google.com/file/d/.../view"
+            },
             {
               "fieldLabel": "First_Name",
               "requiredField": true
@@ -112,16 +117,13 @@
           "buttonLabel": "Generate Contract"
         }
       },
-      "id": "step7-node-1",
+      "id": "wf5-node-1",
       "name": "SOW Contract Form",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2,
-      "position": [
-        250,
-        300
-      ],
+      "position": [250, 300],
       "webhookId": "sow-contract-form",
-      "notes": "Form for Anthony to submit new client contract details. Includes all project scope, financial terms, compliance requirements, and Notion contact ID for CRM linking."
+      "notes": "Form for Anthony to submit new client contract details. Includes Proposal_Google_Drive_URL for extracting proposal details, plus all project scope, financial terms, compliance requirements, and Notion contact ID."
     },
     {
       "parameters": {
@@ -143,14 +145,81 @@
         },
         "options": {}
       },
-      "id": "step7-node-2",
+      "id": "wf5-node-2",
       "name": "Calculate Amounts",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3,
-      "position": [
-        470,
-        300
-      ]
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $('SOW Contract Form').first().json.Proposal_Google_Drive_URL || '';\nconst match = url.match(/\\/d\\/([a-zA-Z0-9_-]+)/);\nconst fileId = match ? match[1] : '';\nreturn [{ json: { proposal_file_id: fileId } }];"
+      },
+      "id": "wf5-node-3",
+      "name": "Extract Proposal File ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300],
+      "notes": "Parses the Google Drive URL to extract the file ID for downloading the proposal PDF."
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.proposal_file_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "wf5-node-4",
+      "name": "Download Proposal PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [910, 300],
+      "notes": "Downloads the proposal PDF from Google Drive using the extracted file ID."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract text content from the downloaded PDF binary\nconst binaryData = $input.first().binary?.data;\nlet proposalText = '';\nif (binaryData) {\n  proposalText = Buffer.from(binaryData.data, 'base64').toString('utf-8').substring(0, 10000);\n}\n// The form fields already have the key details, so the proposal is supplementary\nreturn [{ json: { proposal_text: proposalText } }];"
+      },
+      "id": "wf5-node-5",
+      "name": "Extract Proposal Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300],
+      "notes": "Extracts raw text from the proposal PDF binary data. This text is sent to Claude for structured extraction."
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-4-20250514",
+          "mode": "id"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a business analyst. Extract key details from this proposal text. Confirm or supplement the following form data:\n\nProject Name: {{ $('SOW Contract Form').first().json.Project_Name }}\nProject Scope: {{ $('SOW Contract Form').first().json.Project_Scope }}\nTimeline: {{ $('SOW Contract Form').first().json.Project_Start_Date }} to {{ $('SOW Contract Form').first().json.Project_End_Date }}\nTotal Cost: {{ $('SOW Contract Form').first().json.Total_Project_Cost }}\n\nProposal text:\n{{ $json.proposal_text }}\n\nReturn a JSON object with these fields:\n- confirmed_scope: the project scope (confirmed or enhanced from proposal)\n- deliverables: array of key deliverables found in the proposal\n- timeline_notes: any timeline details from the proposal\n- pricing_notes: any pricing details or payment terms from the proposal\n- additional_notes: anything else relevant not captured above\n\nReturn ONLY valid JSON, no markdown fences."
+            }
+          ]
+        },
+        "options": {
+          "maxTokensToSample": 1024
+        }
+      },
+      "id": "wf5-node-6",
+      "name": "Claude: Extract Proposal Details",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [1350, 300],
+      "credentials": {
+        "anthropicApi": {
+          "id": "au1c518sMzUt89ul",
+          "name": "VV Claude"
+        }
+      },
+      "notes": "Sends the extracted proposal text to Claude to confirm/extract structured project details (scope, deliverables, timeline, pricing). Supplements form data."
     },
     {
       "parameters": {
@@ -168,14 +237,11 @@
         },
         "options": {}
       },
-      "id": "step7-node-3",
+      "id": "wf5-node-7",
       "name": "Create/Find Client Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [
-        690,
-        200
-      ],
+      "position": [1570, 200],
       "notes": "Creates client folder in Google Drive (or uses existing one if already created in Step 4)."
     },
     {
@@ -289,14 +355,11 @@
         },
         "advancedOptions": {}
       },
-      "id": "step7-node-4",
+      "id": "wf5-node-8",
       "name": "PDFco: Fill SOW Template",
       "type": "n8n-nodes-pdfco.PDFco Api",
       "typeVersion": 1,
-      "position": [
-        690,
-        400
-      ],
+      "position": [1570, 400],
       "notes": "Fills the SOW PDF template with all client and project details including compliance terms and contract length."
     },
     {
@@ -310,14 +373,11 @@
           }
         }
       },
-      "id": "step7-node-5",
+      "id": "wf5-node-9",
       "name": "Download Filled PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        910,
-        400
-      ]
+      "position": [1790, 400]
     },
     {
       "parameters": {
@@ -334,14 +394,11 @@
         },
         "options": {}
       },
-      "id": "step7-node-6",
+      "id": "wf5-node-10",
       "name": "Upload Contract to Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [
-        1130,
-        400
-      ]
+      "position": [2010, 400]
     },
     {
       "parameters": {
@@ -365,29 +422,23 @@
         "jsonBody": "={\n  \"test_mode\": false,\n  \"draft\": true,\n  \"text_tags\": true,\n  \"name\": \"Veteran Vectors SoW - {{ $('SOW Contract Form').item.json.Project_Name }} - {{ $('SOW Contract Form').item.json.Company_Name }}\",\n  \"files\": [{\n    \"name\": \"SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}.pdf\",\n    \"file_url\": {{ JSON.stringify($('Download Filled PDF').item.json.url || '') }}\n  }],\n  \"recipients\": [\n    { \"id\": 1, \"email\": \"anthony@veteranvectors.io\", \"name\": \"Anthony Pinto\" },\n    { \"id\": 2, \"email\": {{ JSON.stringify($('SOW Contract Form').item.json.Client_Email) }}, \"name\": {{ JSON.stringify($('SOW Contract Form').item.json.Full_Client_Name) }} }\n  ]\n}",
         "options": {}
       },
-      "id": "step7-node-7",
+      "id": "wf5-node-11",
       "name": "Create SignWell Document",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        1350,
-        400
-      ],
-      "notes": "Creates a SignWell document for e-signatures. Uses JSON.stringify for proper escaping (fixes SEC-16)."
+      "position": [2230, 400],
+      "notes": "Creates a SignWell document for e-signatures. Uses JSON.stringify for proper escaping. SOW goes out solely from SignWell — no draft email."
     },
     {
       "parameters": {
         "amount": 15
       },
-      "id": "step7-node-8",
+      "id": "wf5-node-12",
       "name": "Wait for SignWell Processing",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [
-        1570,
-        400
-      ],
-      "webhookId": "step7-signwell-wait"
+      "position": [2450, 400],
+      "webhookId": "wf5-signwell-wait"
     },
     {
       "parameters": {
@@ -411,14 +462,36 @@
         "jsonBody": "={\n  \"test_mode\": false,\n  \"email_subject\": \"SoW - {{ $('SOW Contract Form').item.json.Project_Name }} - {{ $('SOW Contract Form').item.json.Company_Name }}\",\n  \"email_message\": \"Hi {{ $('SOW Contract Form').item.json.First_Name }},\\n\\nPlease review and sign this Statement of Work for \\\"{{ $('SOW Contract Form').item.json.Project_Name }}\\\".\\n\\nThanks,\\nAnthony\"\n}",
         "options": {}
       },
-      "id": "step7-node-9",
+      "id": "wf5-node-13",
       "name": "Send Contract for Signing",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        1790,
-        400
-      ]
+      "position": [2670, 400],
+      "notes": "Sends the SOW for signing via SignWell. This is the ONLY way the SOW reaches the client — no separate draft email."
+    },
+    {
+      "parameters": {
+        "resource": "customer",
+        "operation": "create",
+        "name": "={{ $('SOW Contract Form').item.json.Full_Client_Name }}",
+        "additionalFields": {
+          "email": "={{ $('SOW Contract Form').item.json.Client_Email }}",
+          "description": "=Veteran Vectors - {{ $('SOW Contract Form').item.json.Project_Name }}",
+          "metadata": {
+            "metadataProperties": [
+              {
+                "key": "Company",
+                "value": "={{ $('SOW Contract Form').item.json.Company_Name }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wf5-node-14",
+      "name": "Stripe: Create Customer",
+      "type": "n8n-nodes-base.stripe",
+      "typeVersion": 1,
+      "position": [690, 700]
     },
     {
       "parameters": {
@@ -442,41 +515,11 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step7-node-10",
+      "id": "wf5-node-15",
       "name": "Has Fixed Cost?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        910,
-        600
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "customer",
-        "operation": "create",
-        "name": "={{ $('SOW Contract Form').item.json.Full_Client_Name }}",
-        "additionalFields": {
-          "email": "={{ $('SOW Contract Form').item.json.Client_Email }}",
-          "description": "=Veteran Vectors - {{ $('SOW Contract Form').item.json.Project_Name }}",
-          "metadata": {
-            "metadataProperties": [
-              {
-                "key": "Company",
-                "value": "={{ $('SOW Contract Form').item.json.Company_Name }}"
-              }
-            ]
-          }
-        }
-      },
-      "id": "step7-node-11",
-      "name": "Stripe: Create Customer",
-      "type": "n8n-nodes-base.stripe",
-      "typeVersion": 1,
-      "position": [
-        690,
-        600
-      ]
+      "position": [910, 700]
     },
     {
       "parameters": {
@@ -490,7 +533,7 @@
           "parameters": [
             {
               "name": "customer",
-              "value": "={{ $json.id }}"
+              "value": "={{ $('Stripe: Create Customer').item.json.id }}"
             },
             {
               "name": "amount",
@@ -508,14 +551,11 @@
         },
         "options": {}
       },
-      "id": "step7-node-12",
+      "id": "wf5-node-16",
       "name": "Stripe: Invoice Item",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        1130,
-        600
-      ]
+      "position": [1130, 650]
     },
     {
       "parameters": {
@@ -551,15 +591,12 @@
         },
         "options": {}
       },
-      "id": "step7-node-13",
+      "id": "wf5-node-17",
       "name": "Stripe: Create Invoice (Draft)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        1350,
-        600
-      ],
-      "notes": "Creates invoice as DRAFT (auto_advance=false). Invoice is NOT sent until contract is signed (WF_STEP7)."
+      "position": [1350, 650],
+      "notes": "Creates invoice as DRAFT (auto_advance=false). Invoice is NOT sent until SOW is signed by all parties."
     },
     {
       "parameters": {
@@ -583,14 +620,11 @@
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step7-node-14",
+      "id": "wf5-node-18",
       "name": "Has Retainer?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        1570,
-        600
-      ]
+      "position": [1570, 700]
     },
     {
       "parameters": {
@@ -622,14 +656,22 @@
         },
         "options": {}
       },
-      "id": "step7-node-15",
+      "id": "wf5-node-19",
       "name": "Stripe: Create Retainer Price",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        1790,
-        540
-      ]
+      "position": [1790, 650]
+    },
+    {
+      "parameters": {
+        "jsCode": "const endDateStr = $('SOW Contract Form').first().json.Project_End_Date;\nconst endDate = new Date(endDateStr);\n// First of next full month after project end date\n// e.g., if project ends April 5th, retainer starts May 1st\nconst retainerStart = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 1);\nconst billingAnchorTimestamp = Math.floor(retainerStart.getTime() / 1000);\nreturn [{ json: {\n  retainer_start_date: retainerStart.toISOString(),\n  billing_cycle_anchor: billingAnchorTimestamp,\n  price_id: $json.id\n}}];"
+      },
+      "id": "wf5-node-20",
+      "name": "Calculate Retainer Start Date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2010, 650],
+      "notes": "Calculates the retainer start date as the 1st of the next full month after Project_End_Date. E.g., project ends April 5th → retainer starts May 1st."
     },
     {
       "parameters": {
@@ -647,7 +689,15 @@
             },
             {
               "name": "items[0][price]",
-              "value": "={{ $json.id }}"
+              "value": "={{ $json.price_id }}"
+            },
+            {
+              "name": "billing_cycle_anchor",
+              "value": "={{ $json.billing_cycle_anchor }}"
+            },
+            {
+              "name": "proration_behavior",
+              "value": "none"
             },
             {
               "name": "collection_method",
@@ -665,25 +715,19 @@
         },
         "options": {}
       },
-      "id": "step7-node-16",
+      "id": "wf5-node-21",
       "name": "Stripe: Create Subscription (Paused)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        2010,
-        540
-      ],
-      "notes": "Creates the retainer subscription PAUSED (pause_collection=void). It will be resumed in WF_STEP7 after contract signing."
+      "position": [2230, 650],
+      "notes": "Creates the retainer subscription PAUSED with billing_cycle_anchor set to 1st of next full month after project end date. Will be resumed after invoice payment."
     },
     {
-      "id": "step7-node-17",
+      "id": "wf5-node-22",
       "name": "Update Notion (Contract Sent)",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
-      "position": [
-        2010,
-        300
-      ],
+      "typeVersion": 2.2,
+      "position": [2890, 300],
       "credentials": {
         "notionApi": {
           "id": "YOUR_NOTION_CRED_ID",
@@ -711,21 +755,18 @@
       }
     },
     {
-      "id": "step7-node-18",
+      "id": "wf5-node-23",
       "name": "Create Notion Project",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
-      "position": [
-        2230,
-        300
-      ],
+      "typeVersion": 2.2,
+      "position": [3110, 300],
       "credentials": {
         "notionApi": {
           "id": "YOUR_NOTION_CRED_ID",
           "name": "Notion account"
         }
       },
-      "notes": "Creates a Notion Project record linked to the Client contact (fixes DATA-05 from audit).",
+      "notes": "Creates a Notion Project record linked to the Client contact.",
       "parameters": {
         "resource": "databasePage",
         "operation": "create",
@@ -767,50 +808,28 @@
     },
     {
       "parameters": {
-        "sendTo": "={{ $('SOW Contract Form').item.json.Client_Email }}",
-        "subject": "=Statement of Work \u2014 {{ $('SOW Contract Form').item.json.Project_Name }} \u2014 {{ $('SOW Contract Form').item.json.Company_Name }}",
-        "emailType": "html",
-        "message": "=<h2>Statement of Work \u2014 {{ $('SOW Contract Form').item.json.Project_Name }}</h2>\n<p>Hi {{ $('SOW Contract Form').item.json.First_Name }},</p>\n<p>Thank you for moving forward with Veteran Vectors! Attached below are the details of our engagement.</p>\n<hr>\n<p><strong>Project:</strong> {{ $('SOW Contract Form').item.json.Project_Name }}</p>\n<p><strong>Scope:</strong> {{ $('SOW Contract Form').item.json.Project_Scope }}</p>\n<p><strong>Timeline:</strong> {{ $('SOW Contract Form').item.json.Project_Start_Date }} \u2013 {{ $('SOW Contract Form').item.json.Project_End_Date }}</p>\n<p><strong>Investment:</strong> {{ $('SOW Contract Form').item.json.Total_Project_Cost }} (Initial: {{ $('SOW Contract Form').item.json.Initial_Payment }}, Final: {{ $('SOW Contract Form').item.json.Final_Payment }})</p>\n{{ $('SOW Contract Form').item.json.Has_Retainer === 'Yes' ? '<p><strong>Monthly Retainer:</strong> ' + $('SOW Contract Form').item.json.Retainer_Cost + '</p>' : '' }}\n<hr>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>You\u2019ll receive a SignWell signing request shortly \u2014 please review and sign the Statement of Work</li>\n<li>Once signed, we\u2019ll send over the initial invoice via Stripe</li>\n<li>We\u2019ll kick off the project and schedule our first working session</li>\n</ol>\n<p>If you have any questions about the scope or terms, just reply to this email and we\u2019ll get it sorted.</p>\n<p>Looking forward to building something great together!</p>\n<p>\u2014 Anthony, Veteran Vectors</p>",
-        "options": {}
+        "jsCode": "// Collect Stripe IDs from previous nodes — handles cases where subscription may not exist\nconst customerId = $('Stripe: Create Customer').first()?.json?.id || '';\nlet invoiceId = '';\nlet subscriptionId = '';\ntry { invoiceId = $('Stripe: Create Invoice (Draft)').first()?.json?.id || ''; } catch(e) {}\ntry { subscriptionId = $('Stripe: Create Subscription (Paused)').first()?.json?.id || ''; } catch(e) {}\nreturn [{ json: { stripe_customer_id: customerId, stripe_invoice_id: invoiceId, stripe_subscription_id: subscriptionId } }];"
       },
-      "id": "step7-node-21",
-      "name": "Draft SOW Email",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [2450, 300],
-      "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } },
-      "notes": "Creates a DRAFT SOW email for Anthony to review before sending. Summarizes project scope, timeline, costs, and next steps (SignWell signing request incoming)."
-    },
-    {
-      "parameters": {
-        "jsCode": "// Collect Stripe IDs from previous nodes \u2014 handles cases where subscription may not exist\nconst customerId = $('Stripe: Create Customer').first()?.json?.id || '';\nlet invoiceId = '';\nlet subscriptionId = '';\ntry { invoiceId = $('Stripe: Create Invoice (Draft)').first()?.json?.id || ''; } catch(e) {}\ntry { subscriptionId = $('Stripe: Create Subscription (Paused)').first()?.json?.id || ''; } catch(e) {}\nreturn [{ json: { stripe_customer_id: customerId, stripe_invoice_id: invoiceId, stripe_subscription_id: subscriptionId } }];"
-      },
-      "id": "step7-node-19",
+      "id": "wf5-node-24",
       "name": "Collect Stripe IDs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        2230,
-        600
-      ],
+      "position": [2450, 700],
       "notes": "Collects all Stripe IDs (customer, invoice, subscription) for persistence to Notion."
     },
     {
-      "id": "step7-node-20",
+      "id": "wf5-node-25",
       "name": "Save Stripe IDs to Notion",
       "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
-      "position": [
-        2450,
-        600
-      ],
+      "typeVersion": 2.2,
+      "position": [2670, 700],
       "credentials": {
         "notionApi": {
           "id": "YOUR_NOTION_CRED_ID",
           "name": "Notion account"
         }
       },
-      "notes": "Persists Stripe customer, invoice, and subscription IDs to the Notion contact. These are used by WF_STEP7 to finalize billing after contract signing.",
+      "notes": "Persists Stripe customer, invoice, and subscription IDs to the Notion contact.",
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
@@ -833,6 +852,199 @@
         },
         "options": {}
       }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "signwell-sow-signed"
+        }
+      },
+      "id": "wf5-node-26",
+      "name": "Wait for SOW Signing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3330, 500],
+      "webhookId": "wf5-wait-sow-signed",
+      "notes": "Pauses the workflow and waits for SignWell's document.completed webhook callback. Resumes when all parties have signed the SOW."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the SignWell webhook payload to verify all parties signed\nconst webhookData = $json.body || $json;\nconst documentStatus = webhookData.status || webhookData.document?.status || '';\nconst recipients = webhookData.recipients || webhookData.document?.recipients || [];\n\nlet allSigned = true;\nfor (const recipient of recipients) {\n  if (recipient.status !== 'signed' && recipient.status !== 'completed') {\n    allSigned = false;\n    break;\n  }\n}\n\nconst isCompleted = documentStatus === 'completed' || documentStatus === 'signed';\n\nreturn [{ json: {\n  all_signatures_verified: allSigned && isCompleted,\n  document_status: documentStatus,\n  signer_count: recipients.length,\n  webhook_received_at: new Date().toISOString()\n}}];"
+      },
+      "id": "wf5-node-27",
+      "name": "Verify All Signatures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3550, 500],
+      "notes": "Parses the SignWell webhook payload to confirm all parties have signed the document."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $('Collect Stripe IDs').first().json.stripe_invoice_id }}/finalize",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "options": {}
+      },
+      "id": "wf5-node-28",
+      "name": "Stripe: Finalize Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [3770, 500],
+      "notes": "Finalizes the draft invoice after SOW is signed by all parties."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $('Collect Stripe IDs').first().json.stripe_invoice_id }}/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "options": {}
+      },
+      "id": "wf5-node-29",
+      "name": "Stripe: Send Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [3990, 500],
+      "notes": "Sends the finalized invoice to the client. Only happens after SOW is fully signed."
+    },
+    {
+      "id": "wf5-node-30",
+      "name": "Update Notion (Contract Signed)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [4210, 500],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('SOW Contract Form').item.json.Notion_Contact_ID }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Contract Signed"
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "stripe-invoice-paid"
+        }
+      },
+      "id": "wf5-node-31",
+      "name": "Wait for Invoice Payment",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [4430, 500],
+      "webhookId": "wf5-wait-invoice-paid",
+      "notes": "Pauses the workflow and waits for Stripe's invoice.paid webhook callback. Resumes when the upfront invoice has been paid."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the Stripe webhook payload to confirm payment\nconst webhookData = $json.body || $json;\nconst eventType = webhookData.type || '';\nconst invoice = webhookData.data?.object || {};\nconst isPaid = invoice.status === 'paid' || eventType === 'invoice.paid';\nconst amountPaid = invoice.amount_paid || 0;\n\nreturn [{ json: {\n  payment_verified: isPaid,\n  invoice_id: invoice.id || '',\n  amount_paid_cents: amountPaid,\n  customer_id: invoice.customer || '',\n  payment_received_at: new Date().toISOString()\n}}];"
+      },
+      "id": "wf5-node-32",
+      "name": "Verify Payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4650, 500],
+      "notes": "Parses the Stripe invoice.paid webhook payload to confirm payment was received."
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('SOW Contract Form').item.json.Client_Email }}",
+        "subject": "Welcome to Veteran Vectors — Let's Get Started!",
+        "emailType": "html",
+        "message": "=<h2>Welcome to Veteran Vectors!</h2>\n<p>Hi {{ $('SOW Contract Form').item.json.First_Name }},</p>\n<p>Thank you for your payment — we're officially ready to kick things off! Here's a quick summary of where we stand:</p>\n<hr>\n<p><strong>Project:</strong> {{ $('SOW Contract Form').item.json.Project_Name }}</p>\n<p><strong>Scope:</strong> {{ $('SOW Contract Form').item.json.Project_Scope }}</p>\n<p><strong>Timeline:</strong> {{ $('SOW Contract Form').item.json.Project_Start_Date }} – {{ $('SOW Contract Form').item.json.Project_End_Date }}</p>\n<p><strong>Investment:</strong> {{ $('SOW Contract Form').item.json.Total_Project_Cost }}</p>\n{{ $('SOW Contract Form').item.json.Has_Retainer === 'Yes' ? '<p><strong>Monthly Retainer:</strong> ' + $('SOW Contract Form').item.json.Retainer_Cost + ' (starts after project completion)</p>' : '' }}\n<hr>\n<h3>Next Steps</h3>\n<ol>\n<li><strong>Kickoff Call:</strong> Let's schedule our first working session. Please use <a href=\"https://calendly.com/veteranvectors/kickoff\">this link</a> to book a time that works for you.</li>\n<li><strong>Access &amp; Onboarding:</strong> We'll send over any access requests or onboarding materials within the next 24-48 hours.</li>\n<li><strong>Communication:</strong> You can reach us anytime by replying to this email or via our project channel.</li>\n</ol>\n<p>We're excited to build something great together. Welcome aboard!</p>\n<p>— Anthony, Veteran Vectors</p>",
+        "options": {}
+      },
+      "id": "wf5-node-33",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [4870, 500],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "r13jnGsjwNOqcBvt",
+          "name": "VV Gmail account"
+        }
+      },
+      "notes": "Sends the welcome email to the client ONLY after the upfront invoice has been paid. Includes project details, next steps, and kickoff scheduling link."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/subscriptions/{{ $('Collect Stripe IDs').first().json.stripe_subscription_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "pause_collection",
+              "value": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "wf5-node-34",
+      "name": "Resume Retainer Subscription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [5090, 500],
+      "notes": "Resumes the paused retainer subscription after invoice payment is confirmed. Subscription will start billing on the 1st of next full month after project end date."
+    },
+    {
+      "id": "wf5-node-35",
+      "name": "Update Notion (Project Started)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [5310, 500],
+      "credentials": {
+        "notionApi": {
+          "id": "YOUR_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('SOW Contract Form').item.json.Notion_Contact_ID }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Project Started"
+            },
+            {
+              "key": "Last Contact Date|date",
+              "dateValue": "={{ $now.toISO() }}",
+              "includeTime": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Final Notion status update marking the project as officially started after payment and welcome email."
     }
   ],
   "pinData": {},
@@ -844,6 +1056,17 @@
             "node": "Calculate Amounts",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Amounts": {
+      "main": [
+        [
+          {
+            "node": "Extract Proposal File ID",
+            "type": "main",
+            "index": 0
           },
           {
             "node": "Stripe: Create Customer",
@@ -853,11 +1076,49 @@
         ]
       ]
     },
-    "Calculate Amounts": {
+    "Extract Proposal File ID": {
+      "main": [
+        [
+          {
+            "node": "Download Proposal PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Proposal PDF": {
+      "main": [
+        [
+          {
+            "node": "Extract Proposal Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Proposal Text": {
+      "main": [
+        [
+          {
+            "node": "Claude: Extract Proposal Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Extract Proposal Details": {
       "main": [
         [
           {
             "node": "Create/Find Client Folder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PDFco: Fill SOW Template",
             "type": "main",
             "index": 0
           }
@@ -866,13 +1127,7 @@
     },
     "Create/Find Client Folder": {
       "main": [
-        [
-          {
-            "node": "PDFco: Fill SOW Template",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "PDFco: Fill SOW Template": {
@@ -952,6 +1207,17 @@
         ]
       ]
     },
+    "Create Notion Project": {
+      "main": [
+        [
+          {
+            "node": "Wait for SOW Signing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Stripe: Create Customer": {
       "main": [
         [
@@ -1025,6 +1291,17 @@
       "main": [
         [
           {
+            "node": "Calculate Retainer Start Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Retainer Start Date": {
+      "main": [
+        [
+          {
             "node": "Stripe: Create Subscription (Paused)",
             "type": "main",
             "index": 0
@@ -1043,22 +1320,115 @@
         ]
       ]
     },
-    "Create Notion Project": {
+    "Collect Stripe IDs": {
       "main": [
         [
           {
-            "node": "Draft SOW Email",
+            "node": "Save Stripe IDs to Notion",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Collect Stripe IDs": {
+    "Save Stripe IDs to Notion": {
+      "main": [
+        []
+      ]
+    },
+    "Wait for SOW Signing": {
       "main": [
         [
           {
-            "node": "Save Stripe IDs to Notion",
+            "node": "Verify All Signatures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify All Signatures": {
+      "main": [
+        [
+          {
+            "node": "Stripe: Finalize Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe: Finalize Invoice": {
+      "main": [
+        [
+          {
+            "node": "Stripe: Send Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe: Send Invoice": {
+      "main": [
+        [
+          {
+            "node": "Update Notion (Contract Signed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion (Contract Signed)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Invoice Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Invoice Payment": {
+      "main": [
+        [
+          {
+            "node": "Verify Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Payment": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Welcome Email": {
+      "main": [
+        [
+          {
+            "node": "Resume Retainer Subscription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Retainer Subscription": {
+      "main": [
+        [
+          {
+            "node": "Update Notion (Project Started)",
             "type": "main",
             "index": 0
           }
@@ -1070,10 +1440,9 @@
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
-    "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step5-v4-sow-email",
+  "versionId": "step5-v5-sow-signing-payment-gates",
   "meta": {
     "templateCredsSetupCompleted": false
   },
