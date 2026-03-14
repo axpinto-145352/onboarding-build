@@ -1,6 +1,6 @@
 # Veteran Vectors — Step-by-Step Implementation Guide
 
-## How to Set Up the Complete 8-Step Pipeline
+## How to Set Up the Complete Pipeline
 
 This guide walks you through setting up every workflow, from creating accounts to testing the full pipeline end-to-end.
 
@@ -39,7 +39,7 @@ If you don't already have one, create a new Notion database with these propertie
 | Company | Rich Text | — |
 | Title | Rich Text | — |
 | Source | Select | LI Loom Outreach, Networking/Podcast, Warm Outreach/Text |
-| Status | Select | Connection Sent, Connection Accepted, Research Complete, Loom Sent, Follow-Up Sequence, Responded, Pending Approval, Meeting Booked, Meeting Held, Proposal Draft, Proposal Sent, Contract Sent, Project Started, Declined |
+| Status | Select | Connection Sent, Connection Accepted, Research Complete, Loom Sent, Follow-Up Sequence, Responded, Pending Approval, Meeting Booked, Meeting Held, Proposal Draft, Proposal Sent, Contract Sent, Contract Signed, Project Started, Declined |
 | LI Connection Sent | Checkbox | — |
 | LI Connection Accepted | Checkbox | — |
 | Loom Sent | Checkbox | — |
@@ -381,14 +381,6 @@ done
 - Notion contact updated to "Project Started"
 - Notion project updated to "Active"
 
-### Step 4.9: Import STEP8 — Calendly-Notion Sync
-
-1. Import `WF_STEP8_Calendly_Notion_Sync.json`
-2. Assign Calendly and Notion credentials
-3. Save and Activate
-
-**Test it:** Book any Calendly call. Check that a Meeting record appears in Notion linked to the contact.
-
 ---
 
 ## Phase 5: Prosp.ai Campaign Setup
@@ -460,7 +452,6 @@ Copy the campaign ID and use it in STEP3A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 6. **STEP 5:** Submit the SOW form → verify contract sent via SignWell
 7. **STEP 6:** Wait for reminder schedule → verify emails sent
 8. **STEP 7:** Sign the test contract → verify welcome email and Notion updates
-9. **STEP 8:** Book any call → verify Notion meeting record created
 
 ### Monitoring
 
@@ -483,7 +474,7 @@ Copy the campaign ID and use it in STEP3A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 - [ ] Stripe product created for retainer
 - [ ] Google Drive "Clients" root folder created
 - [ ] Slack #onboarding-alerts channel exists
-- [ ] All 8 workflows activated in n8n
+- [ ] All 10 workflows activated in n8n
 - [ ] End-to-end test completed successfully
 - [ ] Error notification email (anthony@veteranvectors.io) receiving test alerts
 

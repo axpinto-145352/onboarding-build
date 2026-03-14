@@ -32,13 +32,13 @@ Discovery Call  Audit Call       SOW/Contract      Contract & Invoice
 WF_STEP4_       WF_STEP4B_       WF_STEP5_        WF_STEP6_
 Meeting.json    Audit_Call.json  SOW_Contract.json Reminders.json
 
-Onboarding WF7  Onboarding WF8
-Contract Signed All Calendly
-→ Welcome +     Calls →
-Invoice + Start Notion CRM Sync
+Onboarding WF7
+Contract Signed
+→ Welcome +
+Invoice + Start
 
-WF_STEP7_       WF_STEP8_
-Post_Signing    Calendly_Sync
+WF_STEP7_
+Post_Signing
 ```
 
 ---
@@ -60,13 +60,17 @@ Post_Signing    Calendly_Sync
                     │                                   │                    │
           [Find Contact by LI URL]            [Find Contact]         [Find Contact]
                     │                                   │                    │
-          [Exists?]                            [Update Notion]        [Update Notion]
-           │      │                            - Accepted: ✓          - Responded: ✓
-          YES    NO                            - Status: Accepted     - Status: Responded
-           │      │                                     │
-     [Update]  [Create New]                    [Add to Loom Videos Sheet]
-     - Sent: ✓  - Sent: ✓                     (handoff for manual Loom)
-               - Source: LI Loom
+          [Exists?]                            [Exists?]              [Exists?]
+           │      │                            │      │               │      │
+          YES    NO                           YES    NO              YES    NO
+           │      │                            │      │               │      │
+     [Update]  [Create New]             [Update] [Create New]   [Update] [Create New]
+     - Sent: ✓  - Sent: ✓              - Accepted  - Accepted  - Responded - Responded
+               - Source: LI Loom             │      │
+                                             └──┬───┘
+                                                ▼
+                                       [Add to Loom Videos Sheet]
+                                       (handoff for manual Loom)
 ```
 
 **Notion Fields Updated:**
@@ -343,57 +347,33 @@ daily   every 3 days expire    Invoice    Invoice
 ### STEP 7: Post-Signing Onboarding
 
 **Workflow:** `WF_STEP7_Post_Signing.json`
-**Trigger:** SignWell webhook (document.completed)
+**Trigger:** Schedule (every 15 minutes, dual-branch polling)
 
 ```
-[SignWell Webhook: document.completed]
+[Schedule: Every 15 Minutes]
         │
-  [Match Notion Contact]
-  [Download Signed Contract PDF]
-  [Upload to Google Drive]
-        │
-  [Stripe: Send Invoice (first payment)]
-  [Stripe: Resume Retainer Subscription]
-        │
-  [Send Welcome Email]
-  - Standardized template
-  - Next steps: onboarding call
-  - Calendly link for onboarding
-        │
-  [Update Notion]
-  - Contact: "Project Started"
-  - Project: "Active"
-        │
-  [Create Slack Channel (private)]
-  - #client-{company}
-  - Post welcome message
-        │
-  [Slack: "Client fully onboarded!"]
+  ┌─────┴──────────────────────────────────┐
+  ▼                                        ▼
+BRANCH A: New Signatures            BRANCH B: Invoice Payment Check
+  │                                        │
+[Poll SignWell: completed docs]     [Query Notion: Status = "Contract Signed"]
+  │                                        │
+[Find Contact in Notion]            [For each pending contact]
+  │                                        │
+[Already processed?]                [Check Stripe Invoice Status]
+  │ NO                                     │
+[Download Signed Contract]          [Invoice Paid?]
+[Upload to Google Drive]              │ YES          │ NO
+  │                                   │              └─ (skip, wait)
+[Update Notion: "Contract Signed"]    │
+                                      ▼
+                                  [Send Welcome Email]
+                                  [Update Notion: "Project Started"]
+                                  [Update Project: "Active"]
+                                  [Resume Stripe Subscription]
 ```
 
----
-
-### STEP 8: Calendly → Notion Sync (All Calls)
-
-**Workflow:** `WF_STEP8_Calendly_Notion_Sync.json`
-**Trigger:** Calendly webhook (all event types)
-
-```
-[Calendly Webhook: invitee.created / cancelled]
-        │
-  [Find Notion Contact (by email)]
-        │
-  [Create/Update Notion Meeting Record]
-  - Meeting title
-  - Date/time
-  - Contact relation
-  - Meeting type (discovery/audit/onboarding/check-in)
-  - Calendly event URL
-        │
-  [Update Notion Contact]
-  - Last Contact Date: meeting date
-  - Attach meeting to contact
-```
+**Key design:** Welcome email only sends after BOTH contract is signed AND invoice is paid. Branch A handles signing detection only — no Stripe operations (invoice is already sent by WF5). Branch B polls for payment confirmation before completing onboarding.
 
 ---
 
@@ -412,8 +392,8 @@ daily   every 3 days expire    Invoice    Invoice
                                           "Meeting Booked"
                                               STEP 3C
                                                   │
-"Project Started" ← "Contract Sent" ← "Proposal Sent" ← "Meeting Held"
-     STEP 7              STEP 5           STEP 6            STEP 4
+"Project Started" ← "Contract Signed" ← "Contract Sent" ← "Proposal Sent" ← "Meeting Held"
+     STEP 7              STEP 7              STEP 5           STEP 6            STEP 4
                                                                 │
                                                           "Proposal Draft"
                                                               STEP 4
@@ -442,7 +422,7 @@ Side exits: "Declined" (at any qualification/approval gate)
 | Notion | Integration Token (native node) | All steps | `notionApi` credential |
 | Anthropic Claude | API Key | 4, 4B | `anthropicApi` credential |
 | GitHub | Personal Access Token | 4, 4B | `githubApi` — repo scope required; HTTP Request for repo creation, native node for file ops |
-| Calendly | OAuth2 | 3C, 8 | |
+| Calendly | OAuth2 | 3C | |
 | Gmail | OAuth2 | 3C, 5, 6, 7 | `gmailOAuth2` — used for draft emails in 4, 5 |
 | Google Drive | OAuth2 | 4, 4B, 5, 7 | |
 | Google Sheets | OAuth2 | 1, 2 | For Loom Videos sheet |
@@ -474,7 +454,6 @@ Side exits: "Declined" (at any qualification/approval gate)
 | `WF_STEP5_SOW_Contract.json` | Onboarding WF5 — SOW/Contract Creation + Invoicing | n8n Form |
 | `WF_STEP6_Contract_Reminders.json` | Onboarding WF6 — Contract & Invoice Reminders | Daily schedule |
 | `WF_STEP7_Post_Signing.json` | Onboarding WF7 — Post-Signing Onboarding | Schedule / SignWell webhook |
-| `WF_STEP8_Calendly_Notion_Sync.json` | Onboarding WF8 — Calendly → Notion CRM Sync | Schedule / Calendly webhook |
 
 ---
 
@@ -487,12 +466,11 @@ Side exits: "Declined" (at any qualification/approval gate)
 | 3 | WF_STEP2_Loom_Sent | Tracks Loom delivery |
 | 4 | WF_STEP3A_No_Response_Followup | Depends on Loom Sent status |
 | 5 | WF_STEP3C_Calendly_Screening | Qualification gate |
-| 6 | WF_STEP8_Calendly_Notion_Sync | Universal Calendly sync |
-| 7 | WF_STEP4_Meeting_Processing | Post-call processing + GitHub repo |
-| 8 | WF_STEP4B_Audit_Call_Processing | Audit call (depends on STEP4 repo) |
-| 9 | WF_STEP5_SOW_Contract | Contract creation + draft SOW email |
-| 10 | WF_STEP6_Contract_Reminders | Contract + invoice reminder engine |
-| 11 | WF_STEP7_Post_Signing | Final onboarding |
+| 6 | WF_STEP4_Meeting_Processing | Post-call processing + GitHub repo |
+| 7 | WF_STEP4B_Audit_Call_Processing | Audit call (depends on STEP4 repo) |
+| 8 | WF_STEP5_SOW_Contract | Contract creation + draft SOW email |
+| 9 | WF_STEP6_Contract_Reminders | Contract + invoice reminder engine |
+| 10 | WF_STEP7_Post_Signing | Final onboarding |
 
 ## API Constraints
 

@@ -88,7 +88,7 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [1350, 120],
-      "credentials": { "googleSheetsOAuth2Api": { "id": "wi6bAEK3LwBuXnNr", "name": "VV Google Sheets account" } },
+      "credentials": { "googleDriveOAuth2Api": { "id": "YOUR_GOOGLE_DRIVE_CRED_ID", "name": "VV Google Drive account" } },
       "notes": "Uploads the audit call transcript to the client's existing Google Drive folder (created during STEP4 discovery call)."
     },
     {
