@@ -1,47 +1,18 @@
 {
-  "name": "WF STEP4 - Post-Discovery Call Processing (Form \u2192 Claude \u2192 Notion + Drive)",
+  "name": "Onboarding WF4 \u2014 Discovery Call Processing (Form \u2192 AI \u2192 Notion + Drive + GitHub)",
   "nodes": [
     {
       "parameters": {
         "formTitle": "Meeting Transcript Processing",
-        "formDescription": "Paste the BlueDot transcript after a discovery call. Claude will extract notes, action items, and a proposal outline. Results are saved to Notion and Google Drive.",
+        "formDescription": "Paste the BlueDot transcript after a discovery call. Claude will extract notes, generate a proposal + implementation guide, create a GitHub repo with Skills, and prepare a draft proposal email.",
         "formFields": {
           "values": [
-            {
-              "fieldLabel": "Attendee Name",
-              "fieldType": "text",
-              "requiredField": true,
-              "placeholder": "Client's full name"
-            },
-            {
-              "fieldLabel": "Attendee Email",
-              "fieldType": "text",
-              "requiredField": true,
-              "placeholder": "client@company.com"
-            },
-            {
-              "fieldLabel": "Meeting Title",
-              "fieldType": "text",
-              "requiredField": false,
-              "placeholder": "Discovery Call - Company Name"
-            },
-            {
-              "fieldLabel": "Meeting Date",
-              "fieldType": "date",
-              "requiredField": false
-            },
-            {
-              "fieldLabel": "Transcript",
-              "fieldType": "textarea",
-              "requiredField": true,
-              "placeholder": "Paste the full BlueDot transcript here..."
-            },
-            {
-              "fieldLabel": "BlueDot Summary",
-              "fieldType": "textarea",
-              "requiredField": false,
-              "placeholder": "Optional: Paste BlueDot's own summary if available"
-            }
+            { "fieldLabel": "Attendee Name", "fieldType": "text", "requiredField": true, "placeholder": "Client's full name" },
+            { "fieldLabel": "Attendee Email", "fieldType": "text", "requiredField": true, "placeholder": "client@company.com" },
+            { "fieldLabel": "Meeting Title", "fieldType": "text", "requiredField": false, "placeholder": "Discovery Call - Company Name" },
+            { "fieldLabel": "Meeting Date", "fieldType": "date", "requiredField": false },
+            { "fieldLabel": "Transcript", "fieldType": "textarea", "requiredField": true, "placeholder": "Paste the full BlueDot transcript here..." },
+            { "fieldLabel": "BlueDot Summary", "fieldType": "textarea", "requiredField": false, "placeholder": "Optional: Paste BlueDot's own summary if available" }
           ]
         },
         "options": {}
@@ -50,53 +21,20 @@
       "name": "Meeting Transcript Form",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2,
-      "position": [
-        250,
-        300
-      ],
+      "position": [250, 300],
       "webhookId": "meeting-transcript-form",
-      "notes": "Replaces the BlueDot webhook trigger. After each discovery call, open this form at http://localhost:5678/form/meeting-transcript-form and paste the transcript. Works fully on localhost \u2014 no external webhook needed."
+      "notes": "Localhost form trigger. For production: replace with n8n Webhook node to receive BlueDot Svix webhook payloads. BlueDot fires 'New Transcript Available' events via Svix webhooks."
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "bd-name",
-              "name": "attendee_name",
-              "value": "={{ $json['Attendee Name'] || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "bd-email",
-              "name": "attendee_email",
-              "value": "={{ $json['Attendee Email'] || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "bd-title",
-              "name": "meeting_title",
-              "value": "={{ $json['Meeting Title'] || 'Discovery Call' }}",
-              "type": "string"
-            },
-            {
-              "id": "bd-date",
-              "name": "meeting_date",
-              "value": "={{ $json['Meeting Date'] || $now.toISO() }}",
-              "type": "string"
-            },
-            {
-              "id": "bd-transcript",
-              "name": "transcript",
-              "value": "={{ ($json['Transcript'] || '').substring(0, 15000) }}",
-              "type": "string"
-            },
-            {
-              "id": "bd-summary",
-              "name": "bluedot_summary",
-              "value": "={{ $json['BlueDot Summary'] || '' }}",
-              "type": "string"
-            }
+            { "id": "bd-name", "name": "attendee_name", "value": "={{ $json['Attendee Name'] || '' }}", "type": "string" },
+            { "id": "bd-email", "name": "attendee_email", "value": "={{ $json['Attendee Email'] || '' }}", "type": "string" },
+            { "id": "bd-title", "name": "meeting_title", "value": "={{ $json['Meeting Title'] || 'Discovery Call' }}", "type": "string" },
+            { "id": "bd-date", "name": "meeting_date", "value": "={{ $json['Meeting Date'] || $now.toISO() }}", "type": "string" },
+            { "id": "bd-transcript", "name": "transcript", "value": "={{ ($json['Transcript'] || '').substring(0, 15000) }}", "type": "string" },
+            { "id": "bd-summary", "name": "bluedot_summary", "value": "={{ $json['BlueDot Summary'] || '' }}", "type": "string" }
           ]
         },
         "options": {}
@@ -105,69 +43,36 @@
       "name": "Extract Form Data",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3,
-      "position": [
-        470,
-        300
-      ]
+      "position": [470, 300]
     },
     {
       "id": "step4-node-3",
       "name": "Find Notion Contact",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        690,
-        300
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [690, 300],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": {
-          "__rl": true,
-          "value": "YOUR_NOTION_CONTACTS_DB_ID",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {
           "conditions": [
-            {
-              "key": "Email|email",
-              "condition": "string:equals",
-              "emailValue": "={{ $json.attendee_email || '' }}"
-            }
+            { "key": "Email|email", "condition": "string:equals", "emailValue": "={{ $json.attendee_email || '' }}" }
           ]
         },
-        "options": {
-          "simple": false
-        }
+        "options": { "simple": false }
       },
       "alwaysOutputData": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
-            {
-              "leftValue": "={{ $json.id || '' }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
+            { "leftValue": "={{ $json.id || '' }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }
           ]
         },
         "looseTypeValidation": true,
@@ -177,42 +82,24 @@
       "name": "Contact Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        910,
-        300
-      ]
+      "position": [910, 300]
     },
     {
       "parameters": {
-        "jsCode": "const contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nreturn [{ json: {\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || 'Unknown-Company',\n  contact_email: props['Email']?.email || '',\n  existing_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  folder_name: (props['Company']?.rich_text?.[0]?.text?.content || 'Unknown') + '-' + (props['Name']?.title?.[0]?.text?.content || 'Unknown')\n}}];"
+        "jsCode": "const contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nconst contactName = props['Name']?.title?.[0]?.text?.content || 'Unknown';\nconst companyName = props['Company']?.rich_text?.[0]?.text?.content || 'Unknown-Company';\n// Slugify for GitHub repo name: lowercase, replace spaces/special chars with hyphens\nconst repoName = (contactName + '-' + companyName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\nreturn [{ json: {\n  notion_page_id: contact.id,\n  contact_name: contactName,\n  company_name: companyName,\n  contact_email: props['Email']?.email || '',\n  existing_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  folder_name: companyName + '-' + contactName,\n  github_repo_name: repoName\n}}];"
       },
       "id": "step4-node-5",
       "name": "Extract Contact Info",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1130,
-        240
-      ]
+      "position": [1130, 240]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
-            {
-              "leftValue": "={{ $json.existing_folder_id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "empty",
-                "singleValue": true
-              }
-            }
+            { "leftValue": "={{ $json.existing_folder_id }}", "rightValue": "", "operator": { "type": "string", "operation": "empty", "singleValue": true } }
           ]
         },
         "looseTypeValidation": true,
@@ -222,46 +109,27 @@
       "name": "Folder Exists?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        1350,
-        240
-      ]
+      "position": [1350, 240]
     },
     {
       "parameters": {
         "resource": "folder",
         "name": "={{ $('Extract Contact Info').item.json.folder_name }}",
-        "driveId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "My Drive"
-        },
-        "folderId": {
-          "__rl": true,
-          "value": "YOUR_CLIENTS_FOLDER_ID",
-          "mode": "id"
-        },
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "value": "YOUR_CLIENTS_FOLDER_ID", "mode": "id" },
         "options": {}
       },
       "id": "step4-node-7a",
       "name": "Create Google Drive Folder",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [
-        1570,
-        160
-      ]
+      "position": [1570, 160]
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            {
-              "id": "set-folder-id",
-              "name": "drive_folder_id",
-              "value": "={{ $json.existing_folder_id || $('Create Google Drive Folder').item.json.id }}",
-              "type": "string"
-            }
+            { "id": "set-folder-id", "name": "drive_folder_id", "value": "={{ $json.existing_folder_id || $('Create Google Drive Folder').item.json.id }}", "type": "string" }
           ]
         },
         "options": {}
@@ -270,10 +138,48 @@
       "name": "Set Folder ID",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3,
-      "position": [
-        1790,
-        240
-      ]
+      "position": [1790, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/repos/YOUR_GITHUB_USERNAME/vv-client-template/generate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github+json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"owner\": \"YOUR_GITHUB_USERNAME\",\n  \"name\": {{ JSON.stringify($('Extract Contact Info').item.json.github_repo_name) }},\n  \"description\": {{ JSON.stringify('Veteran Vectors client project \\u2014 ' + $('Extract Contact Info').item.json.company_name) }},\n  \"private\": true,\n  \"include_all_branches\": false\n}",
+        "options": {}
+      },
+      "id": "step4-node-13",
+      "name": "GitHub: Create Repo from Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2010, 60],
+      "notes": "Creates a new private GitHub repo from the 'vv-client-template' template repo. The template repo should contain all 8 Skills files pre-loaded in a Skills/ folder. Replace YOUR_GITHUB_USERNAME with your GitHub username. Create the template repo once with: Skills/*.md files, a README, and mark it as a template in GitHub Settings."
+    },
+    {
+      "parameters": {
+        "owner": "YOUR_GITHUB_USERNAME",
+        "repository": "={{ $('Extract Contact Info').item.json.github_repo_name }}",
+        "filePath": "=transcripts/discovery-call-{{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}.md",
+        "commitMessage": "=Add discovery call transcript - {{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}",
+        "fileContent": "=# Discovery Call Transcript\n\n**Date:** {{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}\n**Attendee:** {{ $('Extract Form Data').item.json.attendee_name }}\n**Email:** {{ $('Extract Form Data').item.json.attendee_email }}\n\n---\n\n{{ $('Extract Form Data').item.json.transcript }}",
+        "additionalParameters": {}
+      },
+      "id": "step4-node-14",
+      "name": "GitHub: Upload Transcript",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2230, 60],
+      "credentials": { "githubApi": { "id": "YOUR_GITHUB_CRED_ID", "name": "GitHub account" } },
+      "notes": "Uploads the BlueDot transcript to the client's GitHub repo. Uses native GitHub node (File > Create)."
     },
     {
       "parameters": {
@@ -286,64 +192,51 @@
         "messages": {
           "values": [
             {
-              "content": "=You are a business consultant for Veteran Vectors, an automation consulting firm. Analyze this discovery call transcript and produce:\n\n1. MEETING SUMMARY (2-3 paragraphs)\n2. KEY PAIN POINTS (bulleted list)\n3. ACTION ITEMS (numbered list with owner: Anthony or Client)\n4. BUDGET/TIMELINE mentioned\n5. NEXT STEPS\n6. PRELIMINARY PROPOSAL OUTLINE - Based on the pain points and needs discussed, outline a preliminary proposal with:\n   - Recommended automations/solutions\n   - Estimated scope\n   - Suggested timeline\n   - Approximate value/ROI\n\nTRANSCRIPT:\n{{ $('Extract Form Data').item.json.transcript.substring(0, 12000) }}"
+              "content": "=You are a business consultant for Veteran Vectors, an automation consulting firm that helps small businesses (2-20 employees) automate their operations using n8n, Notion, and AI tools.\n\nAnalyze this discovery call transcript and produce FOUR clearly separated sections. Use the exact section markers shown below.\n\n===MEETING_NOTES===\n1. MEETING SUMMARY (2-3 paragraphs covering what was discussed, key themes, and overall assessment)\n2. KEY PAIN POINTS (bulleted list of specific problems the client described)\n3. BUDGET/TIMELINE mentioned (any numbers, dates, or constraints discussed)\n4. NEXT STEPS (what was agreed upon at the end of the call)\n\n===PROPOSAL===\nWrite a detailed proposal draft including:\n- Executive Summary (2-3 paragraphs, conversational tone)\n- Recommended Automations/Solutions (specific systems to build with details)\n- ROI & Hours Saved (estimate hours saved per month and dollar value at $50/hr)\n- Suggested Timeline (week-by-week implementation roadmap)\n- Investment/Pricing (recommend setup cost range and monthly retainer range based on scope)\n- Why Veteran Vectors (3-4 differentiators relevant to this client)\n- Case Studies (reference relevant VV case studies: defense consulting firm, insurance FMO, AI talent marketplace)\n\n===IMPLEMENTATION_GUIDE===\nWrite a step-by-step implementation guide:\n- Phase 1: Discovery & Data Model Design (what to map out)\n- Phase 2: Core System Build (which automations to build first)\n- Phase 3: Integration & Testing (how to connect systems)\n- Phase 4: Training & Handoff (client training plan)\n- Tools Required (list specific tools: n8n, Notion, etc.)\n- Estimated Timeline per phase\n\n===ACTION_ITEMS===\nReturn a JSON array of action items. Each item must have exactly these fields:\n[{\"task\": \"description\", \"owner\": \"Anthony\" or \"Client\", \"priority\": \"high\" or \"medium\" or \"low\"}]\nInclude 5-10 action items extracted from the call.\n\nTRANSCRIPT:\n{{ $('Extract Form Data').item.json.transcript.substring(0, 12000) }}"
             }
           ]
         },
         "options": {
-          "maxTokens": 4000,
+          "maxTokens": 6000,
           "temperature": 0.2
         }
       },
       "id": "step4-node-9",
-      "name": "Claude: Extract Notes + Proposal Brief",
+      "name": "Claude: Full Analysis + Proposal + Guide",
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
-      "position": [
-        2010,
-        240
-      ],
+      "position": [2010, 240],
       "credentials": {
-        "anthropicApi": {
-          "id": "au1c518sMzUt89ul",
-          "name": "VV Claude"
-        }
+        "anthropicApi": { "id": "au1c518sMzUt89ul", "name": "VV Claude" }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '';\n\n// Parse sections by markers\nfunction getSection(text, marker) {\n  const start = text.indexOf(marker);\n  if (start === -1) return '';\n  const afterMarker = text.substring(start + marker.length);\n  // Find next section marker or end\n  const nextMarker = afterMarker.search(/===\\w+===/); \n  return nextMarker === -1 ? afterMarker.trim() : afterMarker.substring(0, nextMarker).trim();\n}\n\nconst meetingNotes = getSection(raw, '===MEETING_NOTES===');\nconst proposal = getSection(raw, '===PROPOSAL===');\nconst implementationGuide = getSection(raw, '===IMPLEMENTATION_GUIDE===');\nconst actionItemsRaw = getSection(raw, '===ACTION_ITEMS===');\n\n// Parse action items JSON\nlet actionItems = [];\ntry {\n  const jsonMatch = actionItemsRaw.match(/\\[.*\\]/s);\n  if (jsonMatch) actionItems = JSON.parse(jsonMatch[0]);\n} catch(e) { /* AI didn't return valid JSON, fallback to empty */ }\n\nreturn [{ json: {\n  meeting_notes: meetingNotes,\n  proposal: proposal,\n  implementation_guide: implementationGuide,\n  action_items: actionItems,\n  action_items_text: actionItems.map(a => `[${a.priority}] ${a.owner}: ${a.task}`).join('\\n'),\n  full_response: raw\n}}];"
+      },
+      "id": "step4-node-15",
+      "name": "Parse AI Sections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2230, 240]
     },
     {
       "id": "step4-node-10",
       "name": "Update Notion (Meeting Held)",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        2230,
-        180
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [2450, 180],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
         "pageId": "={{ $('Extract Contact Info').item.json.notion_page_id }}",
         "propertiesUi": {
           "propertyValues": [
-            {
-              "key": "Status|select",
-              "selectValue": "Meeting Held"
-            },
-            {
-              "key": "Notes|rich_text",
-              "richTextValue": "={{ ($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000) }}"
-            },
-            {
-              "key": "Last Contact Date|date",
-              "dateValue": "={{ $('Extract Form Data').item.json.meeting_date || $now.toISO() }}",
-              "includeTime": true
-            }
+            { "key": "Status|select", "selectValue": "Meeting Held" },
+            { "key": "Notes|rich_text", "richTextValue": "={{ $json.meeting_notes.substring(0, 2000) }}" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $('Extract Form Data').item.json.meeting_date || $now.toISO() }}", "includeTime": true },
+            { "key": "Drive Folder ID|rich_text", "richTextValue": "={{ $('Set Folder ID').item.json.drive_folder_id }}" }
           ]
         },
         "options": {}
@@ -354,211 +247,144 @@
       "name": "Create Notion Meeting Record",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        2230,
-        340
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [2450, 340],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
         "operation": "create",
-        "databaseId": {
-          "__rl": true,
-          "value": "YOUR_NOTION_MEETINGS_DB_ID",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_MEETINGS_DB_ID", "mode": "id" },
         "title": "={{ $('Extract Form Data').item.json.meeting_title || 'Discovery Call' }}",
         "propertiesUi": {
           "propertyValues": [
-            {
-              "key": "Date|date",
-              "dateValue": "={{ $('Extract Form Data').item.json.meeting_date || $now.toISO() }}",
-              "includeTime": false
-            },
-            {
-              "key": "Meeting Type|select",
-              "selectValue": "Completed"
-            },
-            {
-              "key": "Meeting Category|select",
-              "selectValue": "Discovery"
-            },
-            {
-              "key": "Contact|relation",
-              "relationValue": [
-                "={{ $('Extract Contact Info').item.json.notion_page_id }}"
-              ]
-            },
-            {
-              "key": "Attendee Email|email",
-              "emailValue": "={{ $('Extract Form Data').item.json.attendee_email || '' }}"
-            },
-            {
-              "key": "BlueDot Notes|rich_text",
-              "richTextValue": "={{ ($json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '').substring(0, 2000) }}"
-            }
+            { "key": "Date|date", "dateValue": "={{ $('Extract Form Data').item.json.meeting_date || $now.toISO() }}", "includeTime": false },
+            { "key": "Meeting Type|select", "selectValue": "Completed" },
+            { "key": "Meeting Category|select", "selectValue": "Discovery" },
+            { "key": "Contact|relation", "relationValue": ["={{ $('Extract Contact Info').item.json.notion_page_id }}"] },
+            { "key": "Attendee Email|email", "emailValue": "={{ $('Extract Form Data').item.json.attendee_email || '' }}" },
+            { "key": "BlueDot Notes|rich_text", "richTextValue": "={{ $json.meeting_notes.substring(0, 2000) }}" }
           ]
         },
         "options": {}
       }
     },
     {
-      "id": "step4-node-12",
-      "name": "Save Drive Folder ID to Notion",
+      "parameters": {
+        "owner": "YOUR_GITHUB_USERNAME",
+        "repository": "={{ $('Extract Contact Info').item.json.github_repo_name }}",
+        "filePath": "proposals/proposal-draft.md",
+        "commitMessage": "Add AI-generated proposal draft from discovery call",
+        "fileContent": "=# Proposal Draft \u2014 {{ $('Extract Contact Info').item.json.company_name }}\n\n**Generated:** {{ $now.toISODate() }}\n**Client:** {{ $('Extract Contact Info').item.json.contact_name }}\n**Company:** {{ $('Extract Contact Info').item.json.company_name }}\n\n---\n\n{{ $json.proposal }}",
+        "additionalParameters": {}
+      },
+      "id": "step4-node-16",
+      "name": "GitHub: Upload Proposal",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2670, 180],
+      "credentials": { "githubApi": { "id": "YOUR_GITHUB_CRED_ID", "name": "GitHub account" } }
+    },
+    {
+      "parameters": {
+        "owner": "YOUR_GITHUB_USERNAME",
+        "repository": "={{ $('Extract Contact Info').item.json.github_repo_name }}",
+        "filePath": "docs/implementation-guide.md",
+        "commitMessage": "Add AI-generated implementation guide from discovery call",
+        "fileContent": "=# Implementation Guide \u2014 {{ $('Extract Contact Info').item.json.company_name }}\n\n**Generated:** {{ $now.toISODate() }}\n**Client:** {{ $('Extract Contact Info').item.json.contact_name }}\n\n---\n\n{{ $json.implementation_guide }}",
+        "additionalParameters": {}
+      },
+      "id": "step4-node-17",
+      "name": "GitHub: Upload Implementation Guide",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2670, 340],
+      "credentials": { "githubApi": { "id": "YOUR_GITHUB_CRED_ID", "name": "GitHub account" } }
+    },
+    {
+      "id": "step4-node-18",
+      "name": "Save GitHub Repo to Notion",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        2450,
-        180
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [2670, 500],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "notes": "Stores the GitHub repo name on the contact so WF_STEP4B (Audit Call) can reference it later.",
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
         "pageId": "={{ $('Extract Contact Info').item.json.notion_page_id }}",
         "propertiesUi": {
           "propertyValues": [
-            {
-              "key": "Drive Folder ID|rich_text",
-              "richTextValue": "={{ $('Set Folder ID').item.json.drive_folder_id }}"
-            }
+            { "key": "Notes|rich_text", "richTextValue": "={{ 'GitHub Repo: ' + $('Extract Contact Info').item.json.github_repo_name + '\\n\\nAction Items:\\n' + $json.action_items_text.substring(0, 1500) }}" }
           ]
         },
         "options": {}
       }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extract Contact Info').item.json.contact_email }}",
+        "subject": "=Veteran Vectors \u2014 Proposal for {{ $('Extract Contact Info').item.json.company_name }}",
+        "emailType": "html",
+        "message": "=<h2>Proposal for {{ $('Extract Contact Info').item.json.company_name }}</h2>\n<p>Hi {{ $('Extract Contact Info').item.json.contact_name.split(' ')[0] }},</p>\n<p>Great chatting with you! As promised, here\u2019s a summary of what we discussed and what I\u2019m recommending for {{ $('Extract Contact Info').item.json.company_name }}.</p>\n<hr>\n{{ $json.proposal.substring(0, 3000).replace(/\\n/g, '<br>') }}\n<hr>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>Review this proposal and share any feedback</li>\n<li>Schedule an audit call so we can dive deeper: <a href='YOUR_AUDIT_CALENDLY_LINK'>Book Audit Call</a></li>\n<li>We\u2019ll refine the scope and prepare a formal Statement of Work</li>\n</ol>\n<p>Looking forward to it!</p>\n<p>\u2014 Anthony, Veteran Vectors</p>",
+        "options": {}
+      },
+      "id": "step4-node-19",
+      "name": "Draft Proposal Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [2890, 300],
+      "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } },
+      "notes": "Creates a DRAFT proposal email for Anthony to review before sending. Uses Gmail createDraft operation. Replace YOUR_AUDIT_CALENDLY_LINK with the actual Calendly audit call link."
     }
   ],
   "pinData": {},
   "connections": {
     "Meeting Transcript Form": {
-      "main": [
-        [
-          {
-            "node": "Extract Form Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Extract Form Data", "type": "main", "index": 0 }]]
     },
     "Extract Form Data": {
-      "main": [
-        [
-          {
-            "node": "Find Notion Contact",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Find Notion Contact", "type": "main", "index": 0 }]]
     },
     "Find Notion Contact": {
-      "main": [
-        [
-          {
-            "node": "Contact Found?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Contact Found?", "type": "main", "index": 0 }]]
     },
     "Contact Found?": {
-      "main": [
-        [
-          {
-            "node": "Extract Contact Info",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Extract Contact Info", "type": "main", "index": 0 }]]
     },
     "Extract Contact Info": {
-      "main": [
-        [
-          {
-            "node": "Folder Exists?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Folder Exists?", "type": "main", "index": 0 }]]
     },
     "Folder Exists?": {
       "main": [
-        [
-          {
-            "node": "Create Google Drive Folder",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Set Folder ID",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Create Google Drive Folder", "type": "main", "index": 0 }],
+        [{ "node": "Set Folder ID", "type": "main", "index": 0 }]
       ]
     },
     "Create Google Drive Folder": {
-      "main": [
-        [
-          {
-            "node": "Set Folder ID",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Set Folder ID", "type": "main", "index": 0 }]]
     },
     "Set Folder ID": {
       "main": [
         [
-          {
-            "node": "Claude: Extract Notes + Proposal Brief",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "GitHub: Create Repo from Template", "type": "main", "index": 0 },
+          { "node": "Claude: Full Analysis + Proposal + Guide", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Claude: Extract Notes + Proposal Brief": {
-      "main": [
-        [
-          {
-            "node": "Update Notion (Meeting Held)",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Create Notion Meeting Record",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "GitHub: Create Repo from Template": {
+      "main": [[{ "node": "GitHub: Upload Transcript", "type": "main", "index": 0 }]]
     },
-    "Update Notion (Meeting Held)": {
+    "Claude: Full Analysis + Proposal + Guide": {
+      "main": [[{ "node": "Parse AI Sections", "type": "main", "index": 0 }]]
+    },
+    "Parse AI Sections": {
       "main": [
         [
-          {
-            "node": "Save Drive Folder ID to Notion",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "Update Notion (Meeting Held)", "type": "main", "index": 0 },
+          { "node": "Create Notion Meeting Record", "type": "main", "index": 0 },
+          { "node": "GitHub: Upload Proposal", "type": "main", "index": 0 },
+          { "node": "GitHub: Upload Implementation Guide", "type": "main", "index": 0 },
+          { "node": "Save GitHub Repo to Notion", "type": "main", "index": 0 },
+          { "node": "Draft Proposal Email", "type": "main", "index": 0 }
         ]
       ]
     }
@@ -569,10 +395,8 @@
     "availableInMCP": true,
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step4-v2-localhost",
-  "meta": {
-    "templateCredsSetupCompleted": false
-  },
+  "versionId": "step4-v3-github-ai",
+  "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []
 }

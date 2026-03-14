@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP5 - SOW/Contract Creation + Invoicing + Onboarding Doc",
+  "name": "Onboarding WF5 \u2014 SOW/Contract Creation + Invoicing + Onboarding Doc",
   "nodes": [
     {
       "parameters": {
@@ -767,6 +767,22 @@
     },
     {
       "parameters": {
+        "sendTo": "={{ $('SOW Contract Form').item.json.Client_Email }}",
+        "subject": "=Statement of Work \u2014 {{ $('SOW Contract Form').item.json.Project_Name }} \u2014 {{ $('SOW Contract Form').item.json.Company_Name }}",
+        "emailType": "html",
+        "message": "=<h2>Statement of Work \u2014 {{ $('SOW Contract Form').item.json.Project_Name }}</h2>\n<p>Hi {{ $('SOW Contract Form').item.json.First_Name }},</p>\n<p>Thank you for moving forward with Veteran Vectors! Attached below are the details of our engagement.</p>\n<hr>\n<p><strong>Project:</strong> {{ $('SOW Contract Form').item.json.Project_Name }}</p>\n<p><strong>Scope:</strong> {{ $('SOW Contract Form').item.json.Project_Scope }}</p>\n<p><strong>Timeline:</strong> {{ $('SOW Contract Form').item.json.Project_Start_Date }} \u2013 {{ $('SOW Contract Form').item.json.Project_End_Date }}</p>\n<p><strong>Investment:</strong> {{ $('SOW Contract Form').item.json.Total_Project_Cost }} (Initial: {{ $('SOW Contract Form').item.json.Initial_Payment }}, Final: {{ $('SOW Contract Form').item.json.Final_Payment }})</p>\n{{ $('SOW Contract Form').item.json.Has_Retainer === 'Yes' ? '<p><strong>Monthly Retainer:</strong> ' + $('SOW Contract Form').item.json.Retainer_Cost + '</p>' : '' }}\n<hr>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>You\u2019ll receive a SignWell signing request shortly \u2014 please review and sign the Statement of Work</li>\n<li>Once signed, we\u2019ll send over the initial invoice via Stripe</li>\n<li>We\u2019ll kick off the project and schedule our first working session</li>\n</ol>\n<p>If you have any questions about the scope or terms, just reply to this email and we\u2019ll get it sorted.</p>\n<p>Looking forward to building something great together!</p>\n<p>\u2014 Anthony, Veteran Vectors</p>",
+        "options": {}
+      },
+      "id": "step7-node-21",
+      "name": "Draft SOW Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [2450, 300],
+      "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } },
+      "notes": "Creates a DRAFT SOW email for Anthony to review before sending. Summarizes project scope, timeline, costs, and next steps (SignWell signing request incoming)."
+    },
+    {
+      "parameters": {
         "jsCode": "// Collect Stripe IDs from previous nodes \u2014 handles cases where subscription may not exist\nconst customerId = $('Stripe: Create Customer').first()?.json?.id || '';\nlet invoiceId = '';\nlet subscriptionId = '';\ntry { invoiceId = $('Stripe: Create Invoice (Draft)').first()?.json?.id || ''; } catch(e) {}\ntry { subscriptionId = $('Stripe: Create Subscription (Paused)').first()?.json?.id || ''; } catch(e) {}\nreturn [{ json: { stripe_customer_id: customerId, stripe_invoice_id: invoiceId, stripe_subscription_id: subscriptionId } }];"
       },
       "id": "step7-node-19",
@@ -1027,6 +1043,17 @@
         ]
       ]
     },
+    "Create Notion Project": {
+      "main": [
+        [
+          {
+            "node": "Draft SOW Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Collect Stripe IDs": {
       "main": [
         [
@@ -1046,7 +1073,7 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step7-v3-0",
+  "versionId": "step5-v4-sow-email",
   "meta": {
     "templateCredsSetupCompleted": false
   },

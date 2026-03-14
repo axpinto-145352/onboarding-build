@@ -1,0 +1,458 @@
+{
+  "name": "Lead Gen WF1 \u2014 Prosp LinkedIn Connection Tracking",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Prosp.ai LinkedIn Event",
+        "formDescription": "Log a Prosp.ai LinkedIn event. When deployed to production, replace this form with an n8n Webhook node to receive Prosp.ai webhook payloads directly.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Event Type",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  { "option": "connection_sent" },
+                  { "option": "connection_accepted" },
+                  { "option": "reply_received" }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Prospect Name",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "John Doe"
+            },
+            {
+              "fieldLabel": "LinkedIn URL",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "https://www.linkedin.com/in/john-doe/"
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "john@company.com (if available)"
+            },
+            {
+              "fieldLabel": "Company",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "Acme Corp"
+            },
+            {
+              "fieldLabel": "Campaign Name",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "Q1 Loom Outreach"
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Log Event"
+        }
+      },
+      "id": "step1-node-1",
+      "name": "Prosp LinkedIn Event Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "prosp-linkedin-event-form",
+      "notes": "Localhost-compatible form trigger. For production: replace with n8n Webhook node at /webhook/prosp-linkedin-events to receive Prosp.ai webhook payloads directly. Prosp.ai webhooks are configured in Prosp Settings \u2192 Webhooks."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1-event",
+              "name": "event_type",
+              "value": "={{ $json['Event Type'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "s1-name",
+              "name": "prospect_name",
+              "value": "={{ $json['Prospect Name'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "s1-li",
+              "name": "linkedin_url",
+              "value": "={{ ($json['LinkedIn URL'] || '').trim().replace(/\\/$/, '') }}",
+              "type": "string"
+            },
+            {
+              "id": "s1-email",
+              "name": "email",
+              "value": "={{ $json['Email'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "s1-company",
+              "name": "company",
+              "value": "={{ $json['Company'] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "s1-campaign",
+              "name": "campaign_name",
+              "value": "={{ $json['Campaign Name'] || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step1-node-2",
+      "name": "Normalize Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "connection_sent",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Connection Sent"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "connection_accepted",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Connection Accepted"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "reply_received",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Reply Received"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step1-node-3",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [690, 300]
+    },
+    {
+      "id": "step1-node-4a",
+      "name": "Find Contact (Sent)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [910, 140],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "LinkedIn Profile|url",
+              "condition": "string:equals",
+              "urlValue": "={{ $json.linkedin_url }}"
+            }
+          ]
+        },
+        "options": { "simple": false }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step1-node-5a",
+      "name": "Contact Exists? (Sent)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1130, 140]
+    },
+    {
+      "id": "step1-node-6a",
+      "name": "Update Existing (Connection Sent)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1350, 80],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "LI Connection Sent|checkbox", "checkboxValue": true },
+            { "key": "Status|select", "selectValue": "Connection Sent" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "step1-node-7a",
+      "name": "Create New Contact (Connection Sent)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1350, 200],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "title": "={{ $('Normalize Data').item.json.prospect_name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "LinkedIn Profile|url", "urlValue": "={{ $('Normalize Data').item.json.linkedin_url }}" },
+            { "key": "Company|rich_text", "richTextValue": "={{ $('Normalize Data').item.json.company }}" },
+            { "key": "Email|email", "emailValue": "={{ $('Normalize Data').item.json.email }}" },
+            { "key": "Source|select", "selectValue": "LI Loom Outreach" },
+            { "key": "Status|select", "selectValue": "Connection Sent" },
+            { "key": "LI Connection Sent|checkbox", "checkboxValue": true },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "step1-node-4b",
+      "name": "Find Contact (Accepted)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [910, 340],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "LinkedIn Profile|url",
+              "condition": "string:equals",
+              "urlValue": "={{ $('Normalize Data').item.json.linkedin_url }}"
+            }
+          ]
+        },
+        "options": { "simple": false }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "step1-node-6b",
+      "name": "Update Notion (Connection Accepted)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1130, 340],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.id || $('Find Contact (Accepted)').first().json.id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "LI Connection Accepted|checkbox", "checkboxValue": true },
+            { "key": "Status|select", "selectValue": "Connection Accepted" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1fe-WP2VK2JD_e6CZw34k5lc5m9T3lYuJEwbkqQz0yKw",
+          "mode": "list",
+          "cachedResultName": "Master Social Media Automation - Content & Posting -v1"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 126409621,
+          "mode": "list",
+          "cachedResultName": "Loom Videos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Normalize Data').item.json.prospect_name }}",
+            "LI Profile": "={{ $('Normalize Data').item.json.linkedin_url }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "LI Profile", "displayName": "LI Profile", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step1-node-8b",
+      "name": "Add to Loom Videos Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.0,
+      "position": [1350, 340],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "wi6bAEK3LwBuXnNr", "name": "VV Google Sheets account" }
+      },
+      "notes": "Adds accepted connection to the Loom Videos Google Sheet so Anthony knows to record and send a personalized Loom video. This is the handoff from automated lead gen to manual Loom outreach."
+    },
+    {
+      "id": "step1-node-4c",
+      "name": "Find Contact (Reply)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [910, 520],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "LinkedIn Profile|url",
+              "condition": "string:equals",
+              "urlValue": "={{ $('Normalize Data').item.json.linkedin_url }}"
+            }
+          ]
+        },
+        "options": { "simple": false }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "step1-node-6c",
+      "name": "Update Notion (Responded)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1130, 520],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.id || $('Find Contact (Reply)').first().json.id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Responded|checkbox", "checkboxValue": true },
+            { "key": "Status|select", "selectValue": "Responded" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Prosp LinkedIn Event Form": {
+      "main": [[{ "node": "Normalize Data", "type": "main", "index": 0 }]]
+    },
+    "Normalize Data": {
+      "main": [[{ "node": "Route by Event Type", "type": "main", "index": 0 }]]
+    },
+    "Route by Event Type": {
+      "main": [
+        [{ "node": "Find Contact (Sent)", "type": "main", "index": 0 }],
+        [{ "node": "Find Contact (Accepted)", "type": "main", "index": 0 }],
+        [{ "node": "Find Contact (Reply)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Contact (Sent)": {
+      "main": [[{ "node": "Contact Exists? (Sent)", "type": "main", "index": 0 }]]
+    },
+    "Contact Exists? (Sent)": {
+      "main": [
+        [{ "node": "Update Existing (Connection Sent)", "type": "main", "index": 0 }],
+        [{ "node": "Create New Contact (Connection Sent)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Contact (Accepted)": {
+      "main": [[{ "node": "Update Notion (Connection Accepted)", "type": "main", "index": 0 }]]
+    },
+    "Update Notion (Connection Accepted)": {
+      "main": [[{ "node": "Add to Loom Videos Sheet", "type": "main", "index": 0 }]]
+    },
+    "Find Contact (Reply)": {
+      "main": [[{ "node": "Update Notion (Responded)", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "step1-v1-localhost",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": []
+}

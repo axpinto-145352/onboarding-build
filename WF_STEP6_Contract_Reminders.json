@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP6 - Contract Reminders (Every Other Day)",
+  "name": "Onboarding WF6 \u2014 Contract & Invoice Reminders (Daily \u2192 Every 3 Days)",
   "nodes": [
     {
       "parameters": {
@@ -13,84 +13,26 @@
           ]
         }
       },
-      "id": "step8-node-1",
-      "name": "Every Other Day 9 AM",
+      "id": "step6-node-1",
+      "name": "Every Day 9 AM",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [
-        250,
-        300
-      ],
-      "notes": "Runs daily at 9 AM. The workflow checks internally if today is a reminder day (every other day) to avoid over-contacting."
+      "position": [250, 300],
+      "notes": "Runs daily at 9 AM. The Calculate Days & Tier code node determines whether to send a reminder today (daily for first 7 days, then every 3 days)."
     },
     {
-      "parameters": {
-        "jsCode": "// Check if today is an 'every other day' \u2014 use even/odd day of year\n// $now is a Luxon DateTime in n8n, use .ordinal for day-of-year\nconst dayOfYear = $now.ordinal;\nconst isReminderDay = dayOfYear % 2 === 0;\nreturn [{ json: { isReminderDay, dayOfYear, today: $now.toISODate() } }];"
-      },
-      "id": "step8-node-1b",
-      "name": "Check If Reminder Day",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        470,
-        300
-      ],
-      "notes": "Ensures reminders only fire every other day (even days of the year)."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.isReminderDay }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true"
-              }
-            }
-          ]
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "id": "step8-node-2",
-      "name": "Is Reminder Day?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        690,
-        300
-      ]
-    },
-    {
-      "id": "step8-node-3",
+      "id": "step6-node-2",
       "name": "Query Notion: Unsigned Contracts",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        910,
-        240
-      ],
+      "position": [470, 300],
       "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
       },
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": {
-          "__rl": true,
-          "value": "YOUR_NOTION_CONTACTS_DB_ID",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {
@@ -107,69 +49,72 @@
             }
           ]
         },
-        "options": {
-          "simple": false
-        }
+        "options": { "simple": false }
       },
       "alwaysOutputData": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
             {
               "leftValue": "={{ $json.id || '' }}",
               "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
             }
           ]
         },
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step8-node-4",
+      "id": "step6-node-3",
       "name": "Any Unsigned?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        1130,
-        240
-      ]
+      "position": [690, 300]
     },
     {
       "parameters": {
-        "jsCode": "const results = $input.all().map(i => i.json).filter(p => p.id);\nconst now = new Date();\n\nreturn results.map(page => {\n  const props = page.properties;\n  const name = props['Name']?.title?.[0]?.text?.content || '';\n  const email = props['Email']?.email || '';\n  const company = props['Company']?.rich_text?.[0]?.text?.content || '';\n  const lastContact = props['Last Contact Date']?.date?.start || '';\n  const daysSinceSent = lastContact ? Math.floor((now - new Date(lastContact)) / 86400000) : 0;\n\n  let reminderType = 'gentle';\n  if (daysSinceSent >= 30) reminderType = 'expire';\n  else if (daysSinceSent >= 14) reminderType = 'escalation';\n\n  return {\n    json: {\n      notion_page_id: page.id,\n      name, email, company,\n      first_name: name.split(' ')[0],\n      days_since_sent: daysSinceSent,\n      reminder_type: reminderType,\n      last_contact: lastContact\n    }\n  };\n});"
+        "jsCode": "const results = $input.all().map(i => i.json).filter(p => p.id);\nconst now = new Date();\n\nreturn results.map(page => {\n  const props = page.properties;\n  const name = props['Name']?.title?.[0]?.text?.content || '';\n  const email = props['Email']?.email || '';\n  const company = props['Company']?.rich_text?.[0]?.text?.content || '';\n  const lastContact = props['Last Contact Date']?.date?.start || '';\n  const daysSinceSent = lastContact ? Math.floor((now - new Date(lastContact)) / 86400000) : 0;\n\n  let reminderType = 'skip'; // default: don't send today\n  if (daysSinceSent >= 30) {\n    reminderType = 'expire';\n  } else if (daysSinceSent <= 7) {\n    reminderType = 'gentle'; // daily for first week\n  } else if (daysSinceSent % 3 === 0) {\n    reminderType = 'escalation'; // every 3 days after week 1\n  }\n\n  return { json: {\n    notion_page_id: page.id, name, email, company,\n    first_name: name.split(' ')[0],\n    days_since_sent: daysSinceSent,\n    reminder_type: reminderType,\n    last_contact: lastContact\n  }};\n});"
       },
-      "id": "step8-node-5",
+      "id": "step6-node-4",
       "name": "Calculate Days & Tier",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1350,
-        240
-      ]
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "skip",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step6-node-5",
+      "name": "Filter Skip Days",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1130, 300],
+      "notes": "Filters out contacts where reminder_type is 'skip' (days 8-29 that aren't divisible by 3)."
     },
     {
       "parameters": {
         "options": {}
       },
-      "id": "step8-node-6",
+      "id": "step6-node-6",
       "name": "Loop Over Contacts",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [
-        1570,
-        240
-      ]
+      "position": [1350, 300]
     },
     {
       "parameters": {
@@ -177,19 +122,12 @@
           "values": [
             {
               "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "loose"
-                },
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
                 "conditions": [
                   {
                     "leftValue": "={{ $json.reminder_type }}",
                     "rightValue": "gentle",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
+                    "operator": { "type": "string", "operation": "equals" }
                   }
                 ]
               },
@@ -198,19 +136,12 @@
             },
             {
               "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "loose"
-                },
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
                 "conditions": [
                   {
                     "leftValue": "={{ $json.reminder_type }}",
                     "rightValue": "escalation",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
+                    "operator": { "type": "string", "operation": "equals" }
                   }
                 ]
               },
@@ -219,19 +150,12 @@
             },
             {
               "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "loose"
-                },
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
                 "conditions": [
                   {
                     "leftValue": "={{ $json.reminder_type }}",
                     "rightValue": "expire",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
+                    "operator": { "type": "string", "operation": "equals" }
                   }
                 ]
               },
@@ -242,14 +166,11 @@
         },
         "options": {}
       },
-      "id": "step8-node-7",
+      "id": "step6-node-7",
       "name": "Route by Reminder Type",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [
-        1790,
-        240
-      ]
+      "position": [1570, 300]
     },
     {
       "parameters": {
@@ -260,19 +181,13 @@
           "ccList": "anthony@veteranvectors.io"
         }
       },
-      "id": "step8-node-8a",
+      "id": "step6-node-8a",
       "name": "Send Gentle Reminder",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
-      "position": [
-        2010,
-        100
-      ],
+      "position": [1790, 160],
       "credentials": {
-        "gmailOAuth2": {
-          "id": "r13jnGsjwNOqcBvt",
-          "name": "VV Gmail account"
-        }
+        "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" }
       }
     },
     {
@@ -284,35 +199,23 @@
           "ccList": "anthony@veteranvectors.io"
         }
       },
-      "id": "step8-node-8b",
+      "id": "step6-node-8b",
       "name": "Send Escalation Email",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
-      "position": [
-        2010,
-        260
-      ],
+      "position": [1790, 320],
       "credentials": {
-        "gmailOAuth2": {
-          "id": "r13jnGsjwNOqcBvt",
-          "name": "VV Gmail account"
-        }
+        "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" }
       }
     },
     {
-      "id": "step8-node-8c",
+      "id": "step6-node-8c",
       "name": "Auto-Expire in Notion",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        2010,
-        420
-      ],
+      "position": [1790, 480],
       "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
       },
       "notes": "After 30 days with no signed contract, auto-expires the lead to 'Declined' in Notion.",
       "parameters": {
@@ -321,34 +224,21 @@
         "pageId": "={{ $json.notion_page_id }}",
         "propertiesUi": {
           "propertyValues": [
-            {
-              "key": "Status|select",
-              "selectValue": "Declined"
-            },
-            {
-              "key": "Last Contact Date|date",
-              "dateValue": "={{ $now.toISO() }}",
-              "includeTime": true
-            }
+            { "key": "Status|select", "selectValue": "Declined" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
           ]
         },
         "options": {}
       }
     },
     {
-      "id": "step8-node-9",
+      "id": "step6-node-9",
       "name": "Log Reminder in Notion",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        2230,
-        180
-      ],
+      "position": [2010, 240],
       "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
       },
       "notes": "Updates Last Contact Date to track when reminders were sent (prevents duplicate reminders).",
       "parameters": {
@@ -357,11 +247,202 @@
         "pageId": "={{ $json.notion_page_id }}",
         "propertiesUi": {
           "propertyValues": [
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "step6-node-10",
+      "name": "Query Notion: Unpaid Invoices",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [470, 600],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "notes": "Queries contacts with Status='Project Started' and Invoice Paid checkbox unchecked. Requires adding 'Invoice Paid' checkbox property to Notion Contacts DB.",
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
             {
-              "key": "Last Contact Date|date",
-              "dateValue": "={{ $now.toISO() }}",
-              "includeTime": true
+              "key": "Status|select",
+              "condition": "string:equals",
+              "selectValue": "Project Started"
+            },
+            {
+              "key": "Invoice Paid|checkbox",
+              "condition": "boolean:equals",
+              "booleanValue": false
             }
+          ]
+        },
+        "options": { "simple": false }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id || '' }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step6-node-11",
+      "name": "Any Unpaid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [690, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all().map(i => i.json).filter(p => p.id);\nconst now = new Date();\n\nreturn results.map(page => {\n  const props = page.properties;\n  const name = props['Name']?.title?.[0]?.text?.content || '';\n  const email = props['Email']?.email || '';\n  const company = props['Company']?.rich_text?.[0]?.text?.content || '';\n  const lastContact = props['Last Contact Date']?.date?.start || '';\n  const daysSinceInvoice = lastContact ? Math.floor((now - new Date(lastContact)) / 86400000) : 0;\n\n  let reminderType = 'skip';\n  if (daysSinceInvoice <= 7) {\n    reminderType = 'gentle_invoice'; // daily for first week\n  } else if (daysSinceInvoice % 3 === 0) {\n    reminderType = 'urgent_invoice'; // every 3 days after week 1\n  }\n\n  return { json: {\n    notion_page_id: page.id, name, email, company,\n    first_name: name.split(' ')[0],\n    days_since_invoice: daysSinceInvoice,\n    reminder_type: reminderType,\n    last_contact: lastContact\n  }};\n});"
+      },
+      "id": "step6-node-12",
+      "name": "Calculate Invoice Days & Tier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reminder_type }}",
+              "rightValue": "skip",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step6-node-13",
+      "name": "Filter Skip Invoice Days",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1130, 600]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "step6-node-14",
+      "name": "Loop Over Invoice Contacts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1350, 600]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.reminder_type }}",
+                    "rightValue": "gentle_invoice",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Gentle Invoice Reminder"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.reminder_type }}",
+                    "rightValue": "urgent_invoice",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Urgent Invoice Reminder"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "step6-node-15",
+      "name": "Route Invoice Reminder Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1570, 600]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Friendly reminder: Invoice for {{ $json.company }}",
+        "message": "=<p>Hey {{ $json.first_name }},</p><p>Just a quick reminder that we have an outstanding invoice for the {{ $json.company }} project. If you've already sent payment, please disregard this message!</p><p>If you have any questions about the invoice, just reply to this email.</p><p>Cheers,<br>Anthony<br>Veteran Vectors</p>",
+        "options": {
+          "ccList": "anthony@veteranvectors.io"
+        }
+      },
+      "id": "step6-node-16a",
+      "name": "Send Gentle Invoice Reminder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1790, 560],
+      "credentials": {
+        "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Action needed: Outstanding invoice for {{ $json.company }}",
+        "message": "=<p>Hey {{ $json.first_name }},</p><p>I wanted to follow up on the outstanding invoice for the {{ $json.company }} project. It's been {{ $json.days_since_invoice }} days since the invoice was sent.</p><p>I understand things can slip through the cracks \u2014 could you let me know the status of the payment? If there are any issues, I'm happy to work with you to resolve them.</p><p>Cheers,<br>Anthony<br>Veteran Vectors</p>",
+        "options": {
+          "ccList": "anthony@veteranvectors.io"
+        }
+      },
+      "id": "step6-node-16b",
+      "name": "Send Urgent Invoice Reminder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1790, 700],
+      "credentials": {
+        "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" }
+      }
+    },
+    {
+      "id": "step6-node-17",
+      "name": "Log Invoice Reminder in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [2010, 630],
+      "credentials": {
+        "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" }
+      },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
           ]
         },
         "options": {}
@@ -370,152 +451,83 @@
   ],
   "pinData": {},
   "connections": {
-    "Every Other Day 9 AM": {
+    "Every Day 9 AM": {
       "main": [
         [
-          {
-            "node": "Check If Reminder Day",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check If Reminder Day": {
-      "main": [
-        [
-          {
-            "node": "Is Reminder Day?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Is Reminder Day?": {
-      "main": [
-        [
-          {
-            "node": "Query Notion: Unsigned Contracts",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "Query Notion: Unsigned Contracts", "type": "main", "index": 0 },
+          { "node": "Query Notion: Unpaid Invoices", "type": "main", "index": 0 }
         ]
       ]
     },
     "Query Notion: Unsigned Contracts": {
-      "main": [
-        [
-          {
-            "node": "Any Unsigned?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Any Unsigned?", "type": "main", "index": 0 }]]
     },
     "Any Unsigned?": {
-      "main": [
-        [
-          {
-            "node": "Calculate Days & Tier",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Calculate Days & Tier", "type": "main", "index": 0 }]]
     },
     "Calculate Days & Tier": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Contacts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Filter Skip Days", "type": "main", "index": 0 }]]
+    },
+    "Filter Skip Days": {
+      "main": [[{ "node": "Loop Over Contacts", "type": "main", "index": 0 }]]
     },
     "Loop Over Contacts": {
       "main": [
         [],
-        [
-          {
-            "node": "Route by Reminder Type",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Route by Reminder Type", "type": "main", "index": 0 }]
       ]
     },
     "Route by Reminder Type": {
       "main": [
-        [
-          {
-            "node": "Send Gentle Reminder",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Send Escalation Email",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Auto-Expire in Notion",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Send Gentle Reminder", "type": "main", "index": 0 }],
+        [{ "node": "Send Escalation Email", "type": "main", "index": 0 }],
+        [{ "node": "Auto-Expire in Notion", "type": "main", "index": 0 }]
       ]
     },
     "Send Gentle Reminder": {
-      "main": [
-        [
-          {
-            "node": "Log Reminder in Notion",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Log Reminder in Notion", "type": "main", "index": 0 }]]
     },
     "Send Escalation Email": {
-      "main": [
-        [
-          {
-            "node": "Log Reminder in Notion",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Log Reminder in Notion", "type": "main", "index": 0 }]]
     },
     "Log Reminder in Notion": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Contacts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Loop Over Contacts", "type": "main", "index": 0 }]]
     },
     "Auto-Expire in Notion": {
+      "main": [[{ "node": "Loop Over Contacts", "type": "main", "index": 0 }]]
+    },
+    "Query Notion: Unpaid Invoices": {
+      "main": [[{ "node": "Any Unpaid?", "type": "main", "index": 0 }]]
+    },
+    "Any Unpaid?": {
+      "main": [[{ "node": "Calculate Invoice Days & Tier", "type": "main", "index": 0 }]]
+    },
+    "Calculate Invoice Days & Tier": {
+      "main": [[{ "node": "Filter Skip Invoice Days", "type": "main", "index": 0 }]]
+    },
+    "Filter Skip Invoice Days": {
+      "main": [[{ "node": "Loop Over Invoice Contacts", "type": "main", "index": 0 }]]
+    },
+    "Loop Over Invoice Contacts": {
       "main": [
-        [
-          {
-            "node": "Loop Over Contacts",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [],
+        [{ "node": "Route Invoice Reminder Type", "type": "main", "index": 0 }]
       ]
+    },
+    "Route Invoice Reminder Type": {
+      "main": [
+        [{ "node": "Send Gentle Invoice Reminder", "type": "main", "index": 0 }],
+        [{ "node": "Send Urgent Invoice Reminder", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Gentle Invoice Reminder": {
+      "main": [[{ "node": "Log Invoice Reminder in Notion", "type": "main", "index": 0 }]]
+    },
+    "Send Urgent Invoice Reminder": {
+      "main": [[{ "node": "Log Invoice Reminder in Notion", "type": "main", "index": 0 }]]
+    },
+    "Log Invoice Reminder in Notion": {
+      "main": [[{ "node": "Loop Over Invoice Contacts", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
@@ -525,10 +537,8 @@
     "timeSavedMode": "fixed",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step8-v2-0",
-  "meta": {
-    "templateCredsSetupCompleted": false
-  },
+  "versionId": "step6-v3-daily-invoice",
+  "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []
 }

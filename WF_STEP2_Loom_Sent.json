@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP2 - Loom Sent Tracking (Schedule \u2192 Sheet Poll \u2192 Notion)",
+  "name": "Lead Gen WF2 \u2014 Loom Sent Tracking (Sheet \u2192 Notion)",
   "nodes": [
     {
       "parameters": {

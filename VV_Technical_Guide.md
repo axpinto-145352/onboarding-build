@@ -16,6 +16,7 @@ This document describes the technical architecture of the 8-step LinkedIn-to-Cli
 | **AI Processing** | Anthropic Claude | Loom scripts, meeting notes, proposal drafts, revenue estimation | API access (Sonnet 4.5) |
 | **Scheduling** | Calendly | Discovery calls, audit calls, onboarding calls, check-ins | Professional plan (custom questions + webhooks) |
 | **Meeting Transcription** | BlueDot AI | Auto-transcription with webhook delivery | Business plan with API webhooks |
+| **Source Code & Docs** | GitHub | Client repos (proposals, implementation guides, Skills, transcripts) | Personal account with PAT |
 | **E-Signatures** | SignWell | SOW/contract signing with completion webhooks | Business plan |
 | **Payments** | Stripe | Invoices (draft → send), retainer subscriptions (paused → active) | Standard account |
 | **Document Storage** | Google Drive | Client folders, transcripts, proposals, signed contracts | Google Workspace |
@@ -45,7 +46,9 @@ This document describes the technical architecture of the 8-step LinkedIn-to-Cli
 | Loom Sent | Checkbox | STEP2 | Loom video sent |
 | Responded | Checkbox | STEP1/3C | Contact responded |
 | Call Booked | Checkbox | STEP3C | Discovery call booked |
-| Audit Call | Checkbox | STEP4 | Audit call completed |
+| Audit Call | Checkbox | STEP4B | Audit call completed |
+| Invoice Paid | Checkbox | STEP6/Manual | Tracks whether initial invoice has been paid |
+| GitHub Repo | Rich Text | STEP4 | Client GitHub repo name (used by STEP4B) |
 | Last Contact Date | Date | All | Last interaction timestamp |
 | Need to Follow Up Date | Date | STEP3A | Follow-up date |
 | Notes | Rich Text | WF0/4 | Research brief, meeting notes |
@@ -183,6 +186,7 @@ All credentials are stored in n8n's credential manager. Never in workflow JSON f
 | VV - Calendly account | Calendly OAuth2 | `Htykkb3r14siqEFc` | STEP3C, STEP8 |
 | VV - Calendly (OAuth2) | OAuth2 Generic | `uFXaP32GB3oPzqwu` | STEP3C (cancellation) |
 | VV Gmail account | Gmail OAuth2 | `r13jnGsjwNOqcBvt` | STEP3C, STEP6, STEP7 |
+| GitHub account | GitHub API (PAT) | (configure) | STEP4, STEP4B |
 | Notion Integration | HTTP Header Auth | (configure) | All STEP workflows |
 | Stripe | Stripe API | (configure) | STEP5, STEP7 |
 | SignWell | HTTP Header Auth | (configure) | STEP5, STEP7 |

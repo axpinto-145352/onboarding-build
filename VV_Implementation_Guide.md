@@ -46,6 +46,8 @@ If you don't already have one, create a new Notion database with these propertie
 | Responded | Checkbox | — |
 | Call Booked | Checkbox | — |
 | Audit Call | Checkbox | — |
+| Invoice Paid | Checkbox | — |
+| GitHub Repo | Rich Text | — |
 | Last Contact Date | Date | — |
 | Need to Follow Up Date | Date | — |
 | Notes | Rich Text | — |
@@ -173,6 +175,29 @@ Already configured:
 4. Install to workspace, copy Bot Token (`xoxb-...`)
 5. In n8n: New Credential → Slack OAuth2 API or Header Auth
 
+### Step 2.10: GitHub Personal Access Token
+
+1. Go to [GitHub Settings → Developer Settings → Personal Access Tokens → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+2. Create a new token with:
+   - **Repository access:** All repositories (or select specific ones)
+   - **Permissions:** Repository: Contents (Read and Write), Administration (Read and Write — needed for repo creation)
+3. Copy the token
+4. In n8n: New Credential → GitHub API
+5. Name: `GitHub account`
+6. Access Token: paste your token
+
+**Template Repo Setup:** Create a GitHub template repository named `vv-client-template` containing:
+- `Skills/proposal SKILL.md`
+- `Skills/agent SKILL.md`
+- `Skills/smb SKILL.md`
+- `Skills/doc polish SKILL.md`
+- `Skills/ai check SKILL.md`
+- `Skills/13 agents SKILL.md`
+- `Skills/template-structure.md`
+- `Skills/pdf-generation.md`
+- `README.md`
+- Mark it as a template in GitHub repo Settings
+
 ---
 
 ## Phase 3: Placeholder Replacement
@@ -193,6 +218,9 @@ Before importing any workflow, replace these placeholders in the JSON files:
 | `YOUR_FOLLOWUP_CAMPAIGN_ID` | Prosp.ai follow-up campaign ID | Prosp.ai campaign settings |
 | `YOUR_SOW_TEMPLATE_FILE_ID` | Google Drive file ID for SOW PDF template | Google Drive URL |
 | `prod_YOUR_RETAINER_PRODUCT_ID` | Stripe Product ID for retainer services | Stripe Dashboard → Products |
+| `YOUR_GITHUB_USERNAME` | Your GitHub username | GitHub profile |
+| `YOUR_GITHUB_CRED_ID` | n8n GitHub credential ID | n8n Credentials page |
+| `YOUR_AUDIT_CALENDLY_LINK` | Calendly audit call booking link | Calendly event type URL |
 
 ### Quick Replace Command
 
@@ -288,6 +316,21 @@ done
 - Notion contact updated to "Meeting Held"
 - Meeting record created in Notion
 
+### Step 4.5b: Import STEP4B — Audit Call Processing
+
+1. Import `WF_STEP4B_Audit_Call_Processing.json`
+2. Assign credentials:
+   - Notion nodes → Notion account
+   - Google Drive → Google Drive OAuth2
+   - GitHub nodes → GitHub account
+   - Claude AI → VV Claude
+3. Save and Activate
+
+**Test it:** After running STEP4 for a client (which creates a GitHub repo), paste an audit call transcript in the STEP4B form. Enter the GitHub repo name from STEP4. Check:
+- Audit transcript uploaded to Drive and GitHub
+- Proposal and implementation guide updated (overwritten) in GitHub
+- Meeting record created with Category = "Audit"
+
 ### Step 4.6: Import STEP5 — SOW/Contract Creation
 
 1. Import `WF_STEP5_SOW_Contract.json`
@@ -308,13 +351,18 @@ done
 
 **Test it:** Access the form URL (shown in n8n after activation). Fill out test data and submit.
 
-### Step 4.7: Import STEP6 — Contract Reminders
+### Step 4.7: Import STEP6 — Contract & Invoice Reminders
 
 1. Import `WF_STEP6_Contract_Reminders.json`
-2. Assign Notion and Gmail credentials
-3. Save and Activate
+2. Assign Notion and Gmail credentials to all nodes
+3. **Important:** Add `Invoice Paid` checkbox property to your Notion Contacts database (required for invoice reminder branch)
+4. Save and Activate
 
-**Test it:** Create a test contact with Status = "Contract Sent" and Last Contact Date = yesterday. Wait for the schedule trigger or test manually.
+**Reminder schedule:** Daily for first 7 days, then every 3 days. Auto-expires at 30 days.
+
+**Test it:**
+- Contract reminders: Create a test contact with Status = "Contract Sent" and Last Contact Date = yesterday
+- Invoice reminders: Create a test contact with Status = "Project Started" and Invoice Paid = unchecked
 
 ### Step 4.8: Import STEP7 — Post-Signing Onboarding
 
