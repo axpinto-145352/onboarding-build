@@ -349,37 +349,57 @@ done
    - Copy the `prod_xxx` Product ID
 5. Save and Activate
 
-**Test it:** Access the form URL (shown in n8n after activation). Fill out test data and submit.
+**What it does:** Creates SOW PDF, sends via SignWell for signing, creates a DRAFT Stripe invoice (not sent yet), creates a paused subscription, and saves all Stripe IDs to Notion. Sets status to "Contract Sent".
 
-### Step 4.7: Import STEP6 — Contract & Invoice Reminders
+**Test it:** Access the form URL (shown in n8n after activation). Fill out test data and submit. Verify the Stripe invoice is in DRAFT status (not sent).
 
-1. Import `WF_STEP6_Contract_Reminders.json`
+### Step 4.7: Import STEP6 — Invoice Send (After SOW Signed)
+
+1. Import `WF_STEP6_Invoice_Send.json`
+2. Assign credentials:
+   - Notion → "Notion Integration"
+   - Stripe → Stripe API
+   - Google Drive → OAuth2
+3. Save and Activate
+
+**What it does:** Polls SignWell every 15 minutes for completed (signed) contracts. When found, downloads the signed PDF to Google Drive, finalizes and sends the draft Stripe invoice, and updates Notion status to "Contract Signed".
+
+**Test it:** Sign a test contract in SignWell. Within 15 minutes, check:
+- Signed PDF uploaded to Google Drive
+- Stripe invoice changed from draft to sent
+- Notion contact updated to "Contract Signed"
+
+### Step 4.8: Import STEP7 — Welcome Email (After SOW Signed + Invoice Paid)
+
+1. Import `WF_STEP7_Post_Signing.json`
+2. Assign credentials:
+   - Notion → "Notion Integration"
+   - Gmail → "VV Gmail account"
+   - Stripe → Stripe API
+3. Save and Activate
+
+**What it does:** Polls every 15 minutes for contacts with "Contract Signed" status. Checks Stripe to confirm the invoice is paid. Only when BOTH conditions are met does it send the welcome email, update status to "Project Started", mark the project as "Active", and resume the Stripe subscription.
+
+**Test it:** Pay the test invoice in Stripe. Within 15 minutes, check:
+- Welcome email sent to client
+- Notion contact updated to "Project Started"
+- Notion project updated to "Active"
+- Stripe subscription resumed (if applicable)
+
+### Step 4.9: Import STEP8 — Contract & Invoice Reminders
+
+1. Import `WF_STEP8_Contract_Reminders.json`
 2. Assign Notion and Gmail credentials to all nodes
 3. **Important:** Add `Invoice Paid` checkbox property to your Notion Contacts database (required for invoice reminder branch)
 4. Save and Activate
+
+**What it does:** Dual-branch reminders. Branch A: emails unsigned contract reminders to contacts with "Contract Sent" status. Branch B: emails unpaid invoice reminders to contacts with "Project Started" status where Invoice Paid is unchecked.
 
 **Reminder schedule:** Daily for first 7 days, then every 3 days. Auto-expires at 30 days.
 
 **Test it:**
 - Contract reminders: Create a test contact with Status = "Contract Sent" and Last Contact Date = yesterday
 - Invoice reminders: Create a test contact with Status = "Project Started" and Invoice Paid = unchecked
-
-### Step 4.8: Import STEP7 — Post-Signing Onboarding
-
-1. Import `WF_STEP7_Post_Signing.json`
-2. Assign credentials:
-   - Notion → "Notion Integration"
-   - Google Drive → OAuth2
-   - Gmail → "VV Gmail account"
-   - Stripe → Stripe API
-3. Save and Activate
-4. **In SignWell:** Go to Settings → Webhooks → Add webhook URL from STEP7
-
-**Test it:** Sign a test contract in SignWell. Check:
-- Signed PDF uploaded to Google Drive
-- Welcome email sent
-- Notion contact updated to "Project Started"
-- Notion project updated to "Active"
 
 ---
 
@@ -434,7 +454,7 @@ Copy the campaign ID and use it in STEP3A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 
 1. Create another event type: "Veteran Vectors Onboarding"
 2. Duration: 45 minutes
-3. This URL goes in the welcome email template in STEP7
+3. This URL goes in the welcome email template in WF7 (Post_Signing.json)
 
 ---
 
@@ -448,10 +468,12 @@ Copy the campaign ID and use it in STEP3A's `YOUR_FOLLOWUP_CAMPAIGN_ID` placehol
 4. **STEP 3C:** Book a discovery call on Calendly:
    - With revenue < $5K → verify approval email received → test approve and disapprove
    - With revenue > $5K → verify auto-qualified in Notion
-5. **STEP 4:** Hold a discovery call with BlueDot → verify transcript processed, Drive folder created
-6. **STEP 5:** Submit the SOW form → verify contract sent via SignWell
-7. **STEP 6:** Wait for reminder schedule → verify emails sent
-8. **STEP 7:** Sign the test contract → verify welcome email and Notion updates
+5. **STEP 4:** Hold a discovery call with BlueDot → verify transcript processed, Drive folder created, GitHub repo created
+6. **STEP 4B:** Hold an audit call → verify transcript uploaded, proposal updated in GitHub
+7. **STEP 5:** Submit the SOW form → verify contract sent via SignWell, draft invoice created in Stripe (not sent)
+8. **STEP 6:** Sign the test contract in SignWell → verify signed PDF in Drive, Stripe invoice finalized and sent, Notion status = "Contract Signed"
+9. **STEP 7:** Pay the test invoice in Stripe → verify welcome email sent, Notion status = "Project Started", project = "Active"
+10. **STEP 8:** Backdate a contact's Last Contact Date → verify reminder emails sent on schedule
 
 ### Monitoring
 
