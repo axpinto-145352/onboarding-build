@@ -1,0 +1,288 @@
+{
+  "name": "Onboarding WF6 — Invoice Send (After SOW Signed)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] }
+      },
+      "id": "wf6-node-1",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "notes": "Polls SignWell for newly signed contracts. When found: downloads signed PDF, uploads to Drive, finalizes and sends the Stripe invoice, updates Notion to 'Contract Signed'."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.signwell.com/api/v1/documents/?status=completed&limit=20",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" }] },
+        "options": {}
+      },
+      "id": "wf6-node-2",
+      "name": "List Completed SignWell Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const docs = $json.documents || $json || [];\nconst docList = Array.isArray(docs) ? docs : [docs];\nconst completed = docList.filter(d => (d.status||'').toLowerCase() === 'completed');\nif (!completed.length) return [{ json: { _empty: true } }];\nreturn completed.map(d => {\n  const recipients = d.recipients || [];\n  const client = recipients.find(r => !(r.email||'').includes('veteranvectors')) || recipients[0] || {};\n  return { json: {\n    doc_id: d.id || '', doc_name: d.name || '',\n    client_email: client.email || '', client_name: client.name || '',\n    pdf_url: d.completed_pdf_url || d.file_url || d.pdf_url || '',\n    completed_at: d.completed_at || d.updated_at || ''\n  }};\n});"
+      },
+      "id": "wf6-node-3",
+      "name": "Extract Completed Docs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json._empty }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "wf6-node-4",
+      "name": "Has Completed Docs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": { "options": { "reset": false }, "batchSize": 1 },
+      "id": "wf6-node-5",
+      "name": "Loop Documents",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1130, 300]
+    },
+    {
+      "id": "wf6-node-6",
+      "name": "Find Notion Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1350, 300],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [{ "key": "Email|email", "condition": "string:equals", "emailValue": "={{ $json.client_email || '' }}" }]
+        },
+        "options": { "simple": false }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json.id || '' }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "wf6-node-7",
+      "name": "Contact Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nconst currentStatus = props?.Status?.select?.name || '';\n\n// Only process contacts with 'Contract Sent' status (SOW sent but not yet signed)\nif (currentStatus !== 'Contract Sent') {\n  return [{ json: { _skip: true, reason: 'Status is ' + currentStatus + ', not Contract Sent' } }];\n}\n\nreturn [{ json: {\n  _skip: false,\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  current_status: currentStatus\n}}];"
+      },
+      "id": "wf6-node-8",
+      "name": "Extract Contact + Check Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1790, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json._skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "wf6-node-9",
+      "name": "Needs Processing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2010, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Loop Documents').first().json.pdf_url }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "wf6-node-10",
+      "name": "Download Signed Contract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2230, 240]
+    },
+    {
+      "parameters": {
+        "name": "=Signed-Contract-{{ $('Extract Contact + Check Status').item.json.company_name }}.pdf",
+        "folderId": { "__rl": true, "value": "={{ $('Extract Contact + Check Status').item.json.drive_folder_id }}", "mode": "id" },
+        "options": {}
+      },
+      "id": "wf6-node-11",
+      "name": "Upload Signed Contract to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2450, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $('Extract Contact + Check Status').item.json.stripe_invoice_id }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "wf6-node-12",
+      "name": "Has Draft Invoice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2670, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $('Extract Contact + Check Status').item.json.stripe_invoice_id }}/finalize",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "options": {}
+      },
+      "id": "wf6-node-13",
+      "name": "Stripe: Finalize Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2890, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $('Extract Contact + Check Status').item.json.stripe_invoice_id }}/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "options": {}
+      },
+      "id": "wf6-node-14",
+      "name": "Stripe: Send Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3110, 200],
+      "notes": "Sends the finalized invoice to the client. Only happens after SOW is fully signed."
+    },
+    {
+      "id": "wf6-node-15",
+      "name": "Update Notion (Contract Signed)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [3330, 300],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Extract Contact + Check Status').item.json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status|select", "selectValue": "Contract Signed" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": { "amount": 1 },
+      "id": "wf6-node-delay",
+      "name": "Rate Limit Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3550, 300],
+      "webhookId": "wf6-rate-limit"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [[{ "node": "List Completed SignWell Documents", "type": "main", "index": 0 }]]
+    },
+    "List Completed SignWell Documents": {
+      "main": [[{ "node": "Extract Completed Docs", "type": "main", "index": 0 }]]
+    },
+    "Extract Completed Docs": {
+      "main": [[{ "node": "Has Completed Docs?", "type": "main", "index": 0 }]]
+    },
+    "Has Completed Docs?": {
+      "main": [[{ "node": "Loop Documents", "type": "main", "index": 0 }]]
+    },
+    "Loop Documents": {
+      "main": [[], [{ "node": "Find Notion Contact", "type": "main", "index": 0 }]]
+    },
+    "Find Notion Contact": {
+      "main": [[{ "node": "Contact Found?", "type": "main", "index": 0 }]]
+    },
+    "Contact Found?": {
+      "main": [
+        [{ "node": "Extract Contact + Check Status", "type": "main", "index": 0 }],
+        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Contact + Check Status": {
+      "main": [[{ "node": "Needs Processing?", "type": "main", "index": 0 }]]
+    },
+    "Needs Processing?": {
+      "main": [
+        [{ "node": "Download Signed Contract", "type": "main", "index": 0 }],
+        [{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Download Signed Contract": {
+      "main": [[{ "node": "Upload Signed Contract to Drive", "type": "main", "index": 0 }]]
+    },
+    "Upload Signed Contract to Drive": {
+      "main": [[{ "node": "Has Draft Invoice?", "type": "main", "index": 0 }]]
+    },
+    "Has Draft Invoice?": {
+      "main": [
+        [{ "node": "Stripe: Finalize Invoice", "type": "main", "index": 0 }],
+        [{ "node": "Update Notion (Contract Signed)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Stripe: Finalize Invoice": {
+      "main": [[{ "node": "Stripe: Send Invoice", "type": "main", "index": 0 }]]
+    },
+    "Stripe: Send Invoice": {
+      "main": [[{ "node": "Update Notion (Contract Signed)", "type": "main", "index": 0 }]]
+    },
+    "Update Notion (Contract Signed)": {
+      "main": [[{ "node": "Rate Limit Delay", "type": "main", "index": 0 }]]
+    },
+    "Rate Limit Delay": {
+      "main": [[{ "node": "Loop Documents", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "availableInMCP": true, "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "wf6-v1-invoice-send",
+  "meta": { "templateCredsSetupCompleted": false },
+  "id": "",
+  "tags": []
+}

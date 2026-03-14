@@ -274,47 +274,91 @@ APPROVE    DISAPPROVE
 ### STEP 5: SOW/Contract Creation
 
 **Workflow:** `WF_STEP5_SOW_Contract.json`
-**Name:** `Onboarding WF5 — SOW/Contract Creation + Invoicing + Onboarding Doc`
+**Name:** `Onboarding WF5 — SOW/Contract Creation`
 **Trigger:** Form submission (Anthony submits after proposal approval)
 
 ```
 [n8n Form: Contract Details]
-- Client info (name, email, title, company)
-- Project scope and name
-- Timeline (start/end dates)
-- Costs (fixed, retainer, initial payment)
-- Compliance terms
+- Client info, project scope, timeline, costs
+- Proposal Google Drive URL, Notion Contact ID
         │
-  [Create Google Drive Folder (if not exists)]
-        │
-  [PDFco: Fill SOW Template]
-        │
-  [Upload Unsigned Contract to Drive]
-        │
-  [SignWell: Create + Send for Signing]
-  - Recipients: Anthony + Client
-        │
-  [Stripe: Create Customer]
-  [Stripe: Create Invoice (DRAFT, auto_advance=false)]
-  [IF Retainer: Create Subscription (PAUSED)]
-        │
-  [Update Notion Contact: "Contract Sent"]
-  [Create Notion Project Record]
-        │
-  [Draft SOW Email (Gmail createDraft)]      ← NEW
-  - Summarizes project scope, timeline, costs
-  - Notes SignWell signing request is coming
-  - Draft for Anthony to review before sending
-        │
-  [Save Stripe IDs to Notion]
+  ┌─────┴──────────────────────────────────────────┐
+  ▼                                                ▼
+[Extract Proposal → Claude AI → PDFco]    [Stripe: Create Customer]
+  │                                                │
+[Create/Find Client Folder]               [Has Fixed Cost? → Invoice Item → Draft Invoice]
+[Upload SOW to Drive]                     [Has Retainer? → Price → Subscription (Paused)]
+  │                                                │
+[SignWell: Create + Send for Signing]     [Collect Stripe IDs → Save to Notion]
+  │
+[Update Notion: "Contract Sent"]
+[Create Notion Project Record]
 ```
+
+**Ends here.** WF6 handles invoice send after signing. WF7 handles welcome email after payment.
 
 ---
 
-### STEP 6: Contract & Invoice Reminders
+### STEP 6: Invoice Send (After SOW Signed)
 
-**Workflow:** `WF_STEP6_Contract_Reminders.json`
-**Name:** `Onboarding WF6 — Contract & Invoice Reminders (Daily → Every 3 Days)`
+**Workflow:** `WF_STEP6_Invoice_Send.json`
+**Name:** `Onboarding WF6 — Invoice Send (After SOW Signed)`
+**Trigger:** Schedule (every 15 minutes)
+
+```
+[Poll SignWell: completed documents]
+        │
+  [Find Notion Contact by email]
+        │
+  [Status = "Contract Sent"?]
+    │ YES                    │ NO
+    ▼                        └─ (skip)
+  [Download Signed Contract PDF]
+  [Upload to Google Drive]
+        │
+  [Has Draft Invoice?]
+    │ YES
+    ▼
+  [Stripe: Finalize Invoice]
+  [Stripe: Send Invoice]
+        │
+  [Update Notion: "Contract Signed"]
+```
+
+**Handoff:** Reads Stripe Invoice ID from Notion (saved by WF5). Sets status to "Contract Signed" for WF7 to pick up.
+
+---
+
+### STEP 7: Welcome Email (After Signed + Paid)
+
+**Workflow:** `WF_STEP7_Post_Signing.json`
+**Name:** `Onboarding WF7 — Welcome Email (After SOW Signed + Invoice Paid)`
+**Trigger:** Schedule (every 15 minutes)
+
+```
+[Query Notion: Status = "Contract Signed"]
+        │
+  [For each contact]
+        │
+  [Check Stripe Invoice Status]
+        │
+  [Invoice Paid?]
+    │ YES              │ NO
+    ▼                  └─ (skip, check next poll)
+  [Send Welcome Email]
+  [Update Notion: "Project Started" + Invoice Paid ✓]
+  [Find + Update Project: "Active"]
+  [Resume Stripe Subscription (if exists)]
+```
+
+**Gate:** Welcome email ONLY sends when BOTH contract is signed AND invoice is paid. No double-invoicing — that's WF6's job.
+
+---
+
+### STEP 8: Contract & Invoice Reminders
+
+**Workflow:** `WF_STEP8_Contract_Reminders.json`
+**Name:** `Onboarding WF8 — Contract & Invoice Reminders (Daily → Every 3 Days)`
 **Trigger:** Daily schedule (9 AM)
 
 ```
@@ -326,21 +370,14 @@ APPROVE    DISAPPROVE
   │                                    │
 [Calculate Days & Tier]         [Calculate Invoice Days & Tier]
   │                                    │
-[Filter: Skip non-reminder days] [Filter: Skip non-reminder days]
-  │                                    │
   ┌──────┼──────────────┐        ┌─────┴──────┐
   ▼      ▼              ▼        ▼            ▼
 [≤7d]  [8-29d, %3]   [30+d]   [≤7d]      [8+d, %3]
 Gentle  Escalation   Auto-     Gentle     Urgent
 daily   every 3 days expire    Invoice    Invoice
-  │      │              │        │            │
-  └──┬───┘              │        └──────┬─────┘
-     ▼                  ▼               ▼
-[Log Reminder]    [Notion:Declined]  [Log Invoice Reminder]
 ```
 
-**Reminder Schedule (contracts):** Daily for first 7 days, every 3 days for days 8-29, auto-expire at 30 days.
-**Invoice Reminders (parallel):** Same daily/3-day pattern. Requires `Invoice Paid` checkbox property in Notion Contacts DB.
+**Reminder Schedule:** Daily for first 7 days, every 3 days for days 8-29, auto-expire at 30 days.
 
 ---
 
@@ -453,7 +490,9 @@ Side exits: "Declined" (at any qualification/approval gate)
 | `WF_STEP4B_Audit_Call_Processing.json` | Onboarding WF4B — Audit Call Processing | Form / BlueDot webhook |
 | `WF_STEP5_SOW_Contract.json` | Onboarding WF5 — SOW/Contract Creation + Invoicing | n8n Form |
 | `WF_STEP6_Contract_Reminders.json` | Onboarding WF6 — Contract & Invoice Reminders | Daily schedule |
-| `WF_STEP7_Post_Signing.json` | Onboarding WF7 — Post-Signing Onboarding | Schedule / SignWell webhook |
+| `WF_STEP6_Invoice_Send.json` | Onboarding WF6 — Invoice Send (After SOW Signed) | Schedule (15 min poll) |
+| `WF_STEP7_Post_Signing.json` | Onboarding WF7 — Welcome Email (After Signed + Paid) | Schedule (15 min poll) |
+| `WF_STEP8_Contract_Reminders.json` | Onboarding WF8 — Contract & Invoice Reminders | Daily schedule |
 
 ---
 
@@ -468,9 +507,10 @@ Side exits: "Declined" (at any qualification/approval gate)
 | 5 | WF_STEP3C_Calendly_Screening | Qualification gate |
 | 6 | WF_STEP4_Meeting_Processing | Post-call processing + GitHub repo |
 | 7 | WF_STEP4B_Audit_Call_Processing | Audit call (depends on STEP4 repo) |
-| 8 | WF_STEP5_SOW_Contract | Contract creation + draft SOW email |
-| 9 | WF_STEP6_Contract_Reminders | Contract + invoice reminder engine |
-| 10 | WF_STEP7_Post_Signing | Final onboarding |
+| 8 | WF_STEP5_SOW_Contract | SOW creation + Stripe setup |
+| 9 | WF_STEP6_Invoice_Send | Invoice send after SOW signed |
+| 10 | WF_STEP7_Post_Signing | Welcome email after invoice paid |
+| 11 | WF_STEP8_Contract_Reminders | Contract + invoice reminder engine |
 
 ## API Constraints
 
