@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP7 - Post-Signing Onboarding (Schedule \u2192 SignWell API Poll)",
+  "name": "Onboarding WF7 \u2014 Post-Signing Onboarding (SignWell \u2192 Welcome)",
   "nodes": [
     {
       "parameters": {

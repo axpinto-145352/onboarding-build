@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP3C - Calendly Screening (Schedule \u2192 API Poll \u2192 Notion Approval)",
+  "name": "Lead Gen WF3C \u2014 Calendly Discovery Call Screening",
   "nodes": [
     {
       "parameters": {

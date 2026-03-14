@@ -1,5 +1,5 @@
 {
-  "name": "WF0 - Lead Score & Loom Script (LinkedIn \u2192 Apify \u2192 Score \u2192 Claude \u2192 Sheet)",
+  "name": "Lead Gen WF0 \u2014 Lead Score & Loom Script Generator",
   "nodes": [
     {
       "parameters": {},

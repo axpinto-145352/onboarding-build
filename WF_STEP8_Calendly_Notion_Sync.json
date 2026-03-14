@@ -1,5 +1,5 @@
 {
-  "name": "WF STEP8 - Calendly \u2192 Notion CRM Sync (Schedule \u2192 API Poll)",
+  "name": "Onboarding WF8 \u2014 Calendly \u2192 Notion CRM Sync (All Calls)",
   "nodes": [
     {
       "parameters": {

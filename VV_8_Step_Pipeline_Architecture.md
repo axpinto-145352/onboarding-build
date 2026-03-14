@@ -1,8 +1,8 @@
 # Veteran Vectors — 8-Step LinkedIn-to-Client Onboarding Pipeline
 
-## Architecture Document v4.0
+## Architecture Document v5.0
 
-**Date:** 2026-02-27
+**Date:** 2026-03-14
 **Pipeline:** Prosp.ai LinkedIn Outreach → Notion CRM → Client Onboarding
 **Source of Truth:** Notion CRM (Contacts, Projects, Meetings databases)
 
@@ -11,27 +11,34 @@
 ## Pipeline at a Glance
 
 ```
-STEP 1          STEP 2           STEP 3A/B/C      STEP 4          STEP 5
-LI Connection   Loom Video       Response          Discovery       SOW/Contract
-Sent/Accepted   Sent via         Handling           Call Held →     Creation →
-via Prosp.ai    Prosp.ai         (3 paths)          Notes + AI      Invoicing +
-                                                    Proposal        Onboarding Doc
+═══ LEAD GEN WORKFLOWS ═══
 
-WF_STEP1        WF_STEP2         WF_STEP3A/3C     WF_STEP4        WF_STEP5
-Prosp.ai        Prosp.ai         Schedule/Calendly BlueDot         Form/Webhook
-webhook         webhook          webhook           webhook         trigger
+Lead Gen WF0    Lead Gen WF1     Lead Gen WF2     Lead Gen WF3A/3C
+Lead Score &    LI Connection    Loom Video       Response
+Loom Script     Sent/Accepted    Sent Tracking    Handling
+Generator       via Prosp.ai     (Sheet→Notion)   (3 paths)
 
-────────────────────────────────────────────────────────────────────────────────
+WF0_Lead_       WF_STEP1_        WF_STEP2_        WF_STEP3A / 3C
+Scoring.json    Prosp_LI.json    Loom_Sent.json   Followup/Calendly
 
-STEP 6          STEP 7           STEP 8
-Contract        Contract         All Calendly
-Reminders       Signed →         Calls →
-Every Other     Welcome          Notion
-Day             Email            CRM Sync
+═══ ONBOARDING WORKFLOWS ═══
 
-WF_STEP6        WF_STEP7         WF_STEP8
-Schedule        SignWell         Calendly
-trigger         webhook         webhook
+Onboarding WF4  Onboarding WF4B  Onboarding WF5   Onboarding WF6
+Discovery Call  Audit Call       SOW/Contract      Contract & Invoice
+→ AI + GitHub   → Refine GitHub  Creation →        Reminders
++ Drive + Email + Notion         Invoicing + SOW   (Daily → Every 3 Days)
+                                 Draft Email
+
+WF_STEP4_       WF_STEP4B_       WF_STEP5_        WF_STEP6_
+Meeting.json    Audit_Call.json  SOW_Contract.json Reminders.json
+
+Onboarding WF7  Onboarding WF8
+Contract Signed All Calendly
+→ Welcome +     Calls →
+Invoice + Start Notion CRM Sync
+
+WF_STEP7_       WF_STEP8_
+Post_Signing    Calendly_Sync
 ```
 
 ---
@@ -41,35 +48,37 @@ trigger         webhook         webhook
 ### STEP 1: LinkedIn Connection (Prosp.ai → Notion)
 
 **Workflow:** `WF_STEP1_Prosp_LinkedIn_Connection.json`
-**Trigger:** Prosp.ai webhook (connection_sent, connection_accepted events)
+**Name:** `Lead Gen WF1 — Prosp LinkedIn Connection Tracking`
+**Trigger:** Form Trigger (localhost) / Prosp.ai webhook (production)
 
 ```
-[Prosp.ai Webhook] → [Parse Event Type]
-                          │
-                    [IF connection_sent]
-                      │
-                      ▼
-                [Create/Update Notion Contact]
-                - Name, LinkedIn URL, Company
-                - Status: "Connection Sent"
-                - Source: "LI Loom Outreach"
-                - Tag: from Prosp.ai campaign
-                          │
-                    [IF connection_accepted]
-                      │
-                      ▼
-                [Update Notion Contact]
-                - LI Connection Accepted: ✓
-                - Status: "Connection Accepted"
+[Form: Prosp LinkedIn Event] → [Normalize Data] → [Switch: Event Type]
+                                                        │
+                    ┌───────────────────────────────────┼────────────────────┐
+                    ▼                                   ▼                    ▼
+          [connection_sent]                   [connection_accepted]   [reply_received]
+                    │                                   │                    │
+          [Find Contact by LI URL]            [Find Contact]         [Find Contact]
+                    │                                   │                    │
+          [Exists?]                            [Update Notion]        [Update Notion]
+           │      │                            - Accepted: ✓          - Responded: ✓
+          YES    NO                            - Status: Accepted     - Status: Responded
+           │      │                                     │
+     [Update]  [Create New]                    [Add to Loom Videos Sheet]
+     - Sent: ✓  - Sent: ✓                     (handoff for manual Loom)
+               - Source: LI Loom
 ```
 
 **Notion Fields Updated:**
 - Name, Email, LinkedIn Profile, Company
 - LI Connection Sent: ✓ (checkbox)
 - LI Connection Accepted: ✓ (checkbox, on accept)
-- Status: "Connection Sent" → "Connection Accepted"
+- Responded: ✓ (checkbox, on reply)
+- Status: "Connection Sent" → "Connection Accepted" → "Responded"
 - Source: "LI Loom Outreach"
 - Last Contact Date: timestamp
+
+**Google Sheets:** On `connection_accepted`, appends row to Loom Videos Sheet (Name, LI Profile) so Anthony knows to record and send a personalized Loom video.
 
 ---
 
@@ -191,52 +200,77 @@ APPROVE    DISAPPROVE
 ### STEP 4: Post-Discovery Call Processing
 
 **Workflow:** `WF_STEP4_Meeting_Processing.json`
-**Trigger:** BlueDot webhook (call transcript ready)
+**Name:** `Onboarding WF4 — Discovery Call Processing (Form → AI → Notion + Drive + GitHub)`
+**Trigger:** Form Trigger (localhost) / BlueDot Svix webhook (production)
 
 ```
-[BlueDot Webhook] → [Filter: Discovery/Intro call]
+[Form: Meeting Transcript] → [Extract Form Data]
         │
-  [Match Notion Contact (by email/name)]
+  [Find Notion Contact (by email)]
         │
-  [Create Google Drive Folder (if not exists)]
-  [Upload Transcript to Drive]
+  [Extract Contact Info]
         │
-  [Claude AI: Extract from Transcript]
-  - Meeting summary
-  - Action items
-  - Pain points discussed
-  - Budget/timeline mentioned
-  - Next steps
+  [Folder Exists?] → [Create Google Drive Folder if needed]
         │
-  [Update Notion Contact]
-  - Status: "Meeting Held"
-  - Meeting Notes (rich text)
-  - Action Items
-  - Drive Folder ID
+  [Set Folder ID]
         │
-  [Create Notion Meeting Record]
-  - Title, Date, Contact relation
-  - Transcript URL, Summary
-        │
-  [Create Notion Action Items]
-  - Linked to Meeting and Contact
-        │
-  [Generate Preliminary Proposal]
-  - Claude AI generates proposal draft
-  - Based on transcript + pain points
-  - Stored in Google Drive folder
-        │
-  [Slack Notification]
-  - "Discovery call processed for {name}"
-  - Link to Notion contact
-  - Link to Drive folder
+  ┌─────┴─────────────────────────────────────┐
+  ▼                                           ▼
+  [GitHub: Create Repo from Template]   [Claude AI: 4-Section Analysis]
+  - Private repo from vv-client-template  - ===MEETING_NOTES===
+  - Includes all 8 Skills files           - ===PROPOSAL===
+        │                                 - ===IMPLEMENTATION_GUIDE===
+  [GitHub: Upload Transcript]             - ===ACTION_ITEMS=== (JSON)
+                                                │
+                                          [Parse AI Sections]
+                                                │
+                              ┌────────────┬────┴────┬──────────┬────────────┐
+                              ▼            ▼         ▼          ▼            ▼
+                        [Update Notion] [Meeting  [GitHub:   [GitHub:    [Draft
+                         Meeting Held]  Record]   Proposal]  Impl Guide] Proposal
+                                                                         Email]
 ```
+
+**New in v5:** GitHub repo creation from template, expanded 4-section Claude AI prompt, proposal + implementation guide uploaded to GitHub, action items to Notion, draft proposal email via Gmail.
+
+---
+
+### STEP 4B: Audit Call Processing
+
+**Workflow:** `WF_STEP4B_Audit_Call_Processing.json`
+**Name:** `Onboarding WF4B — Audit Call Processing (Form → AI → Update GitHub + Notion)`
+**Trigger:** Form Trigger (localhost) / BlueDot Svix webhook (production)
+
+```
+[Form: Audit Call Transcript] → [Extract Form Data]
+        │
+  [Find Notion Contact (by email)]
+        │
+  [Extract Contact Info (+ existing GitHub repo name)]
+        │
+  ┌─────┴─────────────────────────────────────┐
+  ▼                    ▼                       ▼
+  [Upload to Drive]  [GitHub: Upload         [Claude AI: Audit Analysis]
+  (existing folder)   Audit Transcript]      - Refined proposal
+                                              - Refined impl guide
+                                              - Action items (JSON)
+                                                    │
+                                              [Parse AI Sections]
+                                                    │
+                              ┌────────────┬────────┴────────────┐
+                              ▼            ▼                     ▼
+                        [Update Notion] [Meeting Record    [GitHub: Update
+                         Audit Notes]   Category=Audit]     Proposal + Guide]
+```
+
+**Key difference from STEP4:** Uses existing GitHub repo and Google Drive folder. GitHub operations use File > Edit (overwrite) instead of File > Create. Meeting Category = "Audit" instead of "Discovery".
 
 ---
 
 ### STEP 5: SOW/Contract Creation
 
 **Workflow:** `WF_STEP5_SOW_Contract.json`
+**Name:** `Onboarding WF5 — SOW/Contract Creation + Invoicing + Onboarding Doc`
 **Trigger:** Form submission (Anthony submits after proposal approval)
 
 ```
@@ -250,8 +284,6 @@ APPROVE    DISAPPROVE
   [Create Google Drive Folder (if not exists)]
         │
   [PDFco: Fill SOW Template]
-  - Populate all contract fields
-  - Terms, scope, timeline, costs
         │
   [Upload Unsigned Contract to Drive]
         │
@@ -264,41 +296,47 @@ APPROVE    DISAPPROVE
         │
   [Update Notion Contact: "Contract Sent"]
   [Create Notion Project Record]
-  - Link to Client, Project details
         │
-  [Create Onboarding Doc (Google Doc)]
-  - Template with client info populated
+  [Draft SOW Email (Gmail createDraft)]      ← NEW
+  - Summarizes project scope, timeline, costs
+  - Notes SignWell signing request is coming
+  - Draft for Anthony to review before sending
         │
-  [Slack: "Contract sent to {name}"]
+  [Save Stripe IDs to Notion]
 ```
 
 ---
 
-### STEP 6: Contract Reminders
+### STEP 6: Contract & Invoice Reminders
 
 **Workflow:** `WF_STEP6_Contract_Reminders.json`
-**Trigger:** Schedule (every other day, 9 AM)
+**Name:** `Onboarding WF6 — Contract & Invoice Reminders (Daily → Every 3 Days)`
+**Trigger:** Daily schedule (9 AM)
 
 ```
-[Schedule: Every Other Day 9 AM]
+[Schedule: Every Day 9 AM]
         │
-  [Query Notion: Status = "Contract Sent"]
-  [Filter: Contract Sent Date within last 30 days]
-        │
-  [For Each Unsigned Contract]
-        │
-  [Calculate days since Contract Sent Date]
-        │
-  ┌──────┼──────────────┐
-  ▼      ▼              ▼
-[< 14d] [14-29d]      [30+ days]
-Gentle   Escalation    Auto-expire
-reminder email +       Notion: "Declined"
-email    Slack alert
-        │
-  [Update Notion: "Proposal Sent" status]
-  [Log reminder date]
+  ┌─────┴──────────────────────────────┐
+  ▼                                    ▼
+[Query: Unsigned Contracts]     [Query: Unpaid Invoices]
+  │                                    │
+[Calculate Days & Tier]         [Calculate Invoice Days & Tier]
+  │                                    │
+[Filter: Skip non-reminder days] [Filter: Skip non-reminder days]
+  │                                    │
+  ┌──────┼──────────────┐        ┌─────┴──────┐
+  ▼      ▼              ▼        ▼            ▼
+[≤7d]  [8-29d, %3]   [30+d]   [≤7d]      [8+d, %3]
+Gentle  Escalation   Auto-     Gentle     Urgent
+daily   every 3 days expire    Invoice    Invoice
+  │      │              │        │            │
+  └──┬───┘              │        └──────┬─────┘
+     ▼                  ▼               ▼
+[Log Reminder]    [Notion:Declined]  [Log Invoice Reminder]
 ```
+
+**Reminder Schedule (contracts):** Daily for first 7 days, every 3 days for days 8-29, auto-expire at 30 days.
+**Invoice Reminders (parallel):** Same daily/3-day pattern. Requires `Invoice Paid` checkbox property in Notion Contacts DB.
 
 ---
 
@@ -398,35 +436,45 @@ Side exits: "Declined" (at any qualification/approval gate)
 
 ## Credential Requirements
 
-| Service | Credential Type | Used In Steps |
-|---------|----------------|---------------|
-| Prosp.ai API | API Key (webhook + REST) | 1, 2, 3A, 3B |
-| Notion | Integration Token | All steps |
-| Anthropic Claude | API Key | 4 |
-| Calendly | OAuth2 | 3C, 8 |
-| Gmail | OAuth2 | 3C, 6, 7 |
-| Google Drive | OAuth2 | 4, 5, 7 |
-| Google Docs | OAuth2 | 5 |
-| BlueDot | Webhook Secret | 4 |
-| SignWell | API Key | 5, 7 |
-| Stripe | Secret Key | 5, 7 |
-| Slack | Bot Token | 4, 5, 7 |
+| Service | Credential Type | Used In Steps | Notes |
+|---------|----------------|---------------|-------|
+| Prosp.ai | Webhook receiver (no polling API) | 1 | Form trigger for localhost |
+| Notion | Integration Token (native node) | All steps | `notionApi` credential |
+| Anthropic Claude | API Key | 4, 4B | `anthropicApi` credential |
+| GitHub | Personal Access Token | 4, 4B | `githubApi` — repo scope required; HTTP Request for repo creation, native node for file ops |
+| Calendly | OAuth2 | 3C, 8 | |
+| Gmail | OAuth2 | 3C, 5, 6, 7 | `gmailOAuth2` — used for draft emails in 4, 5 |
+| Google Drive | OAuth2 | 4, 4B, 5, 7 | |
+| Google Sheets | OAuth2 | 1, 2 | For Loom Videos sheet |
+| BlueDot | Svix Webhook (no REST API) | 4, 4B | Form trigger for localhost |
+| SignWell | API Key | 5, 7 | |
+| Stripe | Secret Key | 5, 7 | |
+| PDFco | API Key | 5 | |
 
 ---
 
 ## File Manifest
 
-| File | Step | Trigger |
-|------|------|---------|
-| `WF_STEP1_Prosp_LinkedIn_Connection.json` | 1, 3B | Prosp.ai webhook |
-| `WF_STEP2_Loom_Sent.json` | 2 | Prosp.ai webhook |
-| `WF_STEP3A_No_Response_Followup.json` | 3A | Daily schedule |
-| `WF_STEP3C_Calendly_Screening.json` | 3C | Calendly webhook |
-| `WF_STEP4_Meeting_Processing.json` | 4 | BlueDot webhook |
-| `WF_STEP5_SOW_Contract.json` | 5 | n8n Form |
-| `WF_STEP6_Contract_Reminders.json` | 6 | Every-other-day schedule |
-| `WF_STEP7_Post_Signing.json` | 7 | SignWell webhook |
-| `WF_STEP8_Calendly_Notion_Sync.json` | 8 | Calendly webhook |
+### Lead Gen Workflows
+
+| File | Workflow Name | Trigger |
+|------|-------------|---------|
+| `WF0_Lead_Scoring.json` | Lead Gen WF0 — Lead Score & Loom Script Generator | Schedule |
+| `WF_STEP1_Prosp_LinkedIn_Connection.json` | Lead Gen WF1 — Prosp LinkedIn Connection Tracking | Form / Prosp.ai webhook |
+| `WF_STEP2_Loom_Sent.json` | Lead Gen WF2 — Loom Sent Tracking (Sheet → Notion) | Schedule (30 min poll) |
+| `WF_STEP3A_No_Response_Followup.json` | Lead Gen WF3A — No Response Follow-Up (3-Day Timer) | Daily schedule |
+| `WF_STEP3C_Calendly_Screening.json` | Lead Gen WF3C — Calendly Discovery Call Screening | Calendly trigger |
+
+### Onboarding Workflows
+
+| File | Workflow Name | Trigger |
+|------|-------------|---------|
+| `WF_STEP4_Meeting_Processing.json` | Onboarding WF4 — Discovery Call Processing | Form / BlueDot webhook |
+| `WF_STEP4B_Audit_Call_Processing.json` | Onboarding WF4B — Audit Call Processing | Form / BlueDot webhook |
+| `WF_STEP5_SOW_Contract.json` | Onboarding WF5 — SOW/Contract Creation + Invoicing | n8n Form |
+| `WF_STEP6_Contract_Reminders.json` | Onboarding WF6 — Contract & Invoice Reminders | Daily schedule |
+| `WF_STEP7_Post_Signing.json` | Onboarding WF7 — Post-Signing Onboarding | Schedule / SignWell webhook |
+| `WF_STEP8_Calendly_Notion_Sync.json` | Onboarding WF8 — Calendly → Notion CRM Sync | Schedule / Calendly webhook |
 
 ---
 
@@ -434,12 +482,22 @@ Side exits: "Declined" (at any qualification/approval gate)
 
 | Order | File | Reason |
 |-------|------|--------|
-| 1 | WF_STEP1_Prosp_LinkedIn_Connection | Entry point, creates contacts |
-| 2 | WF_STEP2_Loom_Sent | Tracks Loom delivery |
-| 3 | WF_STEP3A_No_Response_Followup | Depends on Loom Sent status |
-| 4 | WF_STEP3C_Calendly_Screening | Qualification gate |
-| 5 | WF_STEP8_Calendly_Notion_Sync | Universal Calendly sync |
-| 6 | WF_STEP4_Meeting_Processing | Post-call processing |
-| 7 | WF_STEP5_SOW_Contract | Contract creation |
-| 8 | WF_STEP6_Contract_Reminders | Reminder engine |
-| 9 | WF_STEP7_Post_Signing | Final onboarding |
+| 1 | WF0_Lead_Scoring | Lead scoring & research (standalone) |
+| 2 | WF_STEP1_Prosp_LinkedIn_Connection | Entry point, creates contacts |
+| 3 | WF_STEP2_Loom_Sent | Tracks Loom delivery |
+| 4 | WF_STEP3A_No_Response_Followup | Depends on Loom Sent status |
+| 5 | WF_STEP3C_Calendly_Screening | Qualification gate |
+| 6 | WF_STEP8_Calendly_Notion_Sync | Universal Calendly sync |
+| 7 | WF_STEP4_Meeting_Processing | Post-call processing + GitHub repo |
+| 8 | WF_STEP4B_Audit_Call_Processing | Audit call (depends on STEP4 repo) |
+| 9 | WF_STEP5_SOW_Contract | Contract creation + draft SOW email |
+| 10 | WF_STEP6_Contract_Reminders | Contract + invoice reminder engine |
+| 11 | WF_STEP7_Post_Signing | Final onboarding |
+
+## API Constraints
+
+| Service | Constraint | Workaround |
+|---------|-----------|------------|
+| Prosp.ai | Webhook-only (no polling REST API) | Form trigger for localhost, webhook for production |
+| BlueDot AI | Svix webhook-only (no REST API) | Form trigger for localhost, Svix webhook for production |
+| GitHub | Native n8n node cannot create repos | HTTP Request for repo creation; native node for file ops |
