@@ -1,27 +1,20 @@
 {
-  "name": "Onboarding WF7 \u2014 Post-Signing Onboarding (SignWell \u2192 Welcome)",
+  "name": "Onboarding WF7 — Post-Signing Onboarding (SignWell + Stripe → Welcome)",
   "nodes": [
     {
       "parameters": {
         "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 15
-            }
-          ]
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
         }
       },
       "id": "step7-node-1",
       "name": "Every 15 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [
-        250,
-        300
-      ],
-      "notes": "Polls SignWell API every 15 minutes for newly completed documents. Replaces the SignWell webhook for localhost compatibility."
+      "position": [250, 400],
+      "notes": "Polls every 15 minutes. Branch A: detect newly signed contracts. Branch B: check if invoice is paid for already-signed contracts."
     },
+
     {
       "parameters": {
         "method": "GET",
@@ -30,12 +23,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Api-Key",
-              "value": "YOUR_SIGNWELL_API_KEY"
-            }
-          ]
+          "parameters": [{ "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" }]
         },
         "options": {}
       },
@@ -43,11 +31,8 @@
       "name": "List Completed SignWell Documents",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        470,
-        300
-      ],
-      "notes": "Fetches recently completed documents from SignWell. Replace YOUR_SIGNWELL_API_KEY with your actual API key, or use an n8n credential."
+      "position": [470, 200],
+      "notes": "Branch A: Polls SignWell for newly completed documents."
     },
     {
       "parameters": {
@@ -57,29 +42,13 @@
       "name": "Extract Completed Docs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        690,
-        300
-      ]
+      "position": [690, 200]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json._empty }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ]
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json._empty }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }]
         },
         "looseTypeValidation": true,
         "options": {}
@@ -88,307 +57,300 @@
       "name": "Has Completed Docs?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        910,
-        300
-      ]
+      "position": [910, 200]
     },
     {
-      "parameters": {
-        "options": {
-          "reset": false
-        },
-        "batchSize": 1
-      },
+      "parameters": { "options": { "reset": false }, "batchSize": 1 },
       "id": "step7-node-4",
-      "name": "Loop Documents",
+      "name": "Loop Signed Docs",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [
-        1130,
-        300
-      ]
+      "position": [1130, 200]
     },
     {
       "id": "step7-node-5",
-      "name": "Find Notion Contact",
+      "name": "Find Contact (Signed)",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        1350,
-        300
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [1350, 200],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": {
-          "__rl": true,
-          "value": "YOUR_NOTION_CONTACTS_DB_ID",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {
-          "conditions": [
-            {
-              "key": "Email|email",
-              "condition": "string:equals",
-              "emailValue": "={{ $json.client_email || '' }}"
-            }
-          ]
+          "conditions": [{ "key": "Email|email", "condition": "string:equals", "emailValue": "={{ $json.client_email || '' }}" }]
         },
-        "options": {
-          "simple": false
-        }
+        "options": { "simple": false }
       },
       "alwaysOutputData": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.id || '' }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ]
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json.id || '' }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }]
         },
         "looseTypeValidation": true,
         "options": {}
       },
       "id": "step7-node-6",
-      "name": "Contact Found?",
+      "name": "Contact Found? (Signed)",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        1570,
-        300
-      ]
+      "position": [1570, 200]
     },
     {
       "parameters": {
-        "jsCode": "const contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nconst currentStatus = props?.Status?.select?.name || '';\n\n// Idempotency: skip if already Project Started\nif (currentStatus === 'Project Started') {\n  return [{ json: { _skip: true, reason: 'Already onboarded' } }];\n}\n\nreturn [{ json: {\n  _skip: false,\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_subscription_id: props['Stripe Subscription ID']?.rich_text?.[0]?.text?.content || '',\n  current_status: currentStatus\n}}];"
+        "jsCode": "const contact = $('Find Contact (Signed)').first().json;\nconst props = contact.properties;\nconst currentStatus = props?.Status?.select?.name || '';\n\n// Skip if already Contract Signed or Project Started (already processed)\nif (currentStatus === 'Contract Signed' || currentStatus === 'Project Started') {\n  return [{ json: { _skip: true, reason: 'Already processed signing' } }];\n}\n\nreturn [{ json: {\n  _skip: false,\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_subscription_id: props['Stripe Subscription ID']?.rich_text?.[0]?.text?.content || '',\n  current_status: currentStatus\n}}];"
       },
       "id": "step7-node-7",
-      "name": "Extract Contact + Idempotency Check",
+      "name": "Extract + Skip If Already Signed",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1790,
-        300
-      ]
+      "position": [1790, 200]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json._skip }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "notTrue"
-              }
-            }
-          ]
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json._skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "notTrue" } }]
         },
         "looseTypeValidation": true,
         "options": {}
       },
       "id": "step7-node-8",
-      "name": "Not Already Onboarded?",
+      "name": "New Signing?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        2010,
-        300
-      ]
+      "position": [2010, 200]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Loop Documents').first().json.pdf_url }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          }
-        }
+        "url": "={{ $('Loop Signed Docs').first().json.pdf_url }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
       },
       "id": "step7-node-9",
       "name": "Download Signed Contract",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        2230,
-        200
-      ]
+      "position": [2230, 120]
     },
     {
       "parameters": {
-        "name": "=Signed-Contract-{{ $('Extract Contact + Idempotency Check').item.json.company_name }}.pdf",
-        "folderId": {
-          "__rl": true,
-          "value": "={{ $('Extract Contact + Idempotency Check').item.json.drive_folder_id }}",
-          "mode": "id"
-        },
+        "name": "=Signed-Contract-{{ $('Extract + Skip If Already Signed').item.json.company_name }}.pdf",
+        "folderId": { "__rl": true, "value": "={{ $('Extract + Skip If Already Signed').item.json.drive_folder_id }}", "mode": "id" },
         "options": {}
       },
       "id": "step7-node-10",
       "name": "Upload Signed Contract to Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [
-        2450,
-        200
-      ]
+      "position": [2450, 120]
     },
     {
-      "parameters": {
-        "sendTo": "={{ $('Extract Contact + Idempotency Check').item.json.contact_email }}",
-        "subject": "=Welcome to Veteran Vectors, {{ $('Extract Contact + Idempotency Check').item.json.contact_name }}!",
-        "emailType": "html",
-        "message": "=<h2>Welcome to Veteran Vectors!</h2><p>Hi {{ $('Extract Contact + Idempotency Check').item.json.contact_name }},</p><p>Your contract has been signed and we're ready to get started! Here's what happens next:</p><ol><li>You'll receive a Stripe invoice shortly for the initial payment</li><li>Schedule your onboarding call: <a href='YOUR_ONBOARDING_CALENDLY_LINK'>Book Onboarding Call</a></li><li>We'll set up your project workspace and begin implementation</li></ol><p>Looking forward to working with you!</p><p>\u2014 Anthony, Veteran Vectors</p>",
-        "options": {}
-      },
-      "id": "step7-node-11",
-      "name": "Send Welcome Email",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2,
-      "position": [
-        2670,
-        200
-      ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "r13jnGsjwNOqcBvt",
-          "name": "VV Gmail account"
-        }
-      }
-    },
-    {
-      "id": "step7-node-12",
-      "name": "Update Notion (Project Started)",
+      "id": "step7-node-11a",
+      "name": "Update Notion (Contract Signed)",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        2670,
-        360
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [2670, 120],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
-        "pageId": "={{ $('Extract Contact + Idempotency Check').item.json.notion_page_id }}",
+        "pageId": "={{ $('Extract + Skip If Already Signed').item.json.notion_page_id }}",
         "propertiesUi": {
           "propertyValues": [
-            {
-              "key": "Status|select",
-              "selectValue": "Project Started"
-            },
-            {
-              "key": "Last Contact Date|date",
-              "dateValue": "={{ $now.toISO() }}",
-              "includeTime": true
-            }
+            { "key": "Status|select", "selectValue": "Contract Signed" },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Sets status to 'Contract Signed' — not 'Project Started' yet. Welcome email waits until invoice is paid (Branch B)."
+    },
+    {
+      "parameters": { "amount": 1 },
+      "id": "step7-node-delay-a",
+      "name": "Branch A Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3550, 200],
+      "webhookId": "step7-branch-a-delay"
+    },
+
+
+    {
+      "id": "step7-node-20",
+      "name": "Query Notion: Contract Signed",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [470, 600],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [{ "key": "Status|select", "condition": "string:equals", "selectValue": "Contract Signed" }]
+        },
+        "options": { "simple": false }
+      },
+      "alwaysOutputData": true,
+      "notes": "Branch B: Finds contacts whose contract is signed but invoice hasn't been confirmed paid yet."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json.id || '' }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step7-node-21",
+      "name": "Has Pending Contacts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [690, 600]
+    },
+    {
+      "parameters": { "options": { "reset": false }, "batchSize": 1 },
+      "id": "step7-node-22",
+      "name": "Loop Pending Contacts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [910, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $json;\nconst props = contact.properties;\nreturn [{ json: {\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_subscription_id: props['Stripe Subscription ID']?.rich_text?.[0]?.text?.content || ''\n}}];"
+      },
+      "id": "step7-node-23",
+      "name": "Extract Contact Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json.stripe_invoice_id }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step7-node-24",
+      "name": "Has Stripe Invoice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1350, 600]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.stripe.com/v1/invoices/{{ $json.stripe_invoice_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "step7-node-25",
+      "name": "Stripe: Check Invoice Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1570, 560]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json.status }}", "rightValue": "paid", "operator": { "type": "string", "operation": "equals" } }]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "step7-node-26",
+      "name": "Invoice Paid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1790, 560]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Extract Contact Info').item.json.contact_email }}",
+        "subject": "=Welcome to Veteran Vectors, {{ $('Extract Contact Info').item.json.contact_name }}!",
+        "emailType": "html",
+        "message": "=<h2>Welcome to Veteran Vectors!</h2><p>Hi {{ $('Extract Contact Info').item.json.contact_name }},</p><p>Your contract has been signed and your payment has been received — we're ready to get started! Here's what happens next:</p><ol><li>Schedule your onboarding call: <a href='YOUR_ONBOARDING_CALENDLY_LINK'>Book Onboarding Call</a></li><li>We'll set up your project workspace and begin implementation</li></ol><p>Looking forward to working with you!</p><p>— Anthony, Veteran Vectors</p>",
+        "options": {}
+      },
+      "id": "step7-node-27",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [2010, 500],
+      "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } },
+      "notes": "Only fires after BOTH contract is signed AND invoice is paid."
+    },
+    {
+      "id": "step7-node-28",
+      "name": "Update Notion (Project Started)",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [2230, 500],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $('Extract Contact Info').item.json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status|select", "selectValue": "Project Started" },
+            { "key": "Invoice Paid|checkbox", "checkboxValue": true },
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
           ]
         },
         "options": {}
       }
     },
     {
-      "id": "step7-node-13",
+      "id": "step7-node-29",
       "name": "Find Notion Project",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        2890,
-        360
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [2450, 500],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": {
-          "__rl": true,
-          "value": "YOUR_NOTION_PROJECTS_DB_ID",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "YOUR_NOTION_PROJECTS_DB_ID", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {
-          "conditions": [
-            {
-              "key": "Client|relation",
-              "condition": "string:contains",
-              "relationValue": "={{ $('Extract Contact + Idempotency Check').item.json.notion_page_id }}"
-            }
-          ]
+          "conditions": [{ "key": "Client|relation", "condition": "string:contains", "relationValue": "={{ $('Extract Contact Info').item.json.notion_page_id }}" }]
         },
-        "options": {
-          "simple": false
-        }
+        "options": { "simple": false }
       },
       "alwaysOutputData": true
     },
     {
-      "id": "step7-node-14",
+      "id": "step7-node-30",
       "name": "Update Project (Active)",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
-      "position": [
-        3110,
-        360
-      ],
-      "credentials": {
-        "notionApi": {
-          "id": "YOUR_NOTION_CRED_ID",
-          "name": "Notion account"
-        }
-      },
+      "position": [2670, 500],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
         "pageId": "={{ $json.id }}",
         "propertiesUi": {
-          "propertyValues": [
-            {
-              "key": "Project Status|select",
-              "selectValue": "Active"
-            }
-          ]
+          "propertyValues": [{ "key": "Project Status|select", "selectValue": "Active" }]
         },
         "options": {}
       }
@@ -396,105 +358,22 @@
     {
       "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $('Extract Contact + Idempotency Check').item.json.stripe_invoice_id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ]
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $('Extract Contact Info').item.json.stripe_subscription_id }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }]
         },
         "looseTypeValidation": true,
         "options": {}
       },
-      "id": "step7-node-15",
-      "name": "Has Stripe Invoice?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        2890,
-        540
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://api.stripe.com/v1/invoices/{{ $('Extract Contact + Idempotency Check').item.json.stripe_invoice_id }}/finalize",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {}
-      },
-      "id": "step7-node-16",
-      "name": "Stripe: Finalize Invoice",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3110,
-        480
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://api.stripe.com/v1/invoices/{{ $('Extract Contact + Idempotency Check').item.json.stripe_invoice_id }}/send",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {}
-      },
-      "id": "step7-node-17",
-      "name": "Stripe: Send Invoice",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        3330,
-        480
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $('Extract Contact + Idempotency Check').item.json.stripe_subscription_id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ]
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "id": "step7-node-18",
+      "id": "step7-node-31",
       "name": "Has Subscription?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [
-        3330,
-        620
-      ]
+      "position": [2890, 500]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.stripe.com/v1/subscriptions/{{ $('Extract Contact + Idempotency Check').item.json.stripe_subscription_id }}",
+        "url": "=https://api.stripe.com/v1/subscriptions/{{ $('Extract Contact Info').item.json.stripe_subscription_id }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -503,271 +382,132 @@
         "contentType": "application/x-www-form-urlencoded",
         "options": {}
       },
-      "id": "step7-node-19",
+      "id": "step7-node-32",
       "name": "Stripe: Resume Subscription",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        3550,
-        620
-      ]
+      "position": [3110, 440]
     },
     {
-      "parameters": {
-        "amount": 1
-      },
-      "id": "step7-node-20",
-      "name": "Rate Limit Delay",
+      "parameters": { "amount": 1 },
+      "id": "step7-node-delay-b",
+      "name": "Branch B Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [
-        3550,
-        300
-      ],
-      "webhookId": "step7-rate-limit"
+      "position": [3330, 600],
+      "webhookId": "step7-branch-b-delay"
     }
   ],
   "pinData": {},
   "connections": {
     "Every 15 Minutes": {
-      "main": [
-        [
-          {
-            "node": "List Completed SignWell Documents",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[
+        { "node": "List Completed SignWell Documents", "type": "main", "index": 0 },
+        { "node": "Query Notion: Contract Signed", "type": "main", "index": 0 }
+      ]]
     },
+
     "List Completed SignWell Documents": {
-      "main": [
-        [
-          {
-            "node": "Extract Completed Docs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Extract Completed Docs", "type": "main", "index": 0 }]]
     },
     "Extract Completed Docs": {
-      "main": [
-        [
-          {
-            "node": "Has Completed Docs?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Has Completed Docs?", "type": "main", "index": 0 }]]
     },
     "Has Completed Docs?": {
-      "main": [
-        [
-          {
-            "node": "Loop Documents",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Loop Signed Docs", "type": "main", "index": 0 }]]
     },
-    "Loop Documents": {
+    "Loop Signed Docs": {
       "main": [
         [],
-        [
-          {
-            "node": "Find Notion Contact",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Find Contact (Signed)", "type": "main", "index": 0 }]
       ]
     },
-    "Find Notion Contact": {
+    "Find Contact (Signed)": {
+      "main": [[{ "node": "Contact Found? (Signed)", "type": "main", "index": 0 }]]
+    },
+    "Contact Found? (Signed)": {
       "main": [
-        [
-          {
-            "node": "Contact Found?",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Extract + Skip If Already Signed", "type": "main", "index": 0 }],
+        [{ "node": "Branch A Delay", "type": "main", "index": 0 }]
       ]
     },
-    "Contact Found?": {
-      "main": [
-        [
-          {
-            "node": "Extract Contact + Idempotency Check",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Rate Limit Delay",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Extract + Skip If Already Signed": {
+      "main": [[{ "node": "New Signing?", "type": "main", "index": 0 }]]
     },
-    "Extract Contact + Idempotency Check": {
+    "New Signing?": {
       "main": [
-        [
-          {
-            "node": "Not Already Onboarded?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Not Already Onboarded?": {
-      "main": [
-        [
-          {
-            "node": "Download Signed Contract",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Rate Limit Delay",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Download Signed Contract", "type": "main", "index": 0 }],
+        [{ "node": "Branch A Delay", "type": "main", "index": 0 }]
       ]
     },
     "Download Signed Contract": {
-      "main": [
-        [
-          {
-            "node": "Upload Signed Contract to Drive",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Upload Signed Contract to Drive", "type": "main", "index": 0 }]]
     },
     "Upload Signed Contract to Drive": {
+      "main": [[{ "node": "Update Notion (Contract Signed)", "type": "main", "index": 0 }]]
+    },
+    "Update Notion (Contract Signed)": {
+      "main": [[{ "node": "Branch A Delay", "type": "main", "index": 0 }]]
+    },
+    "Branch A Delay": {
+      "main": [[{ "node": "Loop Signed Docs", "type": "main", "index": 0 }]]
+    },
+
+    "Query Notion: Contract Signed": {
+      "main": [[{ "node": "Has Pending Contacts?", "type": "main", "index": 0 }]]
+    },
+    "Has Pending Contacts?": {
+      "main": [[{ "node": "Loop Pending Contacts", "type": "main", "index": 0 }]]
+    },
+    "Loop Pending Contacts": {
       "main": [
-        [
-          {
-            "node": "Send Welcome Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [],
+        [{ "node": "Extract Contact Info", "type": "main", "index": 0 }]
       ]
     },
-    "Send Welcome Email": {
-      "main": [
-        [
-          {
-            "node": "Update Notion (Project Started)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Notion (Project Started)": {
-      "main": [
-        [
-          {
-            "node": "Find Notion Project",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Has Stripe Invoice?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Find Notion Project": {
-      "main": [
-        [
-          {
-            "node": "Update Project (Active)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Project (Active)": {
-      "main": [
-        [
-          {
-            "node": "Rate Limit Delay",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Extract Contact Info": {
+      "main": [[{ "node": "Has Stripe Invoice?", "type": "main", "index": 0 }]]
     },
     "Has Stripe Invoice?": {
       "main": [
-        [
-          {
-            "node": "Stripe: Finalize Invoice",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Stripe: Check Invoice Status", "type": "main", "index": 0 }],
+        [{ "node": "Branch B Delay", "type": "main", "index": 0 }]
       ]
     },
-    "Stripe: Finalize Invoice": {
+    "Stripe: Check Invoice Status": {
+      "main": [[{ "node": "Invoice Paid?", "type": "main", "index": 0 }]]
+    },
+    "Invoice Paid?": {
       "main": [
-        [
-          {
-            "node": "Stripe: Send Invoice",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Send Welcome Email", "type": "main", "index": 0 }],
+        [{ "node": "Branch B Delay", "type": "main", "index": 0 }]
       ]
     },
-    "Stripe: Send Invoice": {
-      "main": [
-        [
-          {
-            "node": "Has Subscription?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Send Welcome Email": {
+      "main": [[{ "node": "Update Notion (Project Started)", "type": "main", "index": 0 }]]
+    },
+    "Update Notion (Project Started)": {
+      "main": [[
+        { "node": "Find Notion Project", "type": "main", "index": 0 },
+        { "node": "Has Subscription?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Find Notion Project": {
+      "main": [[{ "node": "Update Project (Active)", "type": "main", "index": 0 }]]
+    },
+    "Update Project (Active)": {
+      "main": [[{ "node": "Branch B Delay", "type": "main", "index": 0 }]]
     },
     "Has Subscription?": {
       "main": [
-        [
-          {
-            "node": "Stripe: Resume Subscription",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Stripe: Resume Subscription", "type": "main", "index": 0 }]
       ]
     },
-    "Rate Limit Delay": {
-      "main": [
-        [
-          {
-            "node": "Loop Documents",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Stripe: Resume Subscription": {
+      "main": [[{ "node": "Branch B Delay", "type": "main", "index": 0 }]]
+    },
+    "Branch B Delay": {
+      "main": [[{ "node": "Loop Pending Contacts", "type": "main", "index": 0 }]]
     }
   },
   "active": false,
@@ -776,10 +516,8 @@
     "availableInMCP": true,
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step7-v2-localhost",
-  "meta": {
-    "templateCredsSetupCompleted": false
-  },
+  "versionId": "step7-v3-dual-gate",
+  "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []
 }
