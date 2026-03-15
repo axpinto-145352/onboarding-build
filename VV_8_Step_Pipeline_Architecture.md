@@ -284,12 +284,13 @@ APPROVE    DISAPPROVE
         │
   ┌─────┴──────────────────────────────────────────┐
   ▼                                                ▼
-[Extract Proposal → Claude AI → PDFco]    [Stripe: Create Customer]
+[Extract Proposal → Claude AI: Generate SOW]  [Stripe: Create Customer]
   │                                                │
-[Create/Find Client Folder]               [Has Fixed Cost? → Invoice Item → Draft Invoice]
-[Upload SOW to Drive]                     [Has Retainer? → Price → Subscription (Paused)]
-  │                                                │
-[SignWell: Create + Send for Signing]     [Collect Stripe IDs → Save to Notion]
+[Build HTML → Upload to Drive]           [Has Fixed Cost? → Invoice Item → Draft Invoice]
+[Convert to Google Doc → Export as PDF]  [Has Retainer? → Price → Subscription (Paused)]
+[Upload PDF → Make Downloadable]                   │
+  │                                      [Collect Stripe IDs → Save to Notion]
+[SignWell: Create + Send for Signing]
   │
 [Update Notion: "Contract Sent"]
 [Create Notion Project Record]
@@ -464,9 +465,9 @@ Side exits: "Declined" (at any qualification/approval gate)
 | Google Drive | OAuth2 | 4, 4B, 5, 7 | |
 | Google Sheets | OAuth2 | 1, 2 | For Loom Videos sheet |
 | BlueDot | Svix Webhook (no REST API) | 4, 4B | Form trigger for localhost |
-| SignWell | API Key | 5, 7 | |
-| Stripe | Secret Key | 5, 7 | |
-| PDFco | API Key | 5 | |
+| Prosp.ai | API Key (Header Auth) | 1, 3A | `httpHeaderAuth` — Authorization: Bearer |
+| SignWell | API Key | 5, 6 | HTTP Header Auth — X-Api-Key |
+| Stripe | Secret Key | 5, 6, 7 | |
 
 ---
 

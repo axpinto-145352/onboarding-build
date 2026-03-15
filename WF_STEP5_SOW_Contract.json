@@ -98,17 +98,18 @@
         "modelId": { "__rl": true, "value": "claude-sonnet-4-20250514", "mode": "id" },
         "messages": {
           "values": [{
-            "content": "=You are a business analyst. Extract key details from this proposal text. Confirm or supplement the following form data:\n\nProject Name: {{ $('SOW Contract Form').first().json.Project_Name }}\nProject Scope: {{ $('SOW Contract Form').first().json.Project_Scope }}\nTimeline: {{ $('SOW Contract Form').first().json.Project_Start_Date }} to {{ $('SOW Contract Form').first().json.Project_End_Date }}\nTotal Cost: {{ $('SOW Contract Form').first().json.Total_Project_Cost }}\n\nProposal text:\n{{ $json.proposal_text }}\n\nReturn a JSON object with these fields:\n- confirmed_scope: the project scope (confirmed or enhanced from proposal)\n- deliverables: array of key deliverables found in the proposal\n- timeline_notes: any timeline details from the proposal\n- pricing_notes: any pricing details or payment terms from the proposal\n- additional_notes: anything else relevant not captured above\n\nReturn ONLY valid JSON, no markdown fences."
+            "content": "=You are a business consultant for Veteran Vectors, an automation consulting firm. Generate a professional Statement of Work (SOW) as a complete, styled HTML document.\n\nClient and project details:\n- Client: {{ $('SOW Contract Form').first().json.Full_Client_Name }}\n- Title: {{ $('SOW Contract Form').first().json.Client_Title }}\n- Company: {{ $('SOW Contract Form').first().json.Company_Name }}\n- Address: {{ $('SOW Contract Form').first().json.Company_Address || '' }}, {{ $('SOW Contract Form').first().json.Company_City || '' }}, {{ $('SOW Contract Form').first().json.Company_State }} {{ $('SOW Contract Form').first().json.Company_Zipcode || '' }}\n- Project: {{ $('SOW Contract Form').first().json.Project_Name }}\n- Scope: {{ $('SOW Contract Form').first().json.Project_Scope }}\n- Start Date: {{ $('SOW Contract Form').first().json.Project_Start_Date }}\n- End Date: {{ $('SOW Contract Form').first().json.Project_End_Date }}\n- Total Cost: {{ $('SOW Contract Form').first().json.Total_Project_Cost }}\n- Initial Payment: {{ $('SOW Contract Form').first().json.Initial_Payment }}\n- Final Payment: {{ $('SOW Contract Form').first().json.Final_Payment }}\n- Has Fixed Cost: {{ $('SOW Contract Form').first().json.Has_Fixed_Cost }}\n- Has Retainer: {{ $('SOW Contract Form').first().json.Has_Retainer }}\n- Retainer Cost: {{ $('SOW Contract Form').first().json.Retainer_Cost }}\n- Retainer Description: {{ $('SOW Contract Form').first().json.Retainer_Description || 'N/A' }}\n- Contract Length: {{ $('SOW Contract Form').first().json.Contract_Length || 'As specified' }}\n- Compliance: {{ $('SOW Contract Form').first().json.Compliance_Terms || 'N/A' }}\n\nProposal context (use to enhance scope and deliverables):\n{{ $json.proposal_text }}\n\nGenerate a COMPLETE HTML document with <html>, <head>, <body> tags. Include inline CSS for professional styling (clean fonts, proper spacing, borders for tables, print-friendly). The SOW must include:\n\n1. Header with company name \"Veteran Vectors\" and document title \"Statement of Work\"\n2. Client information and vendor information (Veteran Vectors, Anthony Pinto)\n3. Project overview and detailed scope of work (enhanced with details from the proposal)\n4. Deliverables table (extracted and expanded from proposal context)\n5. Timeline and milestones\n6. Payment terms section:\n   - Initial payment amount and when due\n   - Final payment amount and when due\n   - Retainer terms (if Has_Retainer is Yes): monthly cost, description, when it starts\n   - If Has_Fixed_Cost is No, omit fixed cost references\n7. Compliance terms (if specified, otherwise omit section)\n8. Standard terms and conditions: confidentiality, IP ownership (client owns deliverables, VV retains tools/frameworks), termination (30-day written notice), limitation of liability\n9. Signature blocks for both parties with date lines. Use the text [SIGN_HERE_1] where Anthony Pinto signs and [SIGN_HERE_2] where the client signs (these are SignWell text tags for e-signature placement)\n\nReturn ONLY the raw HTML document. No markdown fences, no explanations, no preamble."
           }]
         },
-        "options": { "maxTokensToSample": 1024 }
+        "options": { "maxTokensToSample": 4096 }
       },
       "id": "wf5-node-6",
-      "name": "Claude: Extract Proposal Details",
+      "name": "Claude: Generate SOW",
       "type": "@n8n/n8n-nodes-langchain.anthropic",
       "typeVersion": 1,
       "position": [1350, 300],
-      "credentials": { "anthropicApi": { "id": "au1c518sMzUt89ul", "name": "VV Claude" } }
+      "credentials": { "anthropicApi": { "id": "au1c518sMzUt89ul", "name": "VV Claude" } },
+      "notes": "Generates the full SOW as an HTML document using Claude. Replaces PDFco template filling — no extra tools needed."
     },
     {
       "parameters": {
@@ -126,58 +127,92 @@
     },
     {
       "parameters": {
-        "operation": "Fill a PDF Form",
-        "url": "https://drive.google.com/file/d/YOUR_SOW_TEMPLATE_FILE_ID/view?usp=sharing",
-        "fields": {
-          "metadataValues": [
-            { "fieldName": "Full_Client_Name", "text": "={{ $('SOW Contract Form').item.json.Full_Client_Name }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Client_Title", "text": "={{ $('SOW Contract Form').item.json.Client_Title }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "{Company_Name}", "text": "={{ $('SOW Contract Form').item.json.Company_Name }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Project_Name", "text": "={{ $('SOW Contract Form').item.json.Project_Name }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Company_Address", "text": "={{ $('SOW Contract Form').item.json.Company_Address }}", "size": "12", "fontName": "Times New Roman" },
-            { "fieldName": "Company_State", "text": "={{ $('SOW Contract Form').item.json.Company_State }}", "size": "12", "fontName": "Times New Roman" },
-            { "fieldName": "Project_Start_Date", "text": "={{ $('SOW Contract Form').item.json.Project_Start_Date }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Project_End_Date", "text": "={{ $('SOW Contract Form').item.json.Project_End_Date }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Total_Project_Cost", "text": "={{ $('SOW Contract Form').item.json.Total_Project_Cost }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Initial_Payment", "text": "={{ $('SOW Contract Form').item.json.Initial_Payment }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Final_Payment", "text": "={{ $('SOW Contract Form').item.json.Final_Payment }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Retainer_Cost", "text": "={{ $('SOW Contract Form').item.json.Retainer_Cost }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Project_Scope", "text": "={{ $('SOW Contract Form').item.json.Project_Scope }}", "size": "12", "fontBold": true, "fontName": "Times New Roman" },
-            { "fieldName": "Compliance_Terms", "text": "={{ $('SOW Contract Form').item.json.Compliance_Terms || 'N/A' }}", "size": "12", "fontName": "Times New Roman" },
-            { "fieldName": "Contract_Length", "text": "={{ $('SOW Contract Form').item.json.Contract_Length || 'As specified' }}", "size": "12", "fontName": "Times New Roman" }
-          ]
-        },
-        "advancedOptions": {}
+        "jsCode": "const claudeResponse = $('Claude: Generate SOW').first().json;\nconst sowHtml = claudeResponse.content?.[0]?.text || claudeResponse.message?.content?.[0]?.text || claudeResponse.text || '';\nconst formData = $('SOW Contract Form').first().json;\nconst fileName = 'SoW-' + (formData.Project_Name || 'Project') + '-' + (formData.Company_Name || 'Client') + '.html';\n\n// Create binary from HTML string\nconst buffer = Buffer.from(sowHtml, 'utf-8');\nreturn [{\n  json: { file_name: fileName, html_length: sowHtml.length },\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/html',\n      fileName: fileName\n    }\n  }\n}];"
       },
       "id": "wf5-node-8",
-      "name": "PDFco: Fill SOW Template",
-      "type": "n8n-nodes-pdfco.PDFco Api",
-      "typeVersion": 1,
-      "position": [1570, 400]
+      "name": "Build SOW HTML Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 400],
+      "notes": "Converts Claude's HTML output into binary data for Google Drive upload. Replaces PDFco — uses Claude + Google Drive for SOW generation."
     },
     {
       "parameters": {
-        "url": "={{ $json.url }}",
-        "options": { "response": { "response": { "responseFormat": "file" } } }
+        "name": "={{ $json.file_name }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "value": "={{ $('Create/Find Client Folder').first().json.id }}", "mode": "id" },
+        "options": {}
       },
       "id": "wf5-node-9",
-      "name": "Download Filled PDF",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [1790, 400]
+      "name": "Upload SOW HTML to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1790, 400],
+      "notes": "Uploads the HTML file to the client's Google Drive folder. The next node converts this to a Google Doc for PDF export."
     },
     {
       "parameters": {
-        "name": "=SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}-Unsigned",
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/copy",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}\",\n  \"mimeType\": \"application/vnd.google-apps.document\",\n  \"parents\": [\"{{ $('Create/Find Client Folder').first().json.id }}\"]\n}",
+        "options": {}
+      },
+      "id": "wf5-node-9b",
+      "name": "Convert to Google Doc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2010, 400],
+      "notes": "Copies the uploaded HTML file as a Google Doc (automatic conversion). This enables PDF export via the Drive API."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/export?mimeType=application/pdf",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "id": "wf5-node-9c",
+      "name": "Export SOW as PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2230, 400],
+      "notes": "Exports the Google Doc as a PDF. The PDF binary is then uploaded to Drive and sent to SignWell."
+    },
+    {
+      "parameters": {
+        "name": "=SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}-Unsigned.pdf",
         "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
-        "folderId": { "__rl": true, "value": "={{ $('Create/Find Client Folder').item.json.id }}", "mode": "id" },
+        "folderId": { "__rl": true, "value": "={{ $('Create/Find Client Folder').first().json.id }}", "mode": "id" },
         "options": {}
       },
       "id": "wf5-node-10",
-      "name": "Upload Contract to Drive",
+      "name": "Upload SOW PDF to Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [2010, 400]
+      "position": [2450, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/permissions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"role\": \"reader\", \"type\": \"anyone\" }",
+        "options": {}
+      },
+      "id": "wf5-node-10b",
+      "name": "Make PDF Downloadable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2670, 400],
+      "notes": "Makes the PDF publicly accessible so SignWell can download it via URL."
     },
     {
       "parameters": {
@@ -192,14 +227,15 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"test_mode\": false,\n  \"draft\": true,\n  \"text_tags\": true,\n  \"name\": \"Veteran Vectors SoW - {{ $('SOW Contract Form').item.json.Project_Name }} - {{ $('SOW Contract Form').item.json.Company_Name }}\",\n  \"files\": [{\n    \"name\": \"SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}.pdf\",\n    \"file_url\": {{ JSON.stringify($('Download Filled PDF').item.json.url || '') }}\n  }],\n  \"recipients\": [\n    { \"id\": 1, \"email\": \"anthony@veteranvectors.io\", \"name\": \"Anthony Pinto\" },\n    { \"id\": 2, \"email\": {{ JSON.stringify($('SOW Contract Form').item.json.Client_Email) }}, \"name\": {{ JSON.stringify($('SOW Contract Form').item.json.Full_Client_Name) }} }\n  ]\n}",
+        "jsonBody": "={\n  \"test_mode\": false,\n  \"draft\": true,\n  \"text_tags\": true,\n  \"name\": \"Veteran Vectors SoW - {{ $('SOW Contract Form').item.json.Project_Name }} - {{ $('SOW Contract Form').item.json.Company_Name }}\",\n  \"files\": [{\n    \"name\": \"SoW-{{ $('SOW Contract Form').item.json.Project_Name }}-{{ $('SOW Contract Form').item.json.Company_Name }}.pdf\",\n    \"file_url\": \"https://drive.google.com/uc?export=download&id={{ $('Upload SOW PDF to Drive').item.json.id }}\"\n  }],\n  \"recipients\": [\n    { \"id\": 1, \"email\": \"anthony@veteranvectors.io\", \"name\": \"Anthony Pinto\" },\n    { \"id\": 2, \"email\": {{ JSON.stringify($('SOW Contract Form').item.json.Client_Email) }}, \"name\": {{ JSON.stringify($('SOW Contract Form').item.json.Full_Client_Name) }} }\n  ]\n}",
         "options": {}
       },
       "id": "wf5-node-11",
       "name": "Create SignWell Document",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [2230, 400]
+      "position": [2890, 400],
+      "notes": "Creates a SignWell document using the PDF from Google Drive. text_tags=true enables [SIGN_HERE_1] and [SIGN_HERE_2] markers placed by Claude in the SOW."
     },
     {
       "parameters": { "amount": 15 },
@@ -207,7 +243,7 @@
       "name": "Wait for SignWell Processing",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2450, 400],
+      "position": [3110, 400],
       "webhookId": "wf5-signwell-wait"
     },
     {
@@ -230,7 +266,7 @@
       "name": "Send Contract for Signing",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [2670, 400]
+      "position": [3330, 400]
     },
     {
       "parameters": {
@@ -396,7 +432,7 @@
       "name": "Update Notion (Contract Sent)",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
-      "position": [2890, 300],
+      "position": [3550, 400],
       "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
@@ -416,7 +452,7 @@
       "name": "Create Notion Project",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
-      "position": [3110, 300],
+      "position": [3770, 400],
       "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
       "parameters": {
         "resource": "databasePage",
@@ -485,22 +521,31 @@
       "main": [[{ "node": "Extract Proposal Text", "type": "main", "index": 0 }]]
     },
     "Extract Proposal Text": {
-      "main": [[{ "node": "Claude: Extract Proposal Details", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Claude: Generate SOW", "type": "main", "index": 0 }]]
     },
-    "Claude: Extract Proposal Details": {
+    "Claude: Generate SOW": {
       "main": [[
         { "node": "Create/Find Client Folder", "type": "main", "index": 0 },
-        { "node": "PDFco: Fill SOW Template", "type": "main", "index": 0 }
+        { "node": "Build SOW HTML Binary", "type": "main", "index": 0 }
       ]]
     },
     "Create/Find Client Folder": { "main": [[]] },
-    "PDFco: Fill SOW Template": {
-      "main": [[{ "node": "Download Filled PDF", "type": "main", "index": 0 }]]
+    "Build SOW HTML Binary": {
+      "main": [[{ "node": "Upload SOW HTML to Drive", "type": "main", "index": 0 }]]
     },
-    "Download Filled PDF": {
-      "main": [[{ "node": "Upload Contract to Drive", "type": "main", "index": 0 }]]
+    "Upload SOW HTML to Drive": {
+      "main": [[{ "node": "Convert to Google Doc", "type": "main", "index": 0 }]]
     },
-    "Upload Contract to Drive": {
+    "Convert to Google Doc": {
+      "main": [[{ "node": "Export SOW as PDF", "type": "main", "index": 0 }]]
+    },
+    "Export SOW as PDF": {
+      "main": [[{ "node": "Upload SOW PDF to Drive", "type": "main", "index": 0 }]]
+    },
+    "Upload SOW PDF to Drive": {
+      "main": [[{ "node": "Make PDF Downloadable", "type": "main", "index": 0 }]]
+    },
+    "Make PDF Downloadable": {
       "main": [[{ "node": "Create SignWell Document", "type": "main", "index": 0 }]]
     },
     "Create SignWell Document": {
@@ -551,7 +596,7 @@
   },
   "active": false,
   "settings": { "executionOrder": "v1", "availableInMCP": true, "callerPolicy": "workflowsFromSameOwner" },
-  "versionId": "wf5-v4-sow-only",
+  "versionId": "wf5-v5-no-pdfco",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []

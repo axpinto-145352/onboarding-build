@@ -21,7 +21,6 @@ Before you start, make sure you have accounts and access to:
 - [ ] **SignWell** — Account for e-signatures
 - [ ] **BlueDot AI** — Account with webhook delivery
 - [ ] **Slack** — Workspace with #onboarding-alerts channel and Bot token
-- [ ] **PDFco** — Account for PDF form filling
 
 ---
 
@@ -47,6 +46,7 @@ If you don't already have one, create a new Notion database with these propertie
 | Call Booked | Checkbox | — |
 | Audit Call | Checkbox | — |
 | Invoice Paid | Checkbox | — |
+| SignWell Doc ID | Rich Text | — |
 | GitHub Repo | Rich Text | — |
 | Last Contact Date | Date | — |
 | Need to Follow Up Date | Date | — |
@@ -216,7 +216,6 @@ Before importing any workflow, replace these placeholders in the JSON files:
 | `YOUR_SIGNWELL_API_KEY` | Your SignWell API key | SignWell Settings |
 | `YOUR_ANTHROPIC_API_KEY` | Your Claude API key | Anthropic Console |
 | `YOUR_FOLLOWUP_CAMPAIGN_ID` | Prosp.ai follow-up campaign ID | Prosp.ai campaign settings |
-| `YOUR_SOW_TEMPLATE_FILE_ID` | Google Drive file ID for SOW PDF template | Google Drive URL |
 | `prod_YOUR_RETAINER_PRODUCT_ID` | Stripe Product ID for retainer services | Stripe Dashboard → Products |
 | `YOUR_GITHUB_USERNAME` | Your GitHub username | GitHub profile |
 | `YOUR_GITHUB_CRED_ID` | n8n GitHub credential ID | n8n Credentials page |
@@ -237,7 +236,6 @@ for f in WF_STEP*.json; do
   sed -i 's/YOUR_SIGNWELL_API_KEY/PASTE_REAL_KEY_HERE/g' "$f"
   sed -i 's/YOUR_ANTHROPIC_API_KEY/PASTE_REAL_KEY_HERE/g' "$f"
   sed -i 's/YOUR_FOLLOWUP_CAMPAIGN_ID/PASTE_REAL_ID_HERE/g' "$f"
-  sed -i 's/YOUR_SOW_TEMPLATE_FILE_ID/PASTE_REAL_ID_HERE/g' "$f"
   sed -i 's/prod_YOUR_RETAINER_PRODUCT_ID/prod_PASTE_REAL_ID_HERE/g' "$f"
 done
 ```
@@ -336,15 +334,10 @@ done
 1. Import `WF_STEP5_SOW_Contract.json`
 2. Assign credentials:
    - Google Drive → OAuth2
-   - PDFco → PDFco API credential
-   - SignWell → "SignWell API"
+   - SignWell → "SignWell API" (HTTP Header Auth)
    - Stripe → Stripe API
    - Notion → "Notion Integration"
-3. **Prepare your SOW PDF template:**
-   - Upload your SOW template to Google Drive
-   - Make sure it has fillable form fields matching the field names in the PDFco node
-   - Copy the file ID from the Drive URL
-4. **Create a Stripe Product:**
+3. **Create a Stripe Product:**
    - Stripe Dashboard → Products → Create → "Veteran Vectors Retainer"
    - Copy the `prod_xxx` Product ID
 5. Save and Activate

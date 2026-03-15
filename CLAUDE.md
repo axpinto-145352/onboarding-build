@@ -17,7 +17,8 @@ When building or modifying n8n workflows, **always use native n8n nodes** instea
 - **Claude/Anthropic**: `@n8n/n8n-nodes-langchain.anthropic` — already in use
 
 **HTTP Request is acceptable for:**
-- Services with no native n8n node (Calendly v2 API, SignWell, Prosp.ai, PDFco)
+- Services with no native n8n node (Calendly v2 API, SignWell, Prosp.ai)
+- Google Drive API operations not available in native node (file copy/conversion, export as PDF, permission setting)
 - Stripe operations not supported by the native node (invoices, invoice items, prices, subscriptions)
 - Generic file downloads
 

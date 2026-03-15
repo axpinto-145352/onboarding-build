@@ -279,10 +279,9 @@ Before you start importing workflows into n8n, make sure you have these written 
 | Google Drive "Clients" Folder ID | Drive URL | WF4, WF4B, WF5 |
 | Stripe Secret Key (`sk_live_...`) | Stripe dashboard | WF5, WF7 |
 | Stripe Retainer Product ID (`prod_...`) | Stripe products page | WF5 |
-| SignWell API Key | SignWell settings | WF5, WF7 |
-| PDFco API Key | PDFco dashboard | WF5 |
+| SignWell API Key | SignWell settings | WF5, WF6 |
+| Prosp.ai API Key | Prosp.ai settings | WF1, WF3A |
 | GitHub Personal Access Token | GitHub settings | WF4, WF4B |
-| SOW PDF Template File ID | Google Drive URL | WF5 |
 
 ---
 
