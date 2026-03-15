@@ -37,3 +37,4 @@ All native Notion nodes should use:
 - Contacts DB: `YOUR_NOTION_CONTACTS_DB_ID`
 - Meetings DB: `YOUR_NOTION_MEETINGS_DB_ID`
 - Projects DB: `YOUR_NOTION_PROJECTS_DB_ID`
+- Tasks (Action Items) DB: `30371d52651c80e0abfae6557752a716`

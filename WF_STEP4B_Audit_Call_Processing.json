@@ -260,6 +260,42 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1350, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $('Parse AI Sections').first().json.action_items || [];\nconst contactId = $('Extract Contact Info').item?.json?.notion_page_id || $('Extract New Contact Info').item?.json?.notion_page_id || '';\nconst contactName = $('Extract Contact Info').item?.json?.contact_name || $('Extract New Contact Info').item?.json?.contact_name || '';\nconst meetingDate = $('Extract Form Data').item.json.meeting_date || new Date().toISOString();\n\nif (items.length === 0) return [];\n\nreturn items.map(item => ({\n  json: {\n    task: item.task || '',\n    owner: item.owner || 'Anthony',\n    priority: item.priority || 'medium',\n    contact_id: contactId,\n    contact_name: contactName,\n    meeting_date: meetingDate\n  }\n}));"
+      },
+      "id": "step4b-node-22",
+      "name": "Split Action Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2010, 540],
+      "notes": "Splits the action_items JSON array from Claude into individual items for batch creation in the Notion Tasks database."
+    },
+    {
+      "id": "step4b-node-23",
+      "name": "Create Notion Task",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2230, 540],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "value": "30371d52651c80e0abfae6557752a716", "mode": "id" },
+        "title": "={{ $json.task }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Assigned To|rich_text", "richTextValue": "={{ $json.owner }}" },
+            { "key": "Contact|relation", "relationValue": ["={{ $json.contact_id }}"] },
+            { "key": "Priority|select", "selectValue": "={{ $json.priority }}" },
+            { "key": "Status|select", "selectValue": "Not Started" },
+            { "key": "Notes|rich_text", "richTextValue": "=Extracted from Audit Call on {{ $json.meeting_date.substring(0, 10) }} with {{ $json.contact_name }}" }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Creates individual action item tasks in the Notion Tasks (Action Items) database, linked to the Contact via relation."
     }
   ],
   "pinData": {},
@@ -309,8 +345,14 @@
           { "node": "Update Notion (Audit Complete)", "type": "main", "index": 0 },
           { "node": "Create Notion Meeting Record (Audit)", "type": "main", "index": 0 },
           { "node": "GitHub: Update Proposal", "type": "main", "index": 0 },
-          { "node": "GitHub: Update Implementation Guide", "type": "main", "index": 0 }
+          { "node": "GitHub: Update Implementation Guide", "type": "main", "index": 0 },
+          { "node": "Split Action Items", "type": "main", "index": 0 }
         ]
+      ]
+    },
+    "Split Action Items": {
+      "main": [
+        [{ "node": "Create Notion Task", "type": "main", "index": 0 }]
       ]
     }
   },
