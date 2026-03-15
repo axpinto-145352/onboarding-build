@@ -36,7 +36,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "databaseId": { "__rl": true, "value": "30371d52651c80b1b5f2d93203b3836b", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {
@@ -85,7 +85,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "create",
-        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "databaseId": { "__rl": true, "value": "30371d52651c80b1b5f2d93203b3836b", "mode": "id" },
         "title": "={{ $('Extract Form Data').first().json.attendee_name }}",
         "propertiesUi": {
           "propertyValues": [
@@ -130,7 +130,7 @@
         "resource": "folder",
         "name": "={{ $json.folder_name }}",
         "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
-        "folderId": { "__rl": true, "value": "YOUR_CLIENTS_FOLDER_ID", "mode": "id" },
+        "folderId": { "__rl": true, "value": "1ys0F-oxyvnhdGnK3cE09cJSw6NTHHKO1", "mode": "id" },
         "options": {}
       },
       "id": "step4-node-7a",
@@ -157,7 +157,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.github.com/repos/YOUR_GITHUB_USERNAME/vv-client-template/generate",
+        "url": "https://api.github.com/repos/axpinto-145352/vv-client-template/generate",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -168,7 +168,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"owner\": \"YOUR_GITHUB_USERNAME\",\n  \"name\": {{ JSON.stringify($('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name) }},\n  \"description\": {{ JSON.stringify('Veteran Vectors client project \\u2014 ' + ($('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name)) }},\n  \"private\": true,\n  \"include_all_branches\": false\n}",
+        "jsonBody": "={\n  \"owner\": \"axpinto-145352\",\n  \"name\": {{ JSON.stringify($('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name) }},\n  \"description\": {{ JSON.stringify('Veteran Vectors client project \\u2014 ' + ($('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name)) }},\n  \"private\": true,\n  \"include_all_branches\": false\n}",
         "options": {}
       },
       "id": "step4-node-13",
@@ -176,11 +176,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2230, 120],
-      "notes": "Creates a new private GitHub repo from the 'vv-client-template' template repo. The template repo should contain all 8 Skills files pre-loaded in a Skills/ folder. Replace YOUR_GITHUB_USERNAME with your GitHub username. Create the template repo once with: Skills/*.md files, a README, and mark it as a template in GitHub Settings."
+      "notes": "Creates a new private GitHub repo from the 'vv-client-template' template repo. The template repo should contain all 8 Skills files pre-loaded in a Skills/ folder. Replace axpinto-145352 with your GitHub username. Create the template repo once with: Skills/*.md files, a README, and mark it as a template in GitHub Settings."
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name }}",
         "filePath": "=transcripts/discovery-call-{{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}.md",
         "commitMessage": "=Add discovery call transcript - {{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}",
@@ -226,7 +226,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '';\n\n// Parse sections by markers\nfunction getSection(text, marker) {\n  const start = text.indexOf(marker);\n  if (start === -1) return '';\n  const afterMarker = text.substring(start + marker.length);\n  // Find next section marker or end\n  const nextMarker = afterMarker.search(/===\\w+===/); \n  return nextMarker === -1 ? afterMarker.trim() : afterMarker.substring(0, nextMarker).trim();\n}\n\nconst meetingNotes = getSection(raw, '===MEETING_NOTES===');\nconst proposal = getSection(raw, '===PROPOSAL===');\nconst implementationGuide = getSection(raw, '===IMPLEMENTATION_GUIDE===');\nconst actionItemsRaw = getSection(raw, '===ACTION_ITEMS===');\n\n// Parse action items JSON\nlet actionItems = [];\ntry {\n  const jsonMatch = actionItemsRaw.match(/\\[.*\\]/s);\n  if (jsonMatch) actionItems = JSON.parse(jsonMatch[0]);\n} catch(e) { /* AI didn't return valid JSON, fallback to empty */ }\n\nreturn [{ json: {\n  meeting_notes: meetingNotes,\n  proposal: proposal,\n  implementation_guide: implementationGuide,\n  action_items: actionItems,\n  action_items_text: actionItems.map(a => `[${a.priority}] ${a.owner}: ${a.task}`).join('\\n'),\n  full_response: raw\n}}];"
+        "jsCode": "const raw = $json.content?.[0]?.text || $json.message?.content?.[0]?.text || $json.text || '';\n\n// Parse sections by markers\nfunction getSection(text, marker) {\n  const start = text.indexOf(marker);\n  if (start === -1) return '';\n  const afterMarker = text.substring(start + marker.length);\n  const nextMarker = afterMarker.search(/===\\w+===/);\n  return nextMarker === -1 ? afterMarker.trim() : afterMarker.substring(0, nextMarker).trim();\n}\n\nlet meetingNotes = getSection(raw, '===MEETING_NOTES===');\nlet proposal = getSection(raw, '===PROPOSAL===');\nlet implementationGuide = getSection(raw, '===IMPLEMENTATION_GUIDE===');\nlet actionItemsRaw = getSection(raw, '===ACTION_ITEMS===');\n\n// Fallback: if section markers not found, try markdown headings\nif (!meetingNotes && !proposal) {\n  const headingPattern = /^#{1,3}\\s+/m;\n  if (headingPattern.test(raw)) {\n    const sections = raw.split(/^#{1,2}\\s+/m).filter(s => s.trim());\n    meetingNotes = sections[0] || raw.substring(0, 2000);\n    proposal = sections[1] || '';\n    implementationGuide = sections[2] || '';\n    actionItemsRaw = sections[3] || '';\n  } else {\n    // No structure found at all - put everything in meeting notes\n    meetingNotes = raw.substring(0, 3000);\n    proposal = '(Could not parse proposal section - see full response in meeting notes)';\n  }\n}\n\n// Parse action items JSON\nlet actionItems = [];\ntry {\n  const jsonMatch = actionItemsRaw.match(/\\[[\\s\\S]*\\]/);\n  if (jsonMatch) actionItems = JSON.parse(jsonMatch[0]);\n} catch(e) { /* AI didn't return valid JSON, fallback to empty */ }\n\nreturn [{ json: {\n  meeting_notes: meetingNotes || '(No meeting notes parsed)',\n  proposal: proposal || '(No proposal parsed)',\n  implementation_guide: implementationGuide || '(No implementation guide parsed)',\n  action_items: actionItems,\n  action_items_text: actionItems.length > 0 ? actionItems.map(a => `[${a.priority || 'medium'}] ${a.owner || 'TBD'}: ${a.task || ''}`).join('\\n') : '(No action items parsed)',\n  full_response: raw\n}}];"
       },
       "id": "step4-node-15",
       "name": "Parse AI Sections",
@@ -266,7 +266,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "create",
-        "databaseId": { "__rl": true, "value": "YOUR_NOTION_MEETINGS_DB_ID", "mode": "id" },
+        "databaseId": { "__rl": true, "value": "30371d52651c80a9a9ffdfaf0b135480", "mode": "id" },
         "title": "={{ $('Extract Form Data').item.json.meeting_title || 'Discovery Call' }}",
         "propertiesUi": {
           "propertyValues": [
@@ -283,7 +283,7 @@
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name }}",
         "filePath": "proposals/proposal-draft.md",
         "commitMessage": "Add AI-generated proposal draft from discovery call",
@@ -299,7 +299,7 @@
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name }}",
         "filePath": "docs/implementation-guide.md",
         "commitMessage": "Add AI-generated implementation guide from discovery call",
@@ -338,7 +338,7 @@
         "sendTo": "={{ $('Extract Contact Info').item.json?.contact_email || $('Extract New Contact Info').item.json?.contact_email }}",
         "subject": "=Veteran Vectors \u2014 Proposal for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}",
         "emailType": "html",
-        "message": "=<h2>Proposal for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}</h2>\n<p>Hi {{ ($('Extract Contact Info').item.json?.contact_name || $('Extract New Contact Info').item.json?.contact_name || '').split(' ')[0] }},</p>\n<p>Great chatting with you! As promised, here\u2019s a summary of what we discussed and what I\u2019m recommending for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}.</p>\n<hr>\n{{ $json.proposal.substring(0, 3000).replace(/\\n/g, '<br>') }}\n<hr>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>Review this proposal and share any feedback</li>\n<li>Schedule an audit call so we can dive deeper: <a href='YOUR_AUDIT_CALENDLY_LINK'>Book Audit Call</a></li>\n<li>We\u2019ll refine the scope and prepare a formal Statement of Work</li>\n</ol>\n<p>Looking forward to it!</p>\n<p>\u2014 Anthony, Veteran Vectors</p>",
+        "message": "=<h2>Proposal for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}</h2>\n<p>Hi {{ ($('Extract Contact Info').item.json?.contact_name || $('Extract New Contact Info').item.json?.contact_name || '').split(' ')[0] }},</p>\n<p>Great chatting with you! As promised, here\u2019s a summary of what we discussed and what I\u2019m recommending for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}.</p>\n<hr>\n{{ $json.proposal.substring(0, 3000).replace(/\\n/g, '<br>') }}\n<hr>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>Review this proposal and share any feedback</li>\n<li>Schedule an audit call so we can dive deeper: <a href='https://calendly.com/anthony-veteranvectors/veteran-vectors-45-min-audit-call'>Book Audit Call</a></li>\n<li>We\u2019ll refine the scope and prepare a formal Statement of Work</li>\n</ol>\n<p>Looking forward to it!</p>\n<p>\u2014 Anthony, Veteran Vectors</p>",
         "options": {}
       },
       "id": "step4-node-19",
@@ -347,7 +347,43 @@
       "typeVersion": 2,
       "position": [3110, 360],
       "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } },
-      "notes": "Creates a DRAFT proposal email for Anthony to review before sending. Uses Gmail createDraft operation. Replace YOUR_AUDIT_CALENDLY_LINK with the actual Calendly audit call link."
+      "notes": "Creates a DRAFT proposal email for Anthony to review before sending. Uses Gmail createDraft operation. Replace https://calendly.com/anthony-veteranvectors/veteran-vectors-45-min-audit-call with the actual Calendly audit call link."
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $('Parse AI Sections').first().json.action_items || [];\nconst contactId = $('Extract Contact Info').item?.json?.notion_page_id || $('Extract New Contact Info').item?.json?.notion_page_id || '';\nconst contactName = $('Extract Contact Info').item?.json?.contact_name || $('Extract New Contact Info').item?.json?.contact_name || '';\nconst meetingDate = $('Extract Form Data').item.json.meeting_date || new Date().toISOString();\n\nif (items.length === 0) return [];\n\nreturn items.map(item => ({\n  json: {\n    task: item.task || '',\n    owner: item.owner || 'Anthony',\n    priority: item.priority || 'medium',\n    contact_id: contactId,\n    contact_name: contactName,\n    meeting_date: meetingDate\n  }\n}));"
+      },
+      "id": "step4-node-22",
+      "name": "Split Action Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2670, 700],
+      "notes": "Splits the action_items JSON array from Claude into individual items for batch creation in the Notion Tasks database."
+    },
+    {
+      "id": "step4-node-23",
+      "name": "Create Notion Task",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2890, 700],
+      "credentials": { "notionApi": { "id": "YOUR_NOTION_CRED_ID", "name": "Notion account" } },
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": { "__rl": true, "value": "30371d52651c80e0abfae6557752a716", "mode": "id" },
+        "title": "={{ $json.task }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Assigned To|rich_text", "richTextValue": "={{ $json.owner }}" },
+            { "key": "Contact|relation", "relationValue": ["={{ $json.contact_id }}"] },
+            { "key": "Priority|select", "selectValue": "={{ $json.priority }}" },
+            { "key": "Status|select", "selectValue": "Not Started" },
+            { "key": "Notes|rich_text", "richTextValue": "=Extracted from Discovery Call on {{ $json.meeting_date.substring(0, 10) }} with {{ $json.contact_name }}" }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Creates individual action item tasks in the Notion Tasks (Action Items) database, linked to the Contact via relation."
     }
   ],
   "pinData": {},
@@ -407,8 +443,14 @@
           { "node": "GitHub: Upload Proposal", "type": "main", "index": 0 },
           { "node": "GitHub: Upload Implementation Guide", "type": "main", "index": 0 },
           { "node": "Save GitHub Repo to Notion", "type": "main", "index": 0 },
-          { "node": "Draft Proposal Email", "type": "main", "index": 0 }
+          { "node": "Draft Proposal Email", "type": "main", "index": 0 },
+          { "node": "Split Action Items", "type": "main", "index": 0 }
         ]
+      ]
+    },
+    "Split Action Items": {
+      "main": [
+        [{ "node": "Create Notion Task", "type": "main", "index": 0 }]
       ]
     }
   },
@@ -418,7 +460,7 @@
     "availableInMCP": true,
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "step4-v4-webhook-contact-create",
+  "versionId": "step4-v5-parse-validation",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []

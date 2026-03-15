@@ -44,7 +44,7 @@
         "operation": "getAll",
         "databaseId": {
           "__rl": true,
-          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "value": "30371d52651c80b1b5f2d93203b3836b",
           "mode": "id"
         },
         "returnAll": true,
@@ -264,7 +264,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.prosp.ai/v1/campaigns/YOUR_FOLLOWUP_CAMPAIGN_ID/prospects",
+        "url": "https://api.prosp.ai/v1/campaigns/86528697-3f57-4fc6-8e44-60a05b60ffe0/prospects",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -291,7 +291,7 @@
         2060,
         100
       ],
-      "notes": "Adds the contact to the Prosp.ai follow-up Loom video campaign (3-message sequence). Replace YOUR_FOLLOWUP_CAMPAIGN_ID with your Prosp.ai follow-up campaign ID. Set up HTTP Header Auth with your Prosp.ai API key.",
+      "notes": "Adds the contact to the Prosp.ai follow-up Loom video campaign (3-message sequence). Replace 86528697-3f57-4fc6-8e44-60a05b60ffe0 with your Prosp.ai follow-up campaign ID. Set up HTTP Header Auth with your Prosp.ai API key.",
       "onError": "continueErrorOutput"
     },
     {

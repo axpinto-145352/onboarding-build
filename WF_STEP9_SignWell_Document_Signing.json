@@ -99,7 +99,7 @@
           "parameters": [
             {
               "name": "X-Api-Key",
-              "value": "YOUR_SIGNWELL_API_KEY"
+              "value": "YWNjZXNzOmQ5NjU5MjM2NjIxYmE4OTkxNTNhZGJiMTg3ZDQwYzYy"
             },
             {
               "name": "Content-Type",
@@ -145,7 +145,7 @@
           "parameters": [
             {
               "name": "X-Api-Key",
-              "value": "YOUR_SIGNWELL_API_KEY"
+              "value": "YWNjZXNzOmQ5NjU5MjM2NjIxYmE4OTkxNTNhZGJiMTg3ZDQwYzYy"
             },
             {
               "name": "Content-Type",

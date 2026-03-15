@@ -143,7 +143,7 @@
         "operation": "getAll",
         "databaseId": {
           "__rl": true,
-          "value": "YOUR_NOTION_CONTACTS_DB_ID",
+          "value": "30371d52651c80b1b5f2d93203b3836b",
           "mode": "id"
         },
         "returnAll": true,

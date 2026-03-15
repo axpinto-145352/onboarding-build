@@ -17,7 +17,8 @@ When building or modifying n8n workflows, **always use native n8n nodes** instea
 - **Claude/Anthropic**: `@n8n/n8n-nodes-langchain.anthropic` — already in use
 
 **HTTP Request is acceptable for:**
-- Services with no native n8n node (Calendly v2 API, SignWell, Prosp.ai, PDFco)
+- Services with no native n8n node (Calendly v2 API, SignWell, Prosp.ai)
+- Google Drive API operations not available in native node (file copy/conversion, export as PDF, permission setting)
 - Stripe operations not supported by the native node (invoices, invoice items, prices, subscriptions)
 - Generic file downloads
 
@@ -33,6 +34,7 @@ All native Notion nodes should use:
 ```
 
 ### Notion Database IDs
-- Contacts DB: `YOUR_NOTION_CONTACTS_DB_ID`
-- Meetings DB: `YOUR_NOTION_MEETINGS_DB_ID`
-- Projects DB: `YOUR_NOTION_PROJECTS_DB_ID`
+- Contacts DB: `30371d52651c80b1b5f2d93203b3836b`
+- Meetings DB: `30371d52651c80a9a9ffdfaf0b135480`
+- Projects DB: `30371d52651c801d99dcddc8774d8f79`
+- Tasks (Action Items) DB: `30371d52651c80e0abfae6557752a716`

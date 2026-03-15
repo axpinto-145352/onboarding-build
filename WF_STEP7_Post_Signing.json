@@ -22,7 +22,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "databaseId": { "__rl": true, "value": "30371d52651c80b1b5f2d93203b3836b", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {
@@ -156,7 +156,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": { "__rl": true, "value": "YOUR_NOTION_PROJECTS_DB_ID", "mode": "id" },
+        "databaseId": { "__rl": true, "value": "30371d52651c801d99dcddc8774d8f79", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {

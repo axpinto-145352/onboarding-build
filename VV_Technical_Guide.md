@@ -19,8 +19,7 @@ This document describes the technical architecture of the 8-step LinkedIn-to-Cli
 | **Source Code & Docs** | GitHub | Client repos (proposals, implementation guides, Skills, transcripts) | Personal account with PAT |
 | **E-Signatures** | SignWell | SOW/contract signing with completion webhooks | Business plan |
 | **Payments** | Stripe | Invoices (draft → send), retainer subscriptions (paused → active) | Standard account |
-| **Document Storage** | Google Drive | Client folders, transcripts, proposals, signed contracts | Google Workspace |
-| **Document Generation** | PDFco | PDF form filling for SOW template | API access |
+| **Document Storage** | Google Drive | Client folders, transcripts, proposals, signed contracts, SOW generation (HTML→Doc→PDF) | Google Workspace |
 | **Email** | Gmail (OAuth2) | Approval emails, cancellation emails, reminders, welcome emails | Google Workspace |
 | **Notifications** | Slack | #onboarding-alerts channel for pipeline events | Workspace with Bot token |
 | **Workflow Engine** | n8n | Orchestrates all 8 steps | Self-hosted or Cloud |

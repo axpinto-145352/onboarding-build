@@ -19,7 +19,7 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" }] },
+        "headerParameters": { "parameters": [{ "name": "X-Api-Key", "value": "YWNjZXNzOmQ5NjU5MjM2NjIxYmE4OTkxNTNhZGJiMTg3ZDQwYzYy" }] },
         "options": {}
       },
       "id": "wf6-node-2",
@@ -71,7 +71,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": { "__rl": true, "value": "YOUR_NOTION_CONTACTS_DB_ID", "mode": "id" },
+        "databaseId": { "__rl": true, "value": "30371d52651c80b1b5f2d93203b3836b", "mode": "id" },
         "returnAll": true,
         "filterType": "manual",
         "filters": {
@@ -98,7 +98,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nconst currentStatus = props?.Status?.select?.name || '';\n\n// Only process contacts with 'Contract Sent' status (SOW sent but not yet signed)\nif (currentStatus !== 'Contract Sent') {\n  return [{ json: { _skip: true, reason: 'Status is ' + currentStatus + ', not Contract Sent' } }];\n}\n\nreturn [{ json: {\n  _skip: false,\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  current_status: currentStatus\n}}];"
+        "jsCode": "const contact = $('Find Notion Contact').first().json;\nconst props = contact.properties;\nconst currentStatus = props?.Status?.select?.name || '';\n\n// Only process contacts with 'Contract Sent' status (SOW sent but not yet signed)\nif (currentStatus !== 'Contract Sent') {\n  return [{ json: { _skip: true, reason: 'Status is ' + currentStatus + ', not Contract Sent' } }];\n}\n\n// Dedup: skip if this exact SignWell document was already processed\nconst existingDocId = props['SignWell Doc ID']?.rich_text?.[0]?.text?.content || '';\nconst currentDocId = $('Loop Documents').first().json.doc_id || '';\nif (existingDocId && existingDocId === currentDocId) {\n  return [{ json: { _skip: true, reason: 'Already processed SignWell doc ' + currentDocId } }];\n}\n\nreturn [{ json: {\n  _skip: false,\n  notion_page_id: contact.id,\n  contact_name: props['Name']?.title?.[0]?.text?.content || 'Unknown',\n  contact_email: props['Email']?.email || '',\n  company_name: props['Company']?.rich_text?.[0]?.text?.content || '',\n  drive_folder_id: props['Drive Folder ID']?.rich_text?.[0]?.text?.content || '',\n  stripe_invoice_id: props['Stripe Invoice ID']?.rich_text?.[0]?.text?.content || '',\n  current_status: currentStatus\n}}];"
       },
       "id": "wf6-node-8",
       "name": "Extract Contact + Check Status",
@@ -203,7 +203,8 @@
         "propertiesUi": {
           "propertyValues": [
             { "key": "Status|select", "selectValue": "Contract Signed" },
-            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true }
+            { "key": "Last Contact Date|date", "dateValue": "={{ $now.toISO() }}", "includeTime": true },
+            { "key": "SignWell Doc ID|rich_text", "richTextValue": "={{ $('Loop Documents').first().json.doc_id }}" }
           ]
         },
         "options": {}
@@ -281,7 +282,7 @@
   },
   "active": false,
   "settings": { "executionOrder": "v1", "availableInMCP": true, "callerPolicy": "workflowsFromSameOwner" },
-  "versionId": "wf6-v1-invoice-send",
+  "versionId": "wf6-v2-dedup",
   "meta": { "templateCredsSetupCompleted": false },
   "id": "",
   "tags": []
