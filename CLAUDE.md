@@ -34,7 +34,7 @@ All native Notion nodes should use:
 ```
 
 ### Notion Database IDs
-- Contacts DB: `YOUR_NOTION_CONTACTS_DB_ID`
-- Meetings DB: `YOUR_NOTION_MEETINGS_DB_ID`
-- Projects DB: `YOUR_NOTION_PROJECTS_DB_ID`
+- Contacts DB: `30371d52651c80b1b5f2d93203b3836b`
+- Meetings DB: `30371d52651c80a9a9ffdfaf0b135480`
+- Projects DB: `30371d52651c801d99dcddc8774d8f79`
 - Tasks (Action Items) DB: `30371d52651c80e0abfae6557752a716`

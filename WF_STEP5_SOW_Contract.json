@@ -457,7 +457,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "create",
-        "databaseId": { "__rl": true, "value": "YOUR_NOTION_PROJECTS_DB_ID", "mode": "id" },
+        "databaseId": { "__rl": true, "value": "30371d52651c801d99dcddc8774d8f79", "mode": "id" },
         "title": "={{ $('SOW Contract Form').item.json.Project_Name }}",
         "propertiesUi": {
           "propertyValues": [
