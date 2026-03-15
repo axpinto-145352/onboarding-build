@@ -116,7 +116,7 @@
         "resource": "folder",
         "name": "={{ $('SOW Contract Form').item.json.Company_Name }}-{{ $('SOW Contract Form').item.json.Full_Client_Name }}",
         "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
-        "folderId": { "__rl": true, "value": "YOUR_CLIENTS_FOLDER_ID", "mode": "id" },
+        "folderId": { "__rl": true, "value": "1ys0F-oxyvnhdGnK3cE09cJSw6NTHHKO1", "mode": "id" },
         "options": {}
       },
       "id": "wf5-node-7",
@@ -221,7 +221,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" },
+            { "name": "X-Api-Key", "value": "YWNjZXNzOmQ5NjU5MjM2NjIxYmE4OTkxNTNhZGJiMTg3ZDQwYzYy" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
@@ -253,7 +253,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" },
+            { "name": "X-Api-Key", "value": "YWNjZXNzOmQ5NjU5MjM2NjIxYmE4OTkxNTNhZGJiMTg3ZDQwYzYy" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },

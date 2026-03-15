@@ -130,7 +130,7 @@
         "resource": "folder",
         "name": "={{ $json.folder_name }}",
         "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
-        "folderId": { "__rl": true, "value": "YOUR_CLIENTS_FOLDER_ID", "mode": "id" },
+        "folderId": { "__rl": true, "value": "1ys0F-oxyvnhdGnK3cE09cJSw6NTHHKO1", "mode": "id" },
         "options": {}
       },
       "id": "step4-node-7a",
@@ -157,7 +157,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.github.com/repos/YOUR_GITHUB_USERNAME/vv-client-template/generate",
+        "url": "https://api.github.com/repos/axpinto-145352/vv-client-template/generate",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendHeaders": true,
@@ -168,7 +168,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"owner\": \"YOUR_GITHUB_USERNAME\",\n  \"name\": {{ JSON.stringify($('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name) }},\n  \"description\": {{ JSON.stringify('Veteran Vectors client project \\u2014 ' + ($('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name)) }},\n  \"private\": true,\n  \"include_all_branches\": false\n}",
+        "jsonBody": "={\n  \"owner\": \"axpinto-145352\",\n  \"name\": {{ JSON.stringify($('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name) }},\n  \"description\": {{ JSON.stringify('Veteran Vectors client project \\u2014 ' + ($('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name)) }},\n  \"private\": true,\n  \"include_all_branches\": false\n}",
         "options": {}
       },
       "id": "step4-node-13",
@@ -176,11 +176,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2230, 120],
-      "notes": "Creates a new private GitHub repo from the 'vv-client-template' template repo. The template repo should contain all 8 Skills files pre-loaded in a Skills/ folder. Replace YOUR_GITHUB_USERNAME with your GitHub username. Create the template repo once with: Skills/*.md files, a README, and mark it as a template in GitHub Settings."
+      "notes": "Creates a new private GitHub repo from the 'vv-client-template' template repo. The template repo should contain all 8 Skills files pre-loaded in a Skills/ folder. Replace axpinto-145352 with your GitHub username. Create the template repo once with: Skills/*.md files, a README, and mark it as a template in GitHub Settings."
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name }}",
         "filePath": "=transcripts/discovery-call-{{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}.md",
         "commitMessage": "=Add discovery call transcript - {{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}",
@@ -283,7 +283,7 @@
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name }}",
         "filePath": "proposals/proposal-draft.md",
         "commitMessage": "Add AI-generated proposal draft from discovery call",
@@ -299,7 +299,7 @@
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json?.github_repo_name || $('Extract New Contact Info').item.json?.github_repo_name }}",
         "filePath": "docs/implementation-guide.md",
         "commitMessage": "Add AI-generated implementation guide from discovery call",
@@ -338,7 +338,7 @@
         "sendTo": "={{ $('Extract Contact Info').item.json?.contact_email || $('Extract New Contact Info').item.json?.contact_email }}",
         "subject": "=Veteran Vectors \u2014 Proposal for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}",
         "emailType": "html",
-        "message": "=<h2>Proposal for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}</h2>\n<p>Hi {{ ($('Extract Contact Info').item.json?.contact_name || $('Extract New Contact Info').item.json?.contact_name || '').split(' ')[0] }},</p>\n<p>Great chatting with you! As promised, here\u2019s a summary of what we discussed and what I\u2019m recommending for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}.</p>\n<hr>\n{{ $json.proposal.substring(0, 3000).replace(/\\n/g, '<br>') }}\n<hr>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>Review this proposal and share any feedback</li>\n<li>Schedule an audit call so we can dive deeper: <a href='YOUR_AUDIT_CALENDLY_LINK'>Book Audit Call</a></li>\n<li>We\u2019ll refine the scope and prepare a formal Statement of Work</li>\n</ol>\n<p>Looking forward to it!</p>\n<p>\u2014 Anthony, Veteran Vectors</p>",
+        "message": "=<h2>Proposal for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}</h2>\n<p>Hi {{ ($('Extract Contact Info').item.json?.contact_name || $('Extract New Contact Info').item.json?.contact_name || '').split(' ')[0] }},</p>\n<p>Great chatting with you! As promised, here\u2019s a summary of what we discussed and what I\u2019m recommending for {{ $('Extract Contact Info').item.json?.company_name || $('Extract New Contact Info').item.json?.company_name }}.</p>\n<hr>\n{{ $json.proposal.substring(0, 3000).replace(/\\n/g, '<br>') }}\n<hr>\n<p><strong>Next Steps:</strong></p>\n<ol>\n<li>Review this proposal and share any feedback</li>\n<li>Schedule an audit call so we can dive deeper: <a href='https://calendly.com/anthony-veteranvectors/veteran-vectors-45-min-audit-call'>Book Audit Call</a></li>\n<li>We\u2019ll refine the scope and prepare a formal Statement of Work</li>\n</ol>\n<p>Looking forward to it!</p>\n<p>\u2014 Anthony, Veteran Vectors</p>",
         "options": {}
       },
       "id": "step4-node-19",
@@ -347,7 +347,7 @@
       "typeVersion": 2,
       "position": [3110, 360],
       "credentials": { "gmailOAuth2": { "id": "r13jnGsjwNOqcBvt", "name": "VV Gmail account" } },
-      "notes": "Creates a DRAFT proposal email for Anthony to review before sending. Uses Gmail createDraft operation. Replace YOUR_AUDIT_CALENDLY_LINK with the actual Calendly audit call link."
+      "notes": "Creates a DRAFT proposal email for Anthony to review before sending. Uses Gmail createDraft operation. Replace https://calendly.com/anthony-veteranvectors/veteran-vectors-45-min-audit-call with the actual Calendly audit call link."
     },
     {
       "parameters": {

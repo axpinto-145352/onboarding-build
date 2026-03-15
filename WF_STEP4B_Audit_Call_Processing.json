@@ -79,7 +79,7 @@
       "parameters": {
         "name": "=audit-call-{{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}.txt",
         "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
-        "folderId": { "__rl": true, "value": "={{ $json.existing_folder_id || 'YOUR_CLIENTS_FOLDER_ID' }}", "mode": "id" },
+        "folderId": { "__rl": true, "value": "={{ $json.existing_folder_id || '1ys0F-oxyvnhdGnK3cE09cJSw6NTHHKO1' }}", "mode": "id" },
         "content": "={{ $('Extract Form Data').item.json.transcript }}",
         "options": {}
       },
@@ -93,7 +93,7 @@
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $json.github_repo_name }}",
         "filePath": "=transcripts/audit-call-{{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}.md",
         "commitMessage": "=Add audit call transcript - {{ $('Extract Form Data').item.json.meeting_date.substring(0, 10) || $now.toISODate() }}",
@@ -194,7 +194,7 @@
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json.github_repo_name || $('Extract New Contact Info').item.json.github_repo_name }}",
         "operation": "edit",
         "filePath": "proposals/proposal-draft.md",
@@ -212,7 +212,7 @@
     },
     {
       "parameters": {
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "axpinto-145352",
         "repository": "={{ $('Extract Contact Info').item.json.github_repo_name || $('Extract New Contact Info').item.json.github_repo_name }}",
         "operation": "edit",
         "filePath": "docs/implementation-guide.md",

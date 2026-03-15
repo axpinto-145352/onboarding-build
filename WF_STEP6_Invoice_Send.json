@@ -19,7 +19,7 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "X-Api-Key", "value": "YOUR_SIGNWELL_API_KEY" }] },
+        "headerParameters": { "parameters": [{ "name": "X-Api-Key", "value": "YWNjZXNzOmQ5NjU5MjM2NjIxYmE4OTkxNTNhZGJiMTg3ZDQwYzYy" }] },
         "options": {}
       },
       "id": "wf6-node-2",
